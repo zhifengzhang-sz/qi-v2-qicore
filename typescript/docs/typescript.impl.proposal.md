@@ -2,620 +2,819 @@
 
 ## Executive Summary
 
-This proposal outlines the TypeScript implementation strategy for QiCore Foundation v-0.3.x, focusing on **basic functionality implementation** as defined in the official version strategy. The TypeScript implementation will validate cross-language behavioral contracts while providing a production-ready foundation for modern JavaScript/TypeScript applications.
+This proposal outlines a **TypeScript-native implementation** of QiCore Foundation that leverages TypeScript's unique strengths rather than forcing Haskell patterns. The implementation will maintain behavioral contracts while embracing TypeScript's modern ecosystem, excellent tooling, and JavaScript runtime characteristics.
+
+### Core Philosophy: TypeScript-First Design
+
+- **Leverage TypeScript Strengths**: Advanced type system, excellent tooling, async/await, native JSON/Object handling
+- **Embrace JavaScript Runtime**: Event loop, Promise-based async, prototype-based objects, V8 optimizations
+- **Modern TypeScript Patterns**: Template literal types, conditional types, mapped types, branded types
+- **Native Ecosystem Integration**: Node.js/Bun runtime, npm ecosystem, existing JavaScript libraries
+- **Contract Compliance**: Maintain mathematical laws and behavioral contracts without forcing Haskell idioms
 
 ### Key Objectives (v-0.3.x Scope)
 
-- **Basic Functionality Complete**: Implement all qi/base and qi/core basic functionality as defined in VERSION_STRATEGY.md
-- **Cross-Language Contract Validation**: Prove behavioral consistency with Haskell reference implementation (v-0.2.4)
-- **Mathematical Compliance**: Maintain Functor/Monad/Applicative law adherence with identical test cases
-- **Production Readiness**: Deliver performant, type-safe implementation for enterprise TypeScript/JavaScript use
-- **Zero Fake/Stub Code**: All unimplemented features explicitly documented, no basic functionality gaps
+- **TypeScript-Native Architecture**: Design patterns that feel natural in TypeScript, not Haskell translations
+- **JavaScript Runtime Optimization**: Leverage V8/Bun JIT, async I/O, and JavaScript object performance
+- **Modern Type System**: Use TypeScript 5.x advanced features for type safety and developer experience
+- **Ecosystem Harmony**: Integrate seamlessly with existing JavaScript/TypeScript tooling and libraries
+- **Contract Compliance**: Prove behavioral consistency through different implementation approaches
 
-### Excluded from v-0.3.x (Reserved for v-1.x.x Advanced Features)
+## TypeScript-Native Architecture
 
-- ❌ HTTP clients and advanced networking
-- ❌ Advanced authentication (OAuth, JWT)  
-- ❌ Circuit breakers and resilience patterns
-- ❌ Metrics collection and aggregation
-- ❌ Database integrations and ORM patterns
-- ❌ Message queue integrations
-- ❌ Performance profiling and JIT optimizations
+### 1. Result<T> Implementation: Native Union Types
 
-## Architecture Overview
-
-### Implementation Strategy
-
-Following the proven Haskell architecture with TypeScript-specific adaptations:
+Instead of forcing monadic patterns, use TypeScript's excellent union type system:
 
 ```typescript
-// Core Result<T> type with monadic operations
-type Result<T, E = QiError> = Success<T> | Failure<E>
+// TypeScript-native discriminated unions (not Haskell-style monads)
+export type Result<T, E = QiError> = 
+  | { readonly tag: 'success'; readonly value: T }
+  | { readonly tag: 'failure'; readonly error: E }
 
-// Configuration with monoid semantics  
-class ConfigData implements Monoid<ConfigData> {
-  static empty(): ConfigData
-  concat(other: ConfigData): ConfigData  // Right-biased merge
+// TypeScript pattern matching with exhaustive checking
+export const match = <T, E, R>(
+  result: Result<T, E>,
+  cases: {
+    success: (value: T) => R
+    failure: (error: E) => R
+  }
+): R => {
+  switch (result.tag) {
+    case 'success': return cases.success(result.value)
+    case 'failure': return cases.failure(result.error)
+  }
 }
 
-// Logger with OpenTelemetry integration
-class Logger {
-  private readonly config: Atomic<LoggerConfig>
-  private readonly context: Atomic<LogContext>
-}
+// Fluent API that feels natural in TypeScript
+export class ResultBuilder<T, E = QiError> {
+  constructor(private readonly result: Result<T, E>) {}
 
-// Cache with async-safe operations
-class Cache {
-  private readonly entries: Map<string, CacheEntry>
-  private readonly accessOrder: string[]
-}
-```
+  map<U>(fn: (value: T) => U): ResultBuilder<U, E> {
+    return new ResultBuilder(
+      this.result.tag === 'success'
+        ? { tag: 'success', value: fn(this.result.value) }
+        : this.result
+    )
+  }
 
-### Cross-Language Adaptations
+  flatMap<U>(fn: (value: T) => Result<U, E>): ResultBuilder<U, E> {
+    return new ResultBuilder(
+      this.result.tag === 'success'
+        ? fn(this.result.value)
+        : this.result
+    )
+  }
 
-| Component | Haskell Pattern | TypeScript Adaptation | Rationale |
-|-----------|-----------------|----------------------|-----------|
-| **Concurrency** | STM transactions | Async/await + locks | No native STM; use atomic operations |
-| **Error Handling** | Pure Result<T> | Manual Result<T> | No exception throwing |
-| **Type Safety** | Compile-time | Runtime + compile-time | Hybrid validation approach |
-| **Property Testing** | QuickCheck | fast-check | Identical test cases |
-| **Monoid Operations** | Native typeclass | Manual implementation | Operator overloading |
-
-## Package Selection and Technology Stack
-
-### Core Dependencies
-
-#### 1. Result<T> Monad Implementation: **Effect-TS**
-```json
-{
-  "effect": "^3.9.0",
-  "@effect/platform": "^0.67.0"
-}
-```
-
-**Rationale**: 
-- Effect-TS is the evolution of fp-ts (merger in 2025) with comprehensive ecosystem
-- Native Result<T> type: `Effect<A, E, R>` maps to our `Result<A, E>`
-- Built-in async/await integration with proper error handling
-- Mature ecosystem with 5M+ weekly downloads (combined fp-ts heritage)
-- Excellent TypeScript support with strong type inference
-
-**Alternative Considered**: neverthrow (898K downloads) - simpler but less comprehensive
-
-#### 2. Property-Based Testing: **fast-check**
-```json
-{
-  "fast-check": "^3.15.0"
-}
-```
-
-**Rationale**:
-- Dominant choice with active maintenance and TypeScript-first design
-- Direct QuickCheck equivalent for property-based testing
-- Proven track record finding bugs in React, Jest, io-ts
-- Seamless integration with Jest/Vitest testing frameworks
-- Essential for mathematical law verification
-
-**Alternative Considered**: JSVerify - less actively maintained
-
-#### 3. Configuration Management: **cosmiconfig**
-```json
-{
-  "cosmiconfig": "^9.0.0",
-  "cosmiconfig-typescript-loader": "^5.0.0"
-}
-```
-
-**Rationale**:
-- Industry standard with 80M+ weekly downloads
-- Native TypeScript support via cosmiconfig-typescript-loader
-- Supports all required formats: JSON, YAML, TOML, TS config files
-- Follows modern configuration conventions (package.json, rc files, config files)
-- Perfect match for our multi-format requirement
-
-**Alternatives Considered**:
-- convict (648K downloads) - more rigid schema approach
-- config (1.5M downloads) - anti-pattern for TypeScript per 2025 analysis
-
-#### 4. Structured Logging: **Pino**
-```json
-{
-  "pino": "^8.17.0",
-  "pino-opentelemetry-transport": "^0.4.0"
-}
-```
-
-**Rationale**:
-- Performance leader with 12.9M+ weekly downloads
-- JSON-first structured logging (matches our requirements)
-- Native OpenTelemetry integration available
-- Async, non-blocking I/O operations
-- 2-3x faster than Winston in benchmarks
-
-**Alternative Considered**: 
-- Winston (15.6M downloads) - more features but slower
-- tslog (188K downloads) - TypeScript-native but smaller ecosystem
-
-#### 5. Caching: **Keyv** + **lru-cache**
-```json
-{
-  "keyv": "^4.5.4",
-  "@keyv/redis": "^2.8.4",
-  "lru-cache": "^10.1.0"
-}
-```
-
-**Rationale**:
-- **Keyv**: Universal key-value interface supporting multiple backends (memory, Redis, etc.)
-- **lru-cache**: TypeScript-rewritten, fastest LRU implementation
-- Seamless backend switching without code changes
-- Perfect match for our memory/distributed cache requirements
-
-**Alternative Considered**: 
-- cache-manager (comprehensive but heavier)
-- node-cache (simpler but less flexible)
-
-#### 6. OpenTelemetry Integration
-```json
-{
-  "@opentelemetry/sdk-node": "^0.48.0",
-  "@opentelemetry/api": "^1.7.0",
-  "@opentelemetry/auto-instrumentations-node": "^0.41.0"
-}
-```
-
-**Rationale**:
-- Official OpenTelemetry SDK with TypeScript v5.0.4 support
-- Auto-instrumentation reduces manual implementation overhead
-- Industry standard for observability (2025 best practices)
-- Vendor-agnostic approach prevents lock-in
-
-### Development Dependencies
-
-#### Testing Framework: **Vitest**
-```json
-{
-  "vitest": "^1.2.0",
-  "@vitest/coverage-v8": "^1.2.0"
-}
-```
-
-**Rationale**:
-- Faster than Jest with native TypeScript support
-- Excellent fast-check integration
-- Built-in coverage reporting
-- Modern testing framework aligned with 2025 practices
-
-#### Build System: **Bun** + **TypeScript**
-```json
-{
-  "typescript": "^5.3.0",
-  "bun-types": "^1.0.25"
-}
-```
-
-**Rationale**:
-- Bun provides fastest TypeScript compilation and runtime
-- Native TypeScript support without additional tooling
-- Excellent package management and bundling
-- Future-oriented choice for 2025 development
-
-## Implementation Plan
-
-### Phase 1: Core Foundation (Week 1-2)
-
-#### 1.1 Result<T> Type Implementation
-```typescript
-// Leverage Effect-TS for proven monad implementation
-import { Effect, Exit } from "effect"
-
-export type Result<T, E = QiError> = Effect.Effect<T, E, never>
-
-// Factory operations
-export const success = <T>(value: T): Result<T> => Effect.succeed(value)
-export const failure = <E>(error: E): Result<never, E> => Effect.fail(error)
-
-// Monadic operations  
-export const map = <T, U, E>(
-  f: (value: T) => U
-) => (result: Result<T, E>): Result<U, E> => Effect.map(result, f)
-
-export const flatMap = <T, U, E>(
-  f: (value: T) => Result<U, E>
-) => (result: Result<T, E>): Result<U, E> => Effect.flatMap(result, f)
-```
-
-#### 1.2 QiError Implementation
-```typescript
-export interface QiError {
-  readonly code: string
-  readonly message: string
-  readonly category: ErrorCategory
-  readonly context: ReadonlyMap<string, unknown>
-  readonly cause?: QiError
-  readonly timestamp: Date
-}
-
-// Error chaining with context preservation
-export const chain = (primary: QiError, secondary: QiError): QiError => ({
-  ...primary,
-  cause: secondary,
-  context: new Map([...primary.context, ...secondary.context])
-})
-```
-
-#### 1.3 Property-Based Testing Setup
-```typescript
-import fc from "fast-check"
-
-// Mathematical law verification (identical to Haskell)
-describe("Functor Laws", () => {
-  test("Identity: map(id) === id", () => {
-    fc.assert(fc.property(
-      arbitraryResult, 
-      (result) => {
-        const mapped = pipe(result, map(identity))
-        return deepEqual(mapped, result)
+  // TypeScript-style error handling
+  async mapAsync<U>(fn: (value: T) => Promise<U>): Promise<ResultBuilder<U, E>> {
+    if (this.result.tag === 'success') {
+      try {
+        const value = await fn(this.result.value)
+        return new ResultBuilder({ tag: 'success', value })
+      } catch (error) {
+        return new ResultBuilder({ 
+          tag: 'failure', 
+          error: error as E 
+        })
       }
-    ))
+    }
+    return new ResultBuilder(this.result)
+  }
+
+  unwrap(): T {
+    if (this.result.tag === 'success') {
+      return this.result.value
+    }
+    throw new Error(`Attempted to unwrap failure: ${this.result.error}`)
+  }
+
+  unwrapOr(defaultValue: T): T {
+    return this.result.tag === 'success' ? this.result.value : defaultValue
+  }
+}
+
+// Factory functions with TypeScript inference
+export const Ok = <T>(value: T): Result<T, never> => ({ tag: 'success', value })
+export const Err = <E>(error: E): Result<never, E> => ({ tag: 'failure', error })
+
+// Async result helpers that work naturally with TypeScript async/await
+export const asyncOk = async <T>(promise: Promise<T>): Promise<Result<T, Error>> => {
+  try {
+    const value = await promise
+    return Ok(value)
+  } catch (error) {
+    return Err(error as Error)
+  }
+}
+```
+
+### 2. Configuration: Native JavaScript Objects + TypeScript Types
+
+Leverage TypeScript's excellent object and JSON handling instead of forcing Haskell-style ADTs:
+
+```typescript
+// TypeScript branded types for type safety
+type ConfigPath = string & { readonly brand: unique symbol }
+type ConfigValue = string | number | boolean | object | null
+
+// Native JavaScript object manipulation with TypeScript safety
+export class Config {
+  private constructor(private readonly data: Record<string, unknown>) {}
+
+  // Factory methods using native JavaScript patterns
+  static fromObject(obj: Record<string, unknown>): Config {
+    return new Config(structuredClone(obj)) // Native deep clone
+  }
+
+  static async fromFile(path: string): Promise<Result<Config, ConfigError>> {
+    try {
+      // Leverage Node.js/Bun native file operations
+      const content = await Bun.file(path).text()
+      const data = path.endsWith('.json') 
+        ? JSON.parse(content)
+        : (await import(path)).default
+      
+      return Ok(new Config(data))
+    } catch (error) {
+      return Err(new ConfigError(`Failed to load config: ${error}`))
+    }
+  }
+
+  // Native JavaScript property access with TypeScript type checking
+  get<T = ConfigValue>(path: string): Result<T, ConfigError> {
+    const keys = path.split('.')
+    let current: unknown = this.data
+    
+    for (const key of keys) {
+      if (current != null && typeof current === 'object' && key in current) {
+        current = (current as Record<string, unknown>)[key]
+      } else {
+        return Err(new ConfigError(`Path not found: ${path}`))
+      }
+    }
+    
+    return Ok(current as T)
+  }
+
+  // TypeScript template literal types for compile-time path validation
+  getTyped<P extends string>(
+    path: P
+  ): Result<ConfigPathValue<P>, ConfigError> {
+    return this.get(path) as Result<ConfigPathValue<P>, ConfigError>
+  }
+
+  // Native object merging (right-biased) using JavaScript spread
+  merge(other: Config): Config {
+    return new Config({
+      ...this.data,
+      ...other.data,
+      // Deep merge nested objects
+      ...Object.fromEntries(
+        Object.entries(other.data).map(([key, value]) => [
+          key,
+          typeof value === 'object' && typeof this.data[key] === 'object'
+            ? { ...this.data[key] as object, ...value as object }
+            : value
+        ])
+      )
+    })
+  }
+
+  // Convert to native JavaScript object for ecosystem integration
+  toObject(): Record<string, unknown> {
+    return structuredClone(this.data)
+  }
+}
+
+// TypeScript conditional types for path-based type inference
+type ConfigPathValue<P extends string> = 
+  P extends `${infer K}.${infer Rest}`
+    ? K extends keyof ConfigSchema
+      ? ConfigPathValue<Rest>
+      : never
+    : P extends keyof ConfigSchema
+      ? ConfigSchema[P]
+      : never
+
+// Schema definition using TypeScript interfaces
+interface ConfigSchema {
+  app: {
+    name: string
+    version: string
+    environment: 'development' | 'staging' | 'production'
+  }
+  logger: {
+    level: 'debug' | 'info' | 'warn' | 'error'
+    format: 'json' | 'text'
+  }
+  cache: {
+    maxSize: number
+    ttl: number
+  }
+}
+```
+
+### 3. Logger: Event-Driven with Native Async/Await
+
+Embrace JavaScript's event-driven nature and async I/O instead of forcing STM patterns:
+
+```typescript
+// Event-driven logger using native JavaScript patterns
+export class Logger extends EventEmitter {
+  private readonly level: LogLevel
+  private readonly formatters = new Map<string, LogFormatter>()
+  private readonly outputs = new Set<LogOutput>()
+
+  constructor(config: LoggerConfig) {
+    super()
+    this.level = config.level
+    this.setupDefaultFormatters()
+    this.setupDefaultOutputs(config)
+  }
+
+  // O(1) level checking using native JavaScript comparison
+  isLevelEnabled(level: LogLevel): boolean {
+    return level >= this.level
+  }
+
+  // Native async/await with structured logging
+  async log(level: LogLevel, message: string, context: LogContext = {}): Promise<void> {
+    if (!this.isLevelEnabled(level)) return
+
+    const entry: LogEntry = {
+      timestamp: new Date(),
+      level,
+      message,
+      context: {
+        ...context,
+        // Automatic trace context from async_hooks (Node.js native)
+        traceId: AsyncLocalStorage.getStore()?.traceId,
+        spanId: AsyncLocalStorage.getStore()?.spanId,
+      }
+    }
+
+    // Emit event for extensibility (JavaScript event-driven pattern)
+    this.emit('log', entry)
+
+    // Async parallel output to all configured destinations
+    await Promise.allSettled(
+      Array.from(this.outputs).map(output => output.write(entry))
+    )
+  }
+
+  // Fluent API with method chaining (JavaScript/TypeScript idiom)
+  withContext(context: LogContext): Logger {
+    const newLogger = new Logger(this.config)
+    newLogger.context = { ...this.context, ...context }
+    return newLogger
+  }
+
+  // OpenTelemetry integration using native JavaScript patterns
+  withTracing(traceId: string, spanId: string): Logger {
+    return this.withContext({ traceId, spanId })
+  }
+
+  // Structured logging with native JavaScript object destructuring
+  async info(message: string, data?: Record<string, unknown>): Promise<void> {
+    await this.log(LogLevel.INFO, message, data)
+  }
+
+  async error(message: string, error?: Error, data?: Record<string, unknown>): Promise<void> {
+    await this.log(LogLevel.ERROR, message, {
+      ...data,
+      error: error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      } : undefined
+    })
+  }
+}
+
+// Native JavaScript class-based formatters
+export class JSONFormatter implements LogFormatter {
+  format(entry: LogEntry): string {
+    return JSON.stringify(entry) // Native JSON serialization
+  }
+}
+
+export class TextFormatter implements LogFormatter {
+  format(entry: LogEntry): string {
+    const { timestamp, level, message, context } = entry
+    const contextStr = Object.keys(context).length > 0 
+      ? ` ${JSON.stringify(context)}`
+      : ''
+    return `[${timestamp.toISOString()}] ${level}: ${message}${contextStr}`
+  }
+}
+
+// Stream-based outputs using Node.js/Bun native streams
+export class StreamOutput implements LogOutput {
+  constructor(private readonly stream: WritableStream<string>) {}
+
+  async write(entry: LogEntry): Promise<void> {
+    const writer = this.stream.getWriter()
+    try {
+      await writer.write(this.formatter.format(entry) + '\n')
+    } finally {
+      writer.releaseLock()
+    }
+  }
+}
+```
+
+### 4. Cache: Native JavaScript Map + Modern Async Patterns
+
+Use JavaScript's native Map and modern async patterns instead of forcing STM:
+
+```typescript
+// Modern JavaScript cache using native Map and async patterns
+export class Cache {
+  private readonly entries = new Map<string, CacheEntry>()
+  private readonly accessOrder: string[] = []
+  private readonly locks = new Map<string, Promise<void>>()
+  
+  constructor(private readonly config: CacheConfig) {}
+
+  // Native JavaScript Promise-based locking (no STM needed)
+  private async withLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+    // Wait for existing lock if any
+    await this.locks.get(key)
+    
+    // Create new lock
+    let resolve: () => void
+    const lock = new Promise<void>(r => { resolve = r })
+    this.locks.set(key, lock)
+    
+    try {
+      return await operation()
+    } finally {
+      this.locks.delete(key)
+      resolve!()
+    }
+  }
+
+  // Native Map operations with async/await
+  async get<T>(key: string): Promise<Result<T, CacheError>> {
+    return this.withLock(key, async () => {
+      const entry = this.entries.get(key)
+      
+      if (!entry) {
+        return Err(new CacheError(`Key not found: ${key}`))
+      }
+
+      if (this.isExpired(entry)) {
+        this.entries.delete(key)
+        this.removeFromAccessOrder(key)
+        return Err(new CacheError(`Key expired: ${key}`))
+      }
+
+      // Update access order for LRU (native array manipulation)
+      this.updateAccessOrder(key)
+      
+      return Ok(entry.value as T)
+    })
+  }
+
+  async set<T>(key: string, value: T, ttl?: number): Promise<Result<void, CacheError>> {
+    return this.withLock(key, async () => {
+      const entry: CacheEntry = {
+        value,
+        timestamp: Date.now(),
+        ttl: ttl ? Date.now() + ttl : undefined,
+        accessCount: 0
+      }
+
+      this.entries.set(key, entry)
+      this.updateAccessOrder(key)
+      
+      // LRU eviction using native array operations
+      if (this.config.maxSize && this.entries.size > this.config.maxSize) {
+        await this.evictLRU()
+      }
+
+      return Ok(undefined)
+    })
+  }
+
+  // Modern async iteration using native JavaScript
+  async *entries(): AsyncGenerator<[string, unknown], void, unknown> {
+    for (const [key, entry] of this.entries) {
+      if (!this.isExpired(entry)) {
+        yield [key, entry.value]
+      }
+    }
+  }
+
+  // Batch operations using native Promise.allSettled
+  async setMany<T>(entries: Map<string, T>): Promise<Map<string, Result<void, CacheError>>> {
+    const results = await Promise.allSettled(
+      Array.from(entries).map(async ([key, value]) => ({
+        key,
+        result: await this.set(key, value)
+      }))
+    )
+
+    return new Map(
+      results.map(result => 
+        result.status === 'fulfilled'
+          ? [result.value.key, result.value.result]
+          : [result.reason?.key || 'unknown', Err(new CacheError(result.reason))]
+      )
+    )
+  }
+
+  // Native array manipulation for LRU
+  private updateAccessOrder(key: string): void {
+    const index = this.accessOrder.indexOf(key)
+    if (index > -1) {
+      this.accessOrder.splice(index, 1)
+    }
+    this.accessOrder.push(key)
+  }
+
+  private removeFromAccessOrder(key: string): void {
+    const index = this.accessOrder.indexOf(key)
+    if (index > -1) {
+      this.accessOrder.splice(index, 1)
+    }
+  }
+
+  private async evictLRU(): Promise<void> {
+    const lruKey = this.accessOrder.shift()
+    if (lruKey) {
+      this.entries.delete(lruKey)
+    }
+  }
+
+  private isExpired(entry: CacheEntry): boolean {
+    return entry.ttl !== undefined && Date.now() > entry.ttl
+  }
+}
+
+// Native JavaScript backend abstraction
+export abstract class CacheBackend {
+  abstract get(key: string): Promise<Result<unknown, CacheError>>
+  abstract set(key: string, value: unknown, ttl?: number): Promise<Result<void, CacheError>>
+  abstract delete(key: string): Promise<Result<boolean, CacheError>>
+  abstract clear(): Promise<Result<void, CacheError>>
+}
+
+// Redis backend using native JavaScript Redis client
+export class RedisCacheBackend extends CacheBackend {
+  constructor(private readonly redis: Redis) {
+    super()
+  }
+
+  async get(key: string): Promise<Result<unknown, CacheError>> {
+    try {
+      const value = await this.redis.get(key)
+      return value ? Ok(JSON.parse(value)) : Err(new CacheError('Key not found'))
+    } catch (error) {
+      return Err(new CacheError(`Redis get failed: ${error}`))
+    }
+  }
+
+  async set(key: string, value: unknown, ttl?: number): Promise<Result<void, CacheError>> {
+    try {
+      const serialized = JSON.stringify(value)
+      if (ttl) {
+        await this.redis.setex(key, Math.floor(ttl / 1000), serialized)
+      } else {
+        await this.redis.set(key, serialized)
+      }
+      return Ok(undefined)
+    } catch (error) {
+      return Err(new CacheError(`Redis set failed: ${error}`))
+    }
+  }
+}
+```
+
+## Technology Stack: TypeScript-Native Choices
+
+### Runtime and Build System
+
+```json
+{
+  "runtime": "bun",           // Native TypeScript execution, fastest performance
+  "packageManager": "bun",    // Fastest package management
+  "build": "bun build",       // Native bundling
+  "typescript": "^5.3.0"     // Latest TypeScript features
+}
+```
+
+**Rationale**: Bun provides the best TypeScript development experience with native TypeScript execution, built-in bundling, and exceptional performance.
+
+### Core Libraries: JavaScript-Native
+
+```json
+{
+  "dependencies": {
+    "ioredis": "^5.3.2",                    // Best Redis client for Node.js
+    "pino": "^8.17.0",                      // Fastest structured logging
+    "eventemitter3": "^5.0.1",             // High-performance event emitter
+    "@opentelemetry/sdk-node": "^0.48.0"   // Official OpenTelemetry SDK
+  }
+}
+```
+
+**No Functional Programming Libraries**: Instead of fp-ts or Effect, use native TypeScript patterns that JavaScript developers understand and that integrate well with the ecosystem.
+
+### Testing: JavaScript-First
+
+```json
+{
+  "devDependencies": {
+    "vitest": "^1.2.0",        // Fastest test runner with native TypeScript
+    "fast-check": "^3.15.0",   // Property-based testing
+    "@types/node": "^20.10.0"  // Node.js type definitions
+  }
+}
+```
+
+### Property-Based Testing with Native TypeScript Patterns
+
+```typescript
+// Property testing that feels natural in TypeScript
+import fc from 'fast-check'
+import { describe, test, expect } from 'vitest'
+import { Ok, Err, match } from './result'
+
+describe('Result Type Laws', () => {
+  const arbitraryResult = fc.oneof(
+    fc.anything().map(Ok),
+    fc.string().map(Err)
+  )
+
+  test('Functor Identity Law', () => {
+    fc.assert(fc.property(arbitraryResult, (result) => {
+      const identity = <T>(x: T): T => x
+      const mapped = new ResultBuilder(result).map(identity).result
+      
+      expect(mapped).toEqual(result)
+    }))
   })
 
-  test("Composition: map(f ∘ g) === map(f) ∘ map(g)", () => {
+  test('Functor Composition Law', () => {
     fc.assert(fc.property(
       arbitraryResult,
       fc.func(fc.integer()),
       fc.func(fc.integer()),
       (result, f, g) => {
-        const composed = pipe(result, map(x => f(g(x))))
-        const sequential = pipe(result, map(g), map(f))
-        return deepEqual(composed, sequential)
+        const composed = new ResultBuilder(result)
+          .map(x => f(g(x)))
+          .result
+
+        const sequential = new ResultBuilder(result)
+          .map(g)
+          .map(f)
+          .result
+
+        expect(composed).toEqual(sequential)
       }
     ))
+  })
+
+  test('Pattern Matching Exhaustiveness', () => {
+    fc.assert(fc.property(arbitraryResult, (result) => {
+      const matched = match(result, {
+        success: value => `success: ${value}`,
+        failure: error => `failure: ${error}`
+      })
+      
+      expect(typeof matched).toBe('string')
+      expect(matched.startsWith('success:') || matched.startsWith('failure:')).toBe(true)
+    }))
   })
 })
 ```
 
-### Phase 2: Core Services (Week 3-4)
+## Performance Strategy: Leverage JavaScript Runtime
 
-#### 2.1 Configuration Component
+### V8/Bun Optimizations
+
 ```typescript
-export class ConfigData implements Monoid<ConfigData> {
-  constructor(private readonly data: unknown) {}
-
-  static empty(): ConfigData {
-    return new ConfigData({})
-  }
-
-  // Right-biased monoid merge
-  concat(other: ConfigData): ConfigData {
-    return new ConfigData(deepMerge(this.data, other.data))
-  }
-
-  get<T>(keyPath: string): Result<T> {
-    return getNestedValue(this.data, keyPath.split('.'))
-  }
-}
-
-// Factory operations with cosmiconfig
-export const fromFile = async (filePath: string): Promise<Result<ConfigData>> => {
-  const explorer = cosmiconfig('qi-config', {
-    loaders: {
-      '.ts': cosmiconfigTypescriptLoader(),
-    }
-  })
-  
-  try {
-    const result = await explorer.load(filePath)
-    return success(new ConfigData(result?.config ?? {}))
-  } catch (error) {
-    return failure(createConfigError(error))
-  }
-}
-```
-
-#### 2.2 Logger Component  
-```typescript
-export class Logger {
-  private readonly config: AtomicReference<LoggerConfig>
-  private readonly context: AtomicReference<LogContext>
-
-  // O(1) level checking (matching Haskell performance)
-  isLevelEnabled(level: LogLevel): boolean {
-    return level >= this.config.get().level
-  }
-
-  // Async-safe logging with OpenTelemetry integration
-  async info(message: string, context?: LogContext): Promise<void> {
-    if (!this.isLevelEnabled(LogLevel.INFO)) return
-
-    const finalContext = this.mergeContext(context)
-    const logEntry = {
-      level: LogLevel.INFO,
-      message,
-      context: finalContext,
-      timestamp: new Date(),
-      traceId: getActiveTraceId(), // OpenTelemetry integration
-      spanId: getActiveSpanId()
-    }
-
-    await this.output(logEntry)
-  }
-}
-```
-
-#### 2.3 Cache Component
-```typescript
-export class Cache {
+// Leverage JavaScript engine optimizations
+export class OptimizedCache {
+  // Use Map for O(1) operations (V8 optimized)
   private readonly entries = new Map<string, CacheEntry>()
-  private readonly lru = new LRUCache<string, CacheEntry>({
-    max: this.config.maxSize ?? 1000
-  })
   
-  // Async-safe operations
-  async set<T>(
-    key: string, 
-    value: T, 
-    ttl?: TTL
-  ): Promise<Result<void>> {
-    return this.withLock(async () => {
-      const entry = new CacheEntry(value, ttl)
-      this.entries.set(key, entry)
-      this.lru.set(key, entry)
-      return success(undefined)
-    })
+  // Hidden classes optimization
+  private readonly stats = {
+    hits: 0,
+    misses: 0,
+    evictions: 0
   }
 
-  // Atomic getOrSet operation
-  async getOrSet<T>(
-    key: string,
-    factory: () => Promise<Result<T>>,
-    ttl?: TTL
-  ): Promise<Result<T>> {
-    return this.withLock(async () => {
-      const existing = await this.get<T>(key)
-      if (existing.tag === "success") {
-        return existing
-      }
+  // Avoid deoptimization by keeping consistent shapes
+  get(key: string): Result<unknown, CacheError> {
+    // Fast path for hit
+    const entry = this.entries.get(key)
+    if (entry && !this.isExpired(entry)) {
+      this.stats.hits++ // Monomorphic operation
+      return { tag: 'success', value: entry.value }
+    }
+    
+    this.stats.misses++
+    return { tag: 'failure', error: new CacheError('Not found') }
+  }
 
-      const computed = await factory()
-      if (computed.tag === "success") {
-        await this.set(key, computed.value, ttl)
-      }
-      return computed
-    })
+  // Batch operations using native JavaScript array methods
+  setMany(entries: [string, unknown][]): Result<void, CacheError>[] {
+    return entries.map(([key, value]) => this.set(key, value))
+  }
+}
+
+// Memory pool pattern for high-frequency objects
+class LogEntryPool {
+  private readonly pool: LogEntry[] = []
+  
+  acquire(): LogEntry {
+    return this.pool.pop() ?? {
+      timestamp: new Date(),
+      level: 'info',
+      message: '',
+      context: {}
+    }
+  }
+  
+  release(entry: LogEntry): void {
+    // Reset and return to pool
+    entry.message = ''
+    entry.context = {}
+    this.pool.push(entry)
   }
 }
 ```
 
-### Phase 3: Modern 2025 Patterns (Week 5)
+### Async Performance Patterns
 
-#### 3.1 OpenTelemetry Integration
 ```typescript
-import { NodeSDK } from '@opentelemetry/sdk-node'
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
+// Leverage JavaScript async I/O strengths
+export class AsyncConfig {
+  private readonly cache = new Map<string, unknown>()
+  private readonly loading = new Map<string, Promise<unknown>>()
 
-// Auto-instrumentation setup
-const sdk = new NodeSDK({
-  instrumentations: [getNodeAutoInstrumentations()],
-  serviceName: 'qicore-foundation',
-  serviceVersion: '0.3.1'
-})
+  async get<T>(path: string): Promise<Result<T, ConfigError>> {
+    // Check cache first (synchronous)
+    if (this.cache.has(path)) {
+      return Ok(this.cache.get(path) as T)
+    }
 
-// Logger with trace context
-export const withTraceContext = (
-  traceId: string, 
-  spanId: string
-) => (logger: Logger): Logger => {
-  const traceContext = new LogContext({
-    traceId,
-    spanId,
-    fields: new Map([
-      ['traceId', traceId],
-      ['spanId', spanId]
-    ])
-  })
-  return logger.withContext(traceContext)
-}
-```
+    // Check if already loading
+    let loadingPromise = this.loading.get(path)
+    if (!loadingPromise) {
+      loadingPromise = this.loadPath(path)
+      this.loading.set(path, loadingPromise)
+    }
 
-#### 3.2 Dependency Injection Pattern
-```typescript
-// Service container with type safety
-export class ServiceContainer {
-  private readonly services = new Map<ServiceKey<any>, any>()
-
-  register<T>(key: ServiceKey<T>, factory: () => T): void {
-    this.services.set(key, factory())
-  }
-
-  get<T>(key: ServiceKey<T>): Result<T> {
-    const service = this.services.get(key)
-    return service 
-      ? success(service)
-      : failure(createDependencyError(`Service not found: ${key.name}`))
-  }
-}
-
-// Configuration-driven service creation
-export const createServices = async (
-  config: ConfigData
-): Promise<Result<ServiceContainer>> => {
-  const container = new ServiceContainer()
-  
-  // Logger service
-  const loggerConfig = await config.get<LoggerConfig>('logger')
-  if (loggerConfig.tag === "success") {
-    const logger = await Logger.create(loggerConfig.value)
-    if (logger.tag === "success") {
-      container.register(LOGGER_KEY, () => logger.value)
+    try {
+      const value = await loadingPromise
+      this.cache.set(path, value)
+      this.loading.delete(path)
+      return Ok(value as T)
+    } catch (error) {
+      this.loading.delete(path)
+      return Err(new ConfigError(`Failed to load ${path}: ${error}`))
     }
   }
 
-  // Cache service  
-  const cacheConfig = await config.get<CacheConfig>('cache')
-  if (cacheConfig.tag === "success") {
-    const cache = await Cache.create(cacheConfig.value)
-    if (cache.tag === "success") {
-      container.register(CACHE_KEY, () => cache.value)
-    }
-  }
+  // Parallel loading using native Promise.allSettled
+  async loadMany(paths: string[]): Promise<Map<string, Result<unknown, ConfigError>>> {
+    const results = await Promise.allSettled(
+      paths.map(async path => ({ path, result: await this.get(path) }))
+    )
 
-  return success(container)
+    return new Map(
+      results.map(result => 
+        result.status === 'fulfilled'
+          ? [result.value.path, result.value.result]
+          : [result.reason?.path || 'unknown', Err(new ConfigError(result.reason))]
+      )
+    )
+  }
 }
 ```
 
-## Performance Benchmarks and Targets
+## Integration with TypeScript Ecosystem
 
-### Complexity Guarantees
-| Operation | Target Complexity | Implementation Strategy |
-|-----------|------------------|-------------------------|
-| Result.map | O(1) | Direct function application |
-| Logger.isLevelEnabled | O(1) | Atomic reference read |
-| Config.get | O(log k) | Path traversal optimization |
-| Cache.set | O(1) | Hash map + LRU update |
-| Error.chain | O(1) | Immutable context merge |
+### Seamless Library Integration
 
-### Performance Targets (vs Haskell Reference)
-- **Result operations**: Within 1.5x of Haskell performance
-- **Logger throughput**: 100K+ messages/second (Pino optimization)
-- **Cache operations**: 1M+ ops/second (LRU-cache optimization)
-- **Memory overhead**: <2x Haskell reference implementation
-
-## Testing Strategy
-
-### 1. Property-Based Testing (Mathematical Laws)
 ```typescript
-// Identical test structure to Haskell
-describe("Monad Laws", () => {
-  test("Left Identity: flatMap(f)(pure(a)) === f(a)", () => {
-    fc.assert(fc.property(
-      fc.integer(),
-      fc.func(arbitraryResult),
-      (a, f) => {
-        const left = pipe(success(a), flatMap(f))
-        const right = f(a)
-        return deepEqual(left, right)
-      }
-    ))
+// Natural integration with popular JavaScript libraries
+import { Router } from 'express'
+import { Logger } from './qi-foundation'
+
+// Express middleware using native JavaScript patterns
+export const createLoggerMiddleware = (logger: Logger) => 
+  (req: Request, res: Response, next: NextFunction) => {
+    const startTime = Date.now()
+    
+    res.on('finish', async () => {
+      await logger.info('HTTP Request', {
+        method: req.method,
+        url: req.url,
+        statusCode: res.statusCode,
+        duration: Date.now() - startTime,
+        userAgent: req.get('User-Agent')
+      })
+    })
+    
+    next()
+  }
+
+// React integration using native hooks
+export const useConfig = (path: string) => {
+  const [value, setValue] = useState<Result<unknown, ConfigError>>()
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    config.get(path)
+      .then(setValue)
+      .finally(() => setLoading(false))
+  }, [path])
+
+  return { value, loading }
+}
+
+// Next.js API route integration
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const result = await cache.get(req.query.key as string)
+  
+  match(result, {
+    success: value => res.status(200).json({ data: value }),
+    failure: error => res.status(404).json({ error: error.message })
   })
-})
+}
 ```
 
-### 2. Cross-Language Compliance Testing
-- **Identical test cases** generated from Haskell QuickCheck
-- **Behavioral consistency** verification across implementations
-- **Performance regression** testing against Haskell benchmarks
+### TypeScript-Native Error Handling
 
-### 3. Integration Testing
 ```typescript
-describe("Foundation Integration", () => {
-  test("Config → Logger → Cache pipeline", async () => {
-    const config = await fromFile('./test-config.json')
-    const services = await createServices(config.value)
-    
-    const logger = services.get(LOGGER_KEY).value
-    const cache = services.get(CACHE_KEY).value
-    
-    // Test complete pipeline
-    await logger.info("Cache operation starting")
-    const result = await cache.set("test-key", "test-value")
-    await logger.info("Cache operation completed")
-    
-    expect(result.tag).toBe("success")
-  })
+// Leverage TypeScript's type system for error handling
+export type ConfigError = 
+  | { type: 'FileNotFound'; path: string }
+  | { type: 'ParseError'; message: string; line?: number }
+  | { type: 'ValidationError'; field: string; expected: string; actual: string }
+
+// Type-safe error creation
+export const createFileNotFoundError = (path: string): ConfigError => ({
+  type: 'FileNotFound',
+  path
 })
+
+// Pattern matching with TypeScript exhaustiveness checking
+export const handleConfigError = (error: ConfigError): string => {
+  switch (error.type) {
+    case 'FileNotFound':
+      return `Configuration file not found: ${error.path}`
+    case 'ParseError':
+      return `Parse error: ${error.message}${error.line ? ` at line ${error.line}` : ''}`
+    case 'ValidationError':
+      return `Validation error in field '${error.field}': expected ${error.expected}, got ${error.actual}`
+    default:
+      // TypeScript ensures exhaustiveness
+      const _exhaustive: never = error
+      return _exhaustive
+  }
+}
+
+// Result type with specific error types
+export type ConfigResult<T> = Result<T, ConfigError>
+export type CacheResult<T> = Result<T, CacheError>
+export type LoggerResult<T> = Result<T, LoggerError>
 ```
-
-## Risk Assessment and Mitigation
-
-### High-Risk Areas
-
-#### 1. **STM → Async/Await Translation**
-**Risk**: Haskell's STM transactions don't map directly to JavaScript async patterns
-**Mitigation**: 
-- Use atomic operations with careful lock ordering
-- Implement transaction-like semantics with Effect-TS
-- Comprehensive concurrency testing
-
-#### 2. **Performance Gap**
-**Risk**: TypeScript may not match Haskell performance
-**Mitigation**:
-- Leverage Bun's JIT optimization
-- Use performance-optimized libraries (Pino, lru-cache)
-- Continuous benchmarking against Haskell reference
-
-#### 3. **Type Safety Gaps**
-**Risk**: Runtime type errors not caught at compile time
-**Mitigation**:
-- Hybrid compile-time + runtime validation
-- Comprehensive property-based testing
-- Effect-TS type-level guarantees
-
-### Medium-Risk Areas
-
-#### 1. **Ecosystem Fragmentation**
-**Risk**: TypeScript ecosystem changing rapidly
-**Mitigation**: Choose mature, well-maintained packages with large user bases
-
-#### 2. **Bundle Size**
-**Risk**: Large dependency footprint
-**Mitigation**: Tree-shaking optimization, selective imports
-
-## Success Criteria
-
-### 1. **Contract Compliance** (Must Have)
-- ✅ All 29 mathematical law tests pass (fast-check equivalent)
-- ✅ Cross-language behavioral consistency verified
-- ✅ Performance complexity guarantees maintained
-
-### 2. **Production Readiness** (Must Have)
-- ✅ TypeScript strict mode compliance
-- ✅ Comprehensive error handling (no exceptions)
-- ✅ OpenTelemetry integration functional
-- ✅ Bundle size <2MB for complete foundation
-
-### 3. **Performance Targets** (Should Have)
-- ✅ Within 2x of Haskell performance benchmarks
-- ✅ 100K+ log messages/second throughput
-- ✅ 1M+ cache operations/second
-
-### 4. **Developer Experience** (Should Have)
-- ✅ Excellent TypeScript IDE support
-- ✅ Comprehensive API documentation
-- ✅ Examples and migration guides
-
-## Timeline and Deliverables
-
-### Week 1-2: Foundation Implementation
-- **Deliverable**: Core Result<T> and QiError types
-- **Tests**: Mathematical law verification with fast-check
-- **Documentation**: API reference and usage examples
-
-### Week 3-4: Core Services  
-- **Deliverable**: Configuration, Logger, Cache components
-- **Tests**: Integration testing and performance benchmarks
-- **Documentation**: Component guides and configuration reference
-
-### Week 5: Modern Patterns
-- **Deliverable**: OpenTelemetry integration, dependency injection
-- **Tests**: End-to-end integration testing
-- **Documentation**: Advanced patterns and deployment guide
-
-### Week 6: Documentation and Release
-- **Deliverable**: Complete documentation, examples, migration guide
-- **Tests**: Cross-language compliance verification
-- **Documentation**: TypeScript implementation insights document
 
 ## Conclusion
 
-The TypeScript implementation represents a critical validation of QiCore Foundation's cross-language contract approach. By leveraging the mature TypeScript ecosystem and applying lessons learned from the Haskell reference implementation, we can deliver a production-ready foundation that maintains mathematical rigor while providing excellent developer experience.
+This TypeScript implementation embraces the language's strengths instead of forcing Haskell patterns:
 
-The careful package selection balances performance, maintainability, and ecosystem maturity, ensuring the TypeScript implementation will serve as a solid foundation for modern JavaScript/TypeScript applications while proving the viability of our behavioral contract approach across diverse language ecosystems.
+### TypeScript Strengths Leveraged:
+- **Advanced Type System**: Union types, conditional types, template literals for type safety
+- **Native Async/Await**: Natural JavaScript async patterns instead of forcing monadic IO
+- **Excellent Tooling**: IDE support, debugging, ecosystem integration
+- **JavaScript Runtime**: V8 optimizations, event loop, native JSON/Object handling
+- **Ecosystem Harmony**: Seamless integration with existing JavaScript libraries
+
+### Contract Compliance Maintained:
+- **Mathematical Laws**: Property-based testing ensures behavioral consistency  
+- **Performance Guarantees**: O(1) operations using native JavaScript data structures
+- **Error Handling**: Structured error types without exceptions
+- **Cross-Language Consistency**: Same behavioral contracts, different implementation strategies
+
+### Modern TypeScript Patterns:
+- **Discriminated Unions**: Instead of complex monad hierarchies
+- **Builder Pattern**: Fluent APIs that feel natural in TypeScript
+- **Event-Driven Architecture**: Leveraging JavaScript's event loop strengths
+- **Native Async Patterns**: Promise-based operations instead of STM translations
+
+This approach delivers a foundation that feels native to TypeScript developers while maintaining the mathematical rigor and behavioral contracts that define QiCore Foundation.
 
 ---
 
 **Proposal Status**: Complete ✅  
-**Target Implementation**: QiCore Foundation v-0.3.1 (TypeScript)  
-**Author**: Implementation Team  
-**Review Date**: 2025-01-13  
-**Next Milestone**: Implementation Phase 1 Kickoff
+**Philosophy**: TypeScript-First, Not Haskell Translation  
+**Target**: v-0.3.1 with native TypeScript patterns  
+**Review Date**: 2025-01-13
