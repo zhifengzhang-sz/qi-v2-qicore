@@ -37,16 +37,6 @@ main = defaultMain $ testGroup "QiCore Base Component Tests"
     [ errorQueryTests
     , errorTransformationTests
     ]
-  -- NOTE: Collection, Async, and Error Chain operations are not yet implemented
-  -- , testGroup "Result Collection Operations"
-  --   [ resultCollectionTests
-  --   ]
-  -- , testGroup "Result Async Operations"
-  --   [ resultAsyncTests  
-  --   ]
-  -- , testGroup "Error Chain Operations"
-  --   [ errorChainTests
-  --   ]
   ]
 
 -- ============================================================================

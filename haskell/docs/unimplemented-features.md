@@ -141,69 +141,49 @@ Applications can manually reload configuration by calling `fromSources` again.
 
 ---
 
-### 4. **YAML/TOML Configuration Parsing**
+### 4. **Configuration Formats**
 
-**Status**: ✅ **YAML IMPLEMENTED** / ⚠️ **TOML PLANNED** (v-0.2.6)
+**Status**: ✅ **JSON & YAML IMPLEMENTED** / ❌ **TOML & ENV STRING REMOVED** (v-0.2.7)
 
-**YAML - Fully Implemented**:
-- ✅ **Complete YAML parsing** via Data.Yaml library
-- ✅ **Comprehensive error handling** with detailed parse errors  
-- ✅ **Nested structure support** for complex configurations
-- ✅ **JSON conversion** for unified internal representation
-- ✅ **Auto-detection** by .yaml/.yml file extensions
+**Supported Formats (Production Ready)**:
+- ✅ **JSON parsing** - Complete via Aeson library with comprehensive error handling
+- ✅ **YAML parsing** - Complete via Data.Yaml library with detailed parse errors
+- ✅ **Environment variables** - Full support via `fromEnvironment` function
 
-**TOML - Temporarily Disabled**:
-- ⚠️ **API research required** - toml-parser library API differs from expectations
-- ⚠️ **Conversion layer needed** - TOML to JSON transformation complexity
-- ⚠️ **Error handling unification** - different error semantics from YAML
+**Removed Formats (Clean Production Release)**:
+- ❌ **TOML parsing** - Removed in v-0.2.7 to eliminate incomplete code
+- ❌ **ENV string parsing** - Removed in v-0.2.7 (use `fromEnvironment` instead)
 
-**Verified YAML Implementation**:
+**Current Implementation**:
 ```haskell
-parseYAML :: Text -> Result ConfigData
-parseYAML content = case YAML.decodeEither' (TE.encodeUtf8 content) of
-  Left yamlError -> Failure $ Error.create
-    "CONFIG_YAML_PARSE_ERROR"
-    ("YAML parsing failed: " <> T.pack (YAML.prettyPrintParseException yamlError))
-    CONFIGURATION
-    (Map.fromList [("yamlError", JSON.String (T.pack (show yamlError)))])
-    Nothing
-    configErrorTimestamp
-  Right value -> Success (ConfigData value)
+fromString :: Text -> ConfigFormat -> Result ConfigData
+fromString content format = case format of
+  JSON -> parseJSON content  -- ✅ Fully implemented
+  YAML -> parseYAML content  -- ✅ Fully implemented
+  TOML -> Failure $ Error.create
+    "CONFIG_TOML_NOT_SUPPORTED"
+    "TOML format removed in v-0.2.7 for clean production release"
+    VALIDATION
+  ENV -> Failure $ Error.create
+    "CONFIG_ENV_STRING_NOT_SUPPORTED"
+    "ENV string parsing removed in v-0.2.7 - use fromEnvironment function instead"
+    VALIDATION
 
--- Currently disabled pending API research:
-parseTOML :: Text -> Result ConfigData  
-parseTOML _ = Failure $ Error.create
-  "CONFIG_TOML_NOT_IMPLEMENTED"
-  "TOML parsing requires API research - temporarily disabled"
-  CONFIGURATION
-  mempty
-  Nothing
-  configErrorTimestamp
+-- Environment variables still fully supported:
+fromEnvironment :: MonadIO m => Maybe Text -> m (Result ConfigData)
+fromEnvironment maybePrefix = -- ✅ Complete implementation
 ```
 
 **Test Coverage**:
-- ✅ **YAML success parsing** - complex nested structures
-- ✅ **YAML error handling** - malformed YAML with proper error categorization
-- ✅ **Integration testing** - YAML config with cache storage
-- ⚠️ **TOML tests disabled** until implementation complete
+- ✅ **JSON parsing** - Nested structures and error handling
+- ✅ **YAML parsing** - Complex nested structures and malformed input
+- ✅ **Environment variables** - Prefix support and type coercion
+- ✅ **Integration testing** - Configuration with cache storage
 
-**Usage (YAML)**:
-```haskell
--- YAML configuration (working)
-let yamlContent = "database:\n  host: localhost\n  port: 5432"
-configResult <- Config.fromString yamlContent Config.YAML
-
--- Auto-detection by file extension (working)
-configResult <- Config.fromFile "config.yaml"  -- Auto-detects YAML
-
--- TOML configuration (planned)
--- configResult <- Config.fromString tomlContent Config.TOML  -- Not yet working
-```
-
-**Implementation Timeline**:
-- ✅ **v-0.2.6**: YAML support fully completed and tested
-- **v-0.2.7**: Complete TOML parsing implementation
-- **v-1.x.x**: Advanced format features (includes, variables, schema validation)
+**Rationale for Removal**:
+- **Production focus**: Only include complete, tested implementations
+- **Clean API**: Eliminate incomplete features that confuse users
+- **Clear errors**: Explicit "not supported" messages instead of incomplete implementations
 
 ---
 
@@ -257,8 +237,8 @@ For questions about unimplemented features or implementation priorities, refer t
 
 ---
 
-**Document Status**: Updated for v-0.2.6 ✅  
+**Document Status**: Updated for v-0.2.7 ✅  
 **Last Updated**: 2025-01-13  
-**Next Review**: Before v-0.2.7 release  
+**Next Review**: Before v-0.3.x release  
 **Compliance**: Zero fake/stub code policy enforced  
-**v-0.2.6 Status**: Redis fully implemented, YAML implemented, TOML planned for v-0.2.7
+**v-0.2.7 Status**: Clean production release - only complete features included

@@ -228,8 +228,20 @@ fromString :: Text -> ConfigFormat -> Result ConfigData
 fromString content format = case format of
   JSON -> parseJSON content
   YAML -> parseYAML content  
-  TOML -> parseTOML content
-  ENV -> parseENV content
+  TOML -> Failure $ Error.create
+    "CONFIG_TOML_NOT_SUPPORTED"
+    "TOML format removed in v-0.2.7 for clean production release"
+    VALIDATION
+    mempty
+    Nothing
+    configErrorTimestamp
+  ENV -> Failure $ Error.create
+    "CONFIG_ENV_STRING_NOT_SUPPORTED"
+    "ENV string parsing removed in v-0.2.7 - use fromEnvironment function instead"
+    VALIDATION
+    mempty
+    Nothing
+    configErrorTimestamp
   where
     parseJSON :: Text -> Result ConfigData
     parseJSON txt = case JSON.decode (BSL.fromStrict (TE.encodeUtf8 txt)) of
@@ -253,23 +265,8 @@ fromString content format = case format of
         configErrorTimestamp
       Right value -> Success (ConfigData value)
     
-    parseTOML :: Text -> Result ConfigData
-    parseTOML _ = Failure $ Error.create
-      "CONFIG_TOML_NOT_IMPLEMENTED"
-      "TOML parsing requires API research - temporarily disabled"
-      CONFIGURATION
-      mempty
-      Nothing
-      configErrorTimestamp
-    
-    parseENV :: Text -> Result ConfigData
-    parseENV _ = Failure $ Error.create
-      "CONFIG_ENV_NOT_IMPLEMENTED"
-      "Environment variable parsing not yet implemented"
-      CONFIGURATION
-      mempty
-      Nothing
-      configErrorTimestamp
+    -- TOML and ENV string parsing removed in v-0.2.7 for clean production release
+    -- Use fromEnvironment for environment variable loading
 
 -- | Load configuration from environment variables with optional prefix
 --

@@ -1,5 +1,5 @@
 {
-  description = "QiCore Foundation - Mathematical Result<T> in Haskell with GHC 9.12.1 (Minimal)";
+  description = "QiCore Foundation - Mathematical Result<T> in Haskell with GHC 9.12.2 (Minimal)";
   
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
@@ -11,11 +11,11 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         
-        # Use GHC 9.12.1 - minimal setup with only working tools
-        ghcVersion = "ghc9121";
+        # Use GHC 9.12.2 - minimal setup with only working tools
+        ghcVersion = "ghc9122";
         hpkgs = pkgs.haskell.packages.${ghcVersion};
         
-        # MINIMAL essential tools that work with GHC 9.12.1
+        # MINIMAL essential tools that work with GHC 9.12.2
         devTools = [
           # Core tools (verified working)
           hpkgs.ghc
@@ -27,8 +27,8 @@
           pkgs.jq
           pkgs.nixpkgs-fmt
           
-          # Note: Advanced tools temporarily excluded due to GHC 9.12.1 compatibility:
-          # - haskell-language-server (build failures with GHC 9.12.1)
+          # Note: Advanced tools temporarily excluded due to GHC 9.12.2 compatibility:
+          # - haskell-language-server (build failures with GHC 9.12.2)
           # - ghcid (dependency issues)
           # - ormolu (version bound problems)
           # - hlint (compatibility lag)
@@ -41,7 +41,7 @@
           buildInputs = devTools;
           
           shellHook = ''
-            echo "🚀 QiCore Foundation - GHC 9.12.1 Minimal Environment"
+            echo "🚀 QiCore Foundation - GHC 9.12.2 Minimal Environment"
             echo "📦 GHC Version: $(ghc --version)"
             echo ""
             echo "✅ WORKING TOOLS:"
@@ -51,7 +51,7 @@
             echo "  cabal haddock                 - Generate docs (✅ WORKS)"
             echo ""
             echo "⏳ TEMPORARILY EXCLUDED (Ecosystem lag):"
-            echo "  haskell-language-server       - Build failures with GHC 9.12.1"
+            echo "  haskell-language-server       - Build failures with GHC 9.12.2"
             echo "  ghcid                        - Dependency compatibility issues"
             echo "  ormolu                       - Version bound problems"
             echo "  hlint                        - Compatibility lag"
@@ -62,7 +62,7 @@
             echo "  3. Use 'cabal test' for verification"
             echo "  4. Use 'cabal repl' for interactive development"
             echo ""
-            echo "🔥 You have CUTTING EDGE GHC 9.12.1 with core functionality!"
+            echo "🔥 You have CUTTING EDGE GHC 9.12.2 with core functionality!"
             echo "   Advanced tooling will follow as ecosystem catches up."
             echo ""
           '';
