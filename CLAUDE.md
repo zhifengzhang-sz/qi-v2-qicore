@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-QiCore v4.0 Foundation provides mathematical foundation types and infrastructure services for the QiCore platform. The repository implements category theory-based Result<T> monadic error handling and essential services (Config, Logger, Cache) across multiple languages with language-agnostic behavioral contracts.
+QiCore Foundation provides mathematical foundation types and infrastructure services for the QiCore platform. The repository implements category theory-based Result<T> monadic error handling and essential services (Config, Logger, Cache) across multiple languages with language-agnostic behavioral contracts.
 
 ## Key Architecture
 
@@ -200,7 +200,7 @@ cabal test qi-base:test --test-options="--quickcheck-tests=1000"
 #### Repository Scope Clarification
 **IMPORTANT**: This repository implements QiCore **Foundation Only** (Base + Core components):
 - ✅ Base: Result<T>, QiError with all mathematical operations
-- ✅ Core: Configuration, Logger, Cache with 2025 patterns
+- ✅ Core: Configuration, Logger, Cache with modern patterns
 - ❌ Application Components: HTTP, Document, CLP are in separate repositories
 
 Key verification points:
@@ -208,4 +208,4 @@ Key verification points:
 - Performance characteristics benchmarked and regression-tested  
 - Cross-language behavioral consistency ensured via shared test suites
 - Error handling patterns consistent across all implementations
-- 2025 patterns (OpenTelemetry, Valkey, dependency injection) properly integrated
+- Modern patterns (OpenTelemetry, Valkey, dependency injection) properly integrated

@@ -1,0 +1,42 @@
+# Haskell build artifacts
+dist-newstyle/
+dist/
+cabal.project.local
+cabal.project.local~
+.ghc.environment.*
+
+# Stack build artifacts
+.stack-work/
+stack.yaml.lock
+
+# Nix build artifacts
+result
+result-*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Package management
+*.cabal.sandbox.config
+.cabal-sandbox/
+
+# Generated documentation
+dist-docs/

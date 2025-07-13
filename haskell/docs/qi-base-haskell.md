@@ -82,21 +82,20 @@ data QiError = QiError
 -- Alternative and MonadPlus instances for error handling
 
 -- | Smart constructor for errors
-qiError :: T.Text -> T.Text -> ErrorCategory -> QiError
-qiError code msg category = QiError
-  { qiErrorCode = code
-  , qiErrorMessage = msg
-  , qiErrorCategory = category
-  , qiErrorContext = Map.empty
-  , qiErrorCause = Nothing
-  , qiErrorTimestamp = undefined -- Set during creation
-  }
-
--- | Create error with current timestamp (IO required)
+-- | Create QiError with current timestamp (IO required)
+-- Note: All QiError creation must be done in IO to set proper timestamps
 createError :: T.Text -> T.Text -> ErrorCategory -> IO QiError
 createError code msg category = do
   now <- getCurrentTime
-  pure $ (qiError code msg category) { qiErrorTimestamp = now }
+  pure $ QiError
+    { qiErrorCode = code
+    , qiErrorMessage = msg
+    , qiErrorCategory = category
+    , qiErrorContext = Map.empty
+    , qiErrorCause = Nothing
+    , qiErrorTimestamp = now
+    , qiErrorSeverity = MEDIUM  -- Default severity
+    }
 ```
 
 ### Factory Functions

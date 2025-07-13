@@ -1,0 +1,331 @@
+#!/usr/bin/env bash
+
+# QiCore Haskell Ecosystem Update Script
+# This script searches for the latest Nix/Haskell ecosystem updates and provides upgrade recommendations
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+DOCS_DIR="$PROJECT_ROOT/docs"
+
+# Logging function
+log() {
+    echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+# Check if required tools are available
+check_dependencies() {
+    local deps=("curl" "jq" "nix")
+    local missing=()
+    
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" &> /dev/null; then
+            missing+=("$dep")
+        fi
+    done
+    
+    if [ ${#missing[@]} -ne 0 ]; then
+        error "Missing required dependencies: ${missing[*]}"
+        error "Please install: ${missing[*]}"
+        exit 1
+    fi
+}
+
+# Fetch latest GHC version information
+fetch_ghc_versions() {
+    log "Fetching latest GHC version information..."
+    
+    # Get GHC releases from GitHub API
+    local ghc_releases
+    ghc_releases=$(curl -s "https://api.github.com/repos/ghc/ghc/releases" | jq -r '.[0:5] | .[] | select(.prerelease == false) | .tag_name' 2>/dev/null || echo "")
+    
+    if [ -z "$ghc_releases" ]; then
+        warning "Could not fetch GHC releases from GitHub API"
+        return 1
+    fi
+    
+    echo "📦 Latest GHC Releases:"
+    echo "$ghc_releases" | head -3 | sed 's/^/  • /'
+    echo
+    
+    # Get current GHC version
+    local current_ghc
+    if command -v ghc &> /dev/null; then
+        current_ghc=$(ghc --version | awk '{print $8}')
+        echo "🔧 Current GHC Version: $current_ghc"
+    else
+        echo "🔧 Current GHC Version: Not available (run 'nix develop' first)"
+    fi
+    echo
+}
+
+# Check Nixpkgs GHC availability
+check_nixpkgs_ghc() {
+    log "Checking GHC availability in nixpkgs..."
+    
+    # Search for available GHC versions in nixpkgs
+    local available_ghc
+    available_ghc=$(nix search nixpkgs ghc 2>/dev/null | grep -E "packages\..*\.ghc[0-9]+" | head -10 || echo "")
+    
+    if [ -z "$available_ghc" ]; then
+        warning "Could not query nixpkgs for GHC versions"
+        return 1
+    fi
+    
+    echo "🏪 Available GHC versions in nixpkgs:"
+    echo "$available_ghc" | sed 's/^/  • /'
+    echo
+}
+
+# Fetch Haskell ecosystem updates
+fetch_ecosystem_updates() {
+    log "Checking Haskell ecosystem updates..."
+    
+    # Package versions to check
+    local packages=("aeson" "tasty" "QuickCheck" "haskell-language-server")
+    
+    echo "📚 Current Package Ecosystem:"
+    for pkg in "${packages[@]}"; do
+        # Try to get version from Hackage API
+        local version
+        version=$(curl -s "https://hackage.haskell.org/package/$pkg" | grep -o "Latest version.*[0-9]\+\.[0-9]\+\.[0-9]\+" | head -1 | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" || echo "unknown")
+        echo "  • $pkg: $version"
+    done
+    echo
+}
+
+# Generate update recommendations
+generate_recommendations() {
+    log "Generating update recommendations..."
+    
+    local recommendations_file="$DOCS_DIR/ECOSYSTEM_UPDATE_$(date +%Y%m%d).md"
+    
+    cat > "$recommendations_file" << EOF
+# Haskell Ecosystem Update Report
+**Generated**: $(date '+%Y-%m-%d %H:%M:%S')
+
+## Current Status
+- **Project**: QiCore Foundation Haskell Implementation
+- **Current GHC**: $(ghc --version 2>/dev/null | awk '{print $8}' || echo "Unknown")
+- **Flake Status**: $(cd "$PROJECT_ROOT" && nix flake check 2>&1 | head -1 || echo "Check failed")
+
+## Update Recommendations
+
+### GHC Version Updates
+$(fetch_ghc_versions 2>&1 | sed 's/^//')
+
+### Package Updates
+$(fetch_ecosystem_updates 2>&1 | sed 's/^//')
+
+### Action Items
+
+#### Immediate Actions
+- [ ] Review latest GHC release notes for breaking changes
+- [ ] Check if newer GHC version is available in nixpkgs-unstable
+- [ ] Test build compatibility with potential GHC upgrade
+- [ ] Update package dependencies to latest compatible versions
+
+#### Monitoring Tasks
+- [ ] Subscribe to GHC release announcements
+- [ ] Monitor nixpkgs Haskell package updates
+- [ ] Track ecosystem package deprecations
+- [ ] Review Haskell Foundation roadmap updates
+
+### Useful Commands
+
+\`\`\`bash
+# Check current ecosystem status
+nix develop --command ghc --version
+nix search nixpkgs ghc | grep ghc9
+
+# Update flake inputs
+nix flake update
+
+# Test with newer packages
+nix develop --override-input nixpkgs github:nixos/nixpkgs/nixpkgs-unstable
+\`\`\`
+
+### Resources
+- [GHC Releases](https://www.haskell.org/ghc/blog/)
+- [Nixpkgs Haskell](https://search.nixos.org/packages?query=ghc)
+- [Hackage Status](https://hackage.haskell.org/)
+- [Haskell Foundation](https://haskell.foundation/)
+
+---
+*Generated by update-haskell-ecosystem.sh*
+EOF
+
+    success "Update report generated: $recommendations_file"
+}
+
+# Update flake inputs
+update_flake() {
+    log "Updating flake inputs..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # Backup current flake.lock
+    if [ -f "flake.lock" ]; then
+        cp flake.lock "flake.lock.backup.$(date +%Y%m%d_%H%M%S)"
+        log "Backed up current flake.lock"
+    fi
+    
+    # Update flake inputs
+    if nix flake update; then
+        success "Flake inputs updated successfully"
+        
+        # Show what changed
+        if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
+            log "Changes in flake.lock:"
+            git diff --no-index flake.lock.backup.* flake.lock 2>/dev/null | grep -E "^\+" | head -10 || echo "  No significant changes detected"
+        fi
+    else
+        error "Failed to update flake inputs"
+        return 1
+    fi
+}
+
+# Test updated environment
+test_environment() {
+    log "Testing updated environment..."
+    
+    cd "$PROJECT_ROOT"
+    
+    # Test nix develop
+    if timeout 60 nix develop --command echo "✅ Nix develop works"; then
+        success "Nix develop test passed"
+    else
+        error "Nix develop test failed"
+        return 1
+    fi
+    
+    # Test build
+    if timeout 300 nix develop --command cabal build qi-base; then
+        success "Build test passed"
+    else
+        error "Build test failed"
+        return 1
+    fi
+    
+    # Test basic functionality
+    if timeout 60 nix develop --command cabal test qi-base-test --test-show-details=never; then
+        success "Test suite passed"
+    else
+        warning "Test suite failed - review required"
+    fi
+}
+
+# Interactive mode for selective updates
+interactive_mode() {
+    echo "🔄 QiCore Haskell Ecosystem Update Tool"
+    echo "======================================"
+    echo
+    
+    PS3="Select an action: "
+    options=("Check Status" "Update Flake Inputs" "Generate Report" "Full Update" "Test Environment" "Exit")
+    
+    select opt in "${options[@]}"; do
+        case $opt in
+            "Check Status")
+                fetch_ghc_versions
+                check_nixpkgs_ghc
+                fetch_ecosystem_updates
+                ;;
+            "Update Flake Inputs")
+                update_flake
+                ;;
+            "Generate Report")
+                generate_recommendations
+                ;;
+            "Full Update")
+                update_flake
+                test_environment
+                generate_recommendations
+                ;;
+            "Test Environment")
+                test_environment
+                ;;
+            "Exit")
+                break
+                ;;
+            *) 
+                echo "Invalid option $REPLY"
+                ;;
+        esac
+        echo
+    done
+}
+
+# Main function
+main() {
+    echo "🚀 QiCore Haskell Ecosystem Update Script"
+    echo "========================================="
+    echo
+    
+    check_dependencies
+    
+    case "${1:-interactive}" in
+        --check)
+            fetch_ghc_versions
+            check_nixpkgs_ghc
+            fetch_ecosystem_updates
+            ;;
+        --update)
+            update_flake
+            test_environment
+            ;;
+        --report)
+            generate_recommendations
+            ;;
+        --full)
+            update_flake
+            test_environment
+            generate_recommendations
+            ;;
+        --help)
+            cat << EOF
+Usage: $0 [OPTION]
+
+Options:
+  --check     Check current ecosystem status
+  --update    Update flake inputs and test
+  --report    Generate update recommendations
+  --full      Perform full update cycle
+  --help      Show this help message
+  (no args)   Interactive mode
+
+Examples:
+  $0                 # Interactive mode
+  $0 --check         # Quick status check
+  $0 --full          # Complete update cycle
+EOF
+            ;;
+        interactive|*)
+            interactive_mode
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"
