@@ -1,6 +1,6 @@
 cabal-version: 3.6
 name: qi-foundation
-version: 0.2.2
+version: 0.2.6
 synopsis: QiCore Foundation - Base and Core Components
 description: 
   Complete QiCore Foundation implementation including mathematical foundation 
@@ -73,6 +73,9 @@ library
     unordered-containers >= 0.2 && < 0.3,
     vector >= 0.13 && < 0.14,
     async >= 2.2 && < 2.3,
+    -- YAML/TOML parsing support for configuration
+    yaml >= 0.11 && < 0.12,
+    toml-parser >= 2.0 && < 2.1,
     -- Redis/Valkey support for distributed cache  
     hedis >= 0.15 && < 0.16,
     network >= 3.1 && < 3.2
@@ -118,6 +121,8 @@ test-suite qi-core-test
     filepath,
     async,
     vector,
+    yaml,
+    toml-parser,
     QuickCheck >= 2.15 && < 2.16,
     tasty >= 1.5 && < 1.6,
     tasty-quickcheck >= 0.10 && < 0.11,

@@ -91,6 +91,8 @@ import GHC.Generics (Generic)
 import System.Environment (getEnvironment)
 import System.FilePath (takeExtension)
 import Text.Read (readMaybe)
+import Data.Yaml qualified as YAML
+import Toml qualified
 
 import Qi.Base.Error (QiError, ErrorCategory(..), ErrorSeverity(..))
 import Qi.Base.Error qualified as Error
@@ -241,18 +243,20 @@ fromString content format = case format of
       Just value -> Success (ConfigData value)
     
     parseYAML :: Text -> Result ConfigData
-    parseYAML _ = Failure $ Error.create
-      "CONFIG_YAML_NOT_IMPLEMENTED" 
-      "YAML parsing not yet implemented"
-      CONFIGURATION
-      mempty
-      Nothing
-      configErrorTimestamp
+    parseYAML content = case YAML.decodeEither' (TE.encodeUtf8 content) of
+      Left yamlError -> Failure $ Error.create
+        "CONFIG_YAML_PARSE_ERROR"
+        ("YAML parsing failed: " <> T.pack (YAML.prettyPrintParseException yamlError))
+        CONFIGURATION
+        (Map.fromList [("yamlError", JSON.String (T.pack (show yamlError))), ("content", JSON.String (T.take 100 content))])
+        Nothing
+        configErrorTimestamp
+      Right value -> Success (ConfigData value)
     
     parseTOML :: Text -> Result ConfigData
     parseTOML _ = Failure $ Error.create
       "CONFIG_TOML_NOT_IMPLEMENTED"
-      "TOML parsing not yet implemented" 
+      "TOML parsing requires API research - temporarily disabled"
       CONFIGURATION
       mempty
       Nothing

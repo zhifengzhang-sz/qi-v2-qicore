@@ -82,28 +82,24 @@ import Control.Concurrent.STM (STM, TVar, atomically, newTVar, readTVar, writeTV
 import Control.Applicative ((<|>))
 import Control.Monad (when, unless, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Aeson (Value(..), Object, ToJSON(..), FromJSON(..), (.=), (.:), (.:?))
+import Data.Aeson (Value(..), ToJSON(..), FromJSON(..), (.=), (.:), (.:?))
 import Data.Aeson qualified as JSON
 import Data.ByteString.Lazy qualified as BSL
-import Data.HashMap.Strict qualified as HM
 import Data.Map.Strict qualified as Map
 import Data.Text.Encoding qualified as TE
-import Data.Maybe (fromMaybe, isJust, isNothing)
-import Data.Scientific (Scientific)
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
-import Data.Time (UTCTime(..), getCurrentTime, addUTCTime, diffUTCTime, NominalDiffTime)
+import Data.Time (UTCTime(..), getCurrentTime, diffUTCTime, NominalDiffTime)
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (secondsToDiffTime)
 import GHC.Generics (Generic)
 import System.Directory (createDirectoryIfMissing, doesFileExist)
 import System.FilePath (takeDirectory)
 import qualified Database.Redis as Redis
-import qualified Data.ByteString.Char8 as BS
-import qualified Network.Socket as Net
 
-import Qi.Base.Error (QiError, ErrorCategory(..), ErrorSeverity(..))
+import Qi.Base.Error (ErrorCategory(..))
 import Qi.Base.Error qualified as Error
 import Qi.Base.Result (Result(..), pattern Success, pattern Failure)
 import Qi.Base.Result qualified as Result
@@ -386,10 +382,7 @@ createMultiThreaded config = liftIO $ do
 get :: MonadIO m => Text -> Cache -> m (Result Value)
 get key cache = liftIO $ do
   case cacheBackend cache of
-    DistributedBackend _ -> do
-      -- For now, use local cache for distributed backend (metadata)
-      -- Full Redis operations will be implemented in future version
-      getLocal key cache
+    DistributedBackend conn -> getRedis key cache conn
     _ -> getLocal key cache
 
 -- | Get value from local cache (memory/persistent)
@@ -451,10 +444,7 @@ getLocal key cache = do
 set :: MonadIO m => Text -> Value -> Maybe TTL -> Cache -> m (Result ())
 set key value maybeTTL cache = liftIO $ do
   case cacheBackend cache of
-    DistributedBackend _ -> do
-      -- For now, use local cache for distributed backend (metadata)
-      -- Full Redis operations will be implemented in future version
-      setLocal key value maybeTTL cache
+    DistributedBackend conn -> setRedis key value maybeTTL cache conn
     _ -> setLocal key value maybeTTL cache
 
 -- | Set value in local cache (memory/persistent)
@@ -509,7 +499,7 @@ setLocal key value maybeTTL cache = do
 has :: MonadIO m => Text -> Cache -> m Bool
 has key cache = liftIO $ do
   case cacheBackend cache of
-    DistributedBackend _ -> hasLocal key cache
+    DistributedBackend conn -> hasRedis key cache conn
     _ -> hasLocal key cache
 
 -- | Check key existence in local cache
@@ -530,7 +520,7 @@ hasLocal key cache = do
 remove :: MonadIO m => Text -> Cache -> m Bool
 remove key cache = liftIO $ do
   case cacheBackend cache of
-    DistributedBackend _ -> removeLocal key cache
+    DistributedBackend conn -> removeRedis key cache conn
     _ -> removeLocal key cache
 
 -- | Remove key from local cache
@@ -552,13 +542,13 @@ removeLocal key cache = atomically $ do
 clear :: MonadIO m => Cache -> m ()
 clear cache = liftIO $ do
   case cacheBackend cache of
-    DistributedBackend _ -> clearLocal cache
+    DistributedBackend conn -> clearRedis cache conn
     _ -> clearLocal cache
 
 -- | Clear local cache
 clearLocal :: Cache -> IO ()
 clearLocal cache = do
-  currentTime <- getCurrentTime
+  _currentTime <- getCurrentTime
   atomically $ do
     writeTVar (cacheEntries cache) mempty
     writeTVar (cacheAccessOrder cache) []
@@ -575,7 +565,7 @@ clearLocal cache = do
 size :: MonadIO m => Cache -> m Int
 size cache = liftIO $ do
   case cacheBackend cache of
-    DistributedBackend _ -> sizeLocal cache
+    DistributedBackend conn -> sizeRedis cache conn
     _ -> sizeLocal cache
 
 -- | Get size of local cache
@@ -623,7 +613,7 @@ getOrSet key factory maybeTTL cache = do
 setMany :: MonadIO m => Map.Map Text Value -> Maybe TTL -> Cache -> m (Result ())
 setMany kvPairs maybeTTL cache = liftIO $ do
   case cacheBackend cache of
-    DistributedBackend _ -> setManyLocal kvPairs maybeTTL cache
+    DistributedBackend conn -> setManyRedis kvPairs maybeTTL cache conn
     _ -> setManyLocal kvPairs maybeTTL cache
 
 -- | Set multiple values in local cache
@@ -631,9 +621,9 @@ setManyLocal :: Map.Map Text Value -> Maybe TTL -> Cache -> IO (Result ())
 setManyLocal kvPairs maybeTTL cache = do
   results <- mapM (\(k, v) -> setLocal k v maybeTTL cache) (Map.toList kvPairs)
   let failures = [err | Failure err <- results]
-  if null failures
-    then pure (Success ())
-    else pure (Failure (head failures))
+  case failures of
+    [] -> pure (Success ())
+    (firstError:_) -> pure (Failure firstError)
 
 
 -- | Get multiple values by keys
@@ -643,7 +633,7 @@ setManyLocal kvPairs maybeTTL cache = do
 getMany :: MonadIO m => [Text] -> Cache -> m (Result (Map.Map Text Value))
 getMany keys cache = liftIO $ do
   case cacheBackend cache of
-    DistributedBackend _ -> getManyLocal keys cache
+    DistributedBackend conn -> getManyRedis keys cache conn
     _ -> getManyLocal keys cache
 
 -- | Get multiple values from local cache
@@ -651,6 +641,24 @@ getManyLocal :: [Text] -> Cache -> IO (Result (Map.Map Text Value))
 getManyLocal keys cache = do
   results <- mapM (\k -> do
     result <- getLocal k cache
+    pure (k, result)) keys
+  let successes = [(k, v) | (k, Success v) <- results]
+  pure $ Success (Map.fromList successes)
+
+-- | Set multiple values in Redis cache
+setManyRedis :: Map.Map Text Value -> Maybe TTL -> Cache -> Redis.Connection -> IO (Result ())
+setManyRedis kvPairs maybeTTL cache conn = do
+  results <- mapM (\(k, v) -> setRedis k v maybeTTL cache conn) (Map.toList kvPairs)
+  let failures = [err | Failure err <- results]
+  case failures of
+    [] -> pure (Success ())
+    (firstError:_) -> pure (Failure firstError)
+
+-- | Get multiple values from Redis cache
+getManyRedis :: [Text] -> Cache -> Redis.Connection -> IO (Result (Map.Map Text Value))
+getManyRedis keys cache conn = do
+  results <- mapM (\k -> do
+    result <- getRedis k cache conn
     pure (k, result)) keys
   let successes = [(k, v) | (k, Success v) <- results]
   pure $ Success (Map.fromList successes)
@@ -751,11 +759,11 @@ createCluster :: MonadIO m => [(Text, Int)] -> CacheConfig -> m (Result [Cache])
 createCluster nodes config = do
   results <- mapM (\(host, port) -> createDistributed host port config) nodes
   let failures = [err | Failure err <- results]
-  if null failures
-    then do
+  case failures of
+    [] -> do
       let caches = [cache | Success cache <- results]
       pure (Success caches)
-    else pure (Failure (head failures))
+    (firstError:_) -> pure (Failure firstError)
 
 -- | Create cache with metrics integration (2025 Pattern)
 withMetrics :: MonadIO m => Cache -> m Cache
@@ -768,7 +776,7 @@ withMetrics cache = liftIO $ do
 -- | Get cache performance statistics
 getStats :: MonadIO m => Cache -> m CacheStats
 getStats cache = liftIO $ do
-  currentTime <- getCurrentTime
+  _currentTime <- getCurrentTime
   atomically $ do
     stats <- readTVar (cacheStats cache)
     currentSize <- Map.size <$> readTVar (cacheEntries cache)
@@ -854,11 +862,11 @@ cacheErrorTimestamp = UTCTime (fromGregorian 2025 1 1) (secondsToDiffTime 0)
 validateConfig :: CacheConfig -> Result ()
 validateConfig config = do
   case cacheMaxSize config of
-    Just size | size <= 0 -> Result.failure $ Error.create
+    Just maxSize | maxSize <= 0 -> Result.failure $ Error.create
       "CACHE_INVALID_MAX_SIZE"
       "Cache max size must be positive"
       VALIDATION
-      (Map.fromList [("maxSize", JSON.Number (fromIntegral size))])
+      (Map.fromList [("maxSize", JSON.Number (fromIntegral maxSize))])
       Nothing
       cacheErrorTimestamp
     _ -> Success ()
@@ -953,3 +961,126 @@ saveToDisk path cache = do
   let jsonContent = JSON.encode entries
   TIO.writeFile path (TE.decodeUtf8 (BSL.toStrict jsonContent))
   pure (Success ())
+
+-- Redis Operations Implementation
+
+-- | Get value from Redis cache
+getRedis :: Text -> Cache -> Redis.Connection -> IO (Result Value)
+getRedis key cache conn = do
+  result <- Redis.runRedis conn $ Redis.get (TE.encodeUtf8 key)
+  case result of
+    Left redisError -> do
+      -- Update stats for miss and return error
+      atomically $ updateStats cache (\s -> s { statsMisses = statsMisses s + 1 })
+      pure $ Failure $ Error.create
+        "CACHE_REDIS_GET_ERROR"
+        ("Redis GET operation failed: " <> T.pack (show redisError))
+        NETWORK
+        (Map.fromList [("key", JSON.String key), ("error", JSON.String (T.pack (show redisError)))])
+        Nothing
+        cacheErrorTimestamp
+    Right Nothing -> do
+      -- Key not found in Redis
+      atomically $ updateStats cache (\s -> s { statsMisses = statsMisses s + 1 })
+      pure $ Failure $ Error.create
+        "CACHE_KEY_NOT_FOUND"
+        ("Cache key not found: " <> key)
+        RESOURCE
+        (Map.fromList [("key", JSON.String key)])
+        Nothing
+        cacheErrorTimestamp
+    Right (Just redisValue) -> do
+      -- Parse JSON value from Redis
+      case JSON.decode (BSL.fromStrict redisValue) of
+        Nothing -> do
+          atomically $ updateStats cache (\s -> s { statsMisses = statsMisses s + 1 })
+          pure $ Failure $ Error.create
+            "CACHE_REDIS_JSON_PARSE_ERROR"
+            ("Failed to parse JSON from Redis for key: " <> key)
+            SERIALIZATION
+            (Map.fromList [("key", JSON.String key), ("rawValue", JSON.String (TE.decodeUtf8 redisValue))])
+            Nothing
+            cacheErrorTimestamp
+        Just value -> do
+          -- Successfully retrieved and parsed value
+          atomically $ updateStats cache (\s -> s { statsHits = statsHits s + 1 })
+          pure $ Success value
+
+-- | Set value in Redis cache
+setRedis :: Text -> Value -> Maybe TTL -> Cache -> Redis.Connection -> IO (Result ())
+setRedis key value maybeTTL _cache conn = do
+  let jsonValue = BSL.toStrict $ JSON.encode value
+      redisKey = TE.encodeUtf8 key
+  
+  -- Set value in Redis with optional TTL
+  result <- case maybeTTL of
+    Nothing -> Redis.runRedis conn $ Redis.set redisKey jsonValue
+    Just NoTTL -> Redis.runRedis conn $ Redis.set redisKey jsonValue
+    Just (TTLSeconds seconds) -> do
+      let ttlSeconds = round seconds :: Integer
+      Redis.runRedis conn $ Redis.setex redisKey ttlSeconds jsonValue
+    Just (TTLUntil expireTime) -> do
+      currentTime <- getCurrentTime
+      let diffSeconds = round $ diffUTCTime expireTime currentTime :: Integer
+      if diffSeconds > 0
+        then Redis.runRedis conn $ Redis.setex redisKey diffSeconds jsonValue
+        else Redis.runRedis conn $ Redis.set redisKey jsonValue  -- Already expired, set without TTL
+  
+  case result of
+    Left redisError -> pure $ Failure $ Error.create
+      "CACHE_REDIS_SET_ERROR"
+      ("Redis SET operation failed: " <> T.pack (show redisError))
+      NETWORK
+      (Map.fromList [("key", JSON.String key), ("error", JSON.String (T.pack (show redisError)))])
+      Nothing
+      cacheErrorTimestamp
+    Right status -> case status of
+      Redis.Ok -> pure $ Success ()
+      _ -> pure $ Failure $ Error.create
+        "CACHE_REDIS_SET_FAILED"
+        ("Redis SET operation returned non-OK status: " <> T.pack (show status))
+        NETWORK
+        (Map.fromList [("key", JSON.String key), ("status", JSON.String (T.pack (show status)))])
+        Nothing
+        cacheErrorTimestamp
+
+-- | Check if key exists in Redis cache
+hasRedis :: Text -> Cache -> Redis.Connection -> IO Bool
+hasRedis key _cache conn = do
+  result <- Redis.runRedis conn $ Redis.exists (TE.encodeUtf8 key)
+  case result of
+    Left _ -> pure False  -- Connection error treated as "not found"
+    Right exists -> pure exists  -- exists returns Bool directly
+
+-- | Remove key from Redis cache
+removeRedis :: Text -> Cache -> Redis.Connection -> IO Bool
+removeRedis key _cache conn = do
+  result <- Redis.runRedis conn $ Redis.del [TE.encodeUtf8 key]
+  case result of
+    Left _ -> pure False  -- Connection error treated as "not removed"
+    Right count -> pure (count > 0)  -- Returns count of deleted keys
+
+-- | Clear all keys from Redis cache (WARNING: affects entire Redis DB)
+clearRedis :: Cache -> Redis.Connection -> IO ()
+clearRedis cache conn = do
+  -- Note: FLUSHDB clears entire Redis database, use with caution
+  result <- Redis.runRedis conn $ Redis.flushdb
+  case result of
+    Left _ -> pure ()  -- Ignore errors for clear operation
+    Right _ -> do
+      -- Update local stats
+      _currentTime <- getCurrentTime
+      atomically $ do
+        stats <- readTVar (cacheStats cache)
+        writeTVar (cacheStats cache) $ stats
+          { statsSize = 0
+          , statsEvictions = statsEvictions stats + statsSize stats
+          }
+
+-- | Get approximate size of Redis cache
+sizeRedis :: Cache -> Redis.Connection -> IO Int
+sizeRedis _cache conn = do
+  result <- Redis.runRedis conn $ Redis.dbsize
+  case result of
+    Left _ -> pure 0  -- Connection error, return 0
+    Right dbSize -> pure (fromIntegral dbSize)
