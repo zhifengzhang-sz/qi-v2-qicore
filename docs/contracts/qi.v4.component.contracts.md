@@ -1,20 +1,14 @@
-# QiCore v4.0 Component Architecture Specification
+# QiCore v4.0 Foundation Architecture Specification
 
-This document defines the component-level architecture for QiCore v4.0. Components are organizational units that group related behavioral contracts with clear dependency relationships and interface boundaries.
+This document defines the component-level architecture for QiCore v4.0 Foundation. The Foundation consists of two core components that provide mathematical foundation types and essential infrastructure services.
 
-## Component Architecture Overview
+## Foundation Architecture Overview
 
-QiCore v4.0 is organized into five distinct components that form a dependency hierarchy:
+QiCore v4.0 Foundation is organized into two components with a clear dependency hierarchy:
 
 ```mermaid
 graph TD
-    subgraph "QiCore v4.0 Component Architecture"
-        subgraph "Application Components"
-            HTTP[HTTP Component]
-            Document[Document Component]
-            CLP[CLP Component]
-        end
-        
+    subgraph "QiCore v4.0 Foundation Architecture"
         subgraph "Core Component"
             CoreComp[Core Component<br/>Config, Logger, Cache]
         end
@@ -23,17 +17,11 @@ graph TD
             BaseComp[Base Component<br/>Result, QiError]
         end
         
-        HTTP --> CoreComp
-        Document --> CoreComp
-        CLP --> CoreComp
-        
         CoreComp --> BaseComp
         
-        classDef component fill:#e8f5e9,stroke:#1b5e20,stroke-width:3px
         classDef core fill:#f3e5f5,stroke:#4a148c,stroke-width:3px
         classDef base fill:#e1f5fe,stroke:#01579b,stroke-width:3px
         
-        class HTTP,Document,CLP component
         class CoreComp core
         class BaseComp base
     end
@@ -161,182 +149,6 @@ merged = merge([defaultConfig, fileConfig, envConfig])
 logger = create(LogConfig{level: INFO})
 log(INFO, "Application started", {version: "1.0.0"}, logger)
 ```
-
----
-
-## HTTP Component
-
-**Purpose**: Asynchronous HTTP client functionality with robust error handling and resilience patterns
-
-### Component Interface
-
-```
-HttpComponent provides:
-  HTTP operations (all async):
-    - get(url, options) → async Result<HttpResponse>
-    - post(url, body, options) → async Result<HttpResponse>
-    - put(url, body, options) → async Result<HttpResponse>
-    - delete(url, options) → async Result<HttpResponse>
-    - request(config) → async Result<HttpResponse>
-    - stream(url, options) → async Result<Stream<Chunk>>
-  
-  Circuit Breaker operations:
-    - withCircuitBreaker(config) → HttpClient
-    - getCircuitState() → CircuitState
-```
-
-### Included Contracts
-- **HTTP Client**: Full-featured HTTP client with retries and timeouts
-- **Circuit Breaker**: Failure detection and recovery patterns
-- **Streaming**: Support for chunked responses and large payloads
-
-### Dependencies
-- **Base Component**: Uses Result<T> and QiError
-- **Core Component**: 
-  - Uses Configuration for default settings (timeouts, retries)
-  - Uses Logger for request/response logging
-  - May use Cache for response caching
-
-### Exported Types
-- `HttpResponse`: Response data structure
-- `HttpConfig`: Request configuration
-- `HttpOptions`: Simplified request options
-- `CircuitBreakerConfig`: Circuit breaker settings
-- `CircuitState`: Current circuit state (CLOSED, OPEN, HALF_OPEN)
-- `Stream<T>`: Async stream for chunked data
-
-### Component Guarantees
-- **Async Operations**: All operations are asynchronous
-- **Automatic Retries**: Configurable retry policies with exponential backoff
-- **Timeout Management**: Request-level timeout control
-- **Connection Pooling**: Efficient connection reuse
-- **Circuit Breaking**: Automatic failure detection and recovery
-- **Streaming Support**: Memory-efficient large response handling
-
-### Circuit Breaker Configuration
-```yaml
-CircuitBreakerConfig:
-  failureThreshold: Number     # Failures before opening (default: 5)
-  resetTimeout: Number         # Ms before attempting reset (default: 60000)
-  monitoringPeriod: Number     # Ms window for failure counting (default: 10000)
-  halfOpenRequests: Number     # Requests to test in half-open (default: 3)
-```
-
-### Usage Pattern
-```
-// Language-agnostic pattern
-httpClient = withCircuitBreaker(
-  CircuitBreakerConfig{
-    failureThreshold: 5,
-    resetTimeout: 60000
-  }
-)
-
-// Streaming large response
-streamResult = stream("https://api.example.com/large-file", httpClient)
-if isSuccess(streamResult) then
-  stream = unwrap(streamResult)
-  forEach chunk in stream do
-    processChunk(chunk)  // Process without loading entire response
-  end
-end
-```
-
----
-
-## Document Component
-
-**Purpose**: Template-based document generation with multiple format support and streaming capabilities
-
-### Component Interface
-
-```
-DocumentComponent provides:
-  Document operations:
-    - generate(template, data) → async Result<Document>
-    - generateFromFile(path, data) → async Result<Document>
-    - generateStream(template, data) → async Result<Stream<DocumentChunk>>
-    - generateBatch(templates, data) → async Result<Array<Document>>
-    - validateTemplate(template, schema) → Result<ValidationResult>
-```
-
-### Included Contracts
-- **Document Generation**: Multi-engine template processing
-- **Streaming Generation**: Memory-efficient large document handling
-
-### Dependencies
-- **Base Component**: Uses Result<T> and QiError
-- **Core Component**:
-  - Uses Configuration for template paths and settings
-  - Uses Logger for generation logging
-  - May use Cache for compiled templates
-
-### Exported Types
-- `Document`: Generated document structure
-- `Template`: Template definition
-- `ValidationResult`: Template validation outcome
-- `DocumentChunk`: Streamable document fragment
-- `Stream<DocumentChunk>`: Async stream for large documents
-
-### Component Guarantees
-- **Format Agnostic**: Supports multiple output formats
-- **Engine Agnostic**: Pluggable template engines
-- **Batch Processing**: Efficient multi-document generation
-- **Validation**: Pre-generation template validation
-- **Streaming**: Memory-efficient large document generation
-
-### Usage Pattern
-```
-// Language-agnostic pattern
-streamResult = generateStream(template, largeDataset)  // async
-if isSuccess(streamResult) then
-  stream = unwrap(streamResult)
-  writer = createFileWriter("output.pdf")
-  
-  forEach chunk in stream do
-    write(chunk, writer)  // async
-  end
-  close(writer)  // async
-end
-```
-
----
-
-## CLP Component
-
-**Purpose**: Command-line argument parsing with validation and help generation
-
-### Component Interface
-
-```
-CLPComponent provides:
-  CLI operations:
-    - parse(args, config) → Result<ParsedArguments>
-    - parseString(input, config) → Result<ParsedArguments>
-    - validate(args, config) → Result<ValidationResult>
-    - generateHelp(config) → string
-    - generateUsage(config) → string
-```
-
-### Included Contracts
-- **Command-Line Processing**: Hierarchical command parsing
-
-### Dependencies
-- **Base Component**: Uses Result<T> and QiError
-- **Core Component**:
-  - Uses Configuration for default values
-  - Uses Logger for debug output
-
-### Exported Types
-- `ParsedArguments`: Parsed command-line structure
-- `ParserConfig`: Parser configuration
-- `ValidationResult`: Argument validation outcome
-
-### Component Guarantees
-- **Type Safety**: Runtime type validation
-- **Hierarchical Commands**: Nested command support
-- **Auto Documentation**: Help and usage generation
-- **POSIX Compliance**: Standard option parsing
 
 ---
 

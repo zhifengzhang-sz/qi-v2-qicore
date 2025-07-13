@@ -150,6 +150,24 @@ validateTypes:
     - "returns original config if types match"
     - "returns VALIDATION error with type mismatches"
     - "supports basic types: String, Number, Boolean, Array, Object"
+
+# 2025 Pattern: Injected Configuration with Dependency Injection
+validateDependencies:
+  signature: "DependencySchema → ConfigData → Result<ConfigData>"
+  behavior: "Validate configuration dependencies are satisfied"
+  laws:
+    - "checks that all service dependencies have valid configurations"
+    - "validates circular dependency detection"
+    - "returns CONFIGURATION error for missing dependencies"
+
+# 2025 Pattern: Strategy Pattern for Configuration Loading
+loadStrategy:
+  signature: "LoadStrategy → ConfigData → Result<ConfigData>"
+  behavior: "Apply strategy-based configuration loading"
+  laws:
+    - "supports multiple loading strategies (file, env, remote, etc.)"
+    - "strategies are composable and cacheable"
+    - "enables hot-reloading with change detection"
 ```
 
 ## 2. Logger Behavioral Contract
@@ -273,6 +291,33 @@ withContext:
     - "all subsequent log calls include context"
     - "context merged with per-call context"
     - "original logger unchanged (immutable)"
+
+# 2025 Pattern: OpenTelemetry Integration
+withTraceContext:
+  signature: "TraceId → SpanId → Logger → Logger"
+  behavior: "Create logger with OpenTelemetry trace correlation"
+  laws:
+    - "all logs include trace and span IDs for correlation"
+    - "enables distributed tracing across services"
+    - "compatible with OpenTelemetry semantic conventions"
+
+# 2025 Pattern: Structured Logging with Correlation
+withCorrelationId:
+  signature: "CorrelationId → Logger → Logger"
+  behavior: "Create logger with correlation ID for request tracking"
+  laws:
+    - "all logs include correlation ID"
+    - "enables request flow tracking across components"
+    - "supports nested correlation contexts"
+
+# 2025 Pattern: AI-Enhanced Observability
+logWithMetrics:
+  signature: "Message → Metrics → Context? → Logger → Effect<Void>"
+  behavior: "Log with associated performance metrics"
+  laws:
+    - "includes execution time, memory usage, etc."
+    - "enables AI-driven anomaly detection"
+    - "supports automated performance analysis"
 ```
 
 ## 3. Cache Behavioral Contract
@@ -408,6 +453,43 @@ expire:
     - "removes key from cache immediately"
     - "returns true if key was present"
     - "equivalent to TTL reaching zero"
+
+# 2025 Pattern: Distributed Cache Operations
+createDistributed:
+  signature: "ClusterConfig → CacheConfig → Result<Cache>"
+  behavior: "Create distributed cache (Redis/Valkey cluster)"
+  laws:
+    - "supports up to 1000 nodes (Valkey improvement)"
+    - "automatic failover and scaling"
+    - "consistent hashing for key distribution"
+    - "20% memory optimization over Redis (Valkey)"
+
+# 2025 Pattern: Multi-threaded Cache Operations
+createMultiThreaded:
+  signature: "ThreadConfig → CacheConfig → Result<Cache>"
+  behavior: "Create cache with enhanced multithreading (Valkey)"
+  laws:
+    - "improved I/O multithreading for modern CPUs"
+    - "parallel operations while maintaining data safety"
+    - "significant performance improvements on multi-core"
+
+# 2025 Pattern: Cache-aside with Write-behind
+writeBehind:
+  signature: "Key → Value → BackingStore → Cache → Result<Void>"
+  behavior: "Asynchronous write to backing store"
+  laws:
+    - "cache updated immediately"
+    - "backing store updated asynchronously"
+    - "reduces write latency for applications"
+
+# 2025 Pattern: Cache Warming and Preloading
+warmCache:
+  signature: "List<Key> → DataSource → Cache → Result<Integer>"
+  behavior: "Preload cache with frequently accessed data"
+  laws:
+    - "returns count of successfully loaded entries"
+    - "non-blocking operation with progress tracking"
+    - "respects TTL and eviction policies"
 ```
 
 ### Cache Semantics

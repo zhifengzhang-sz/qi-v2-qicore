@@ -40,10 +40,11 @@ fromAsyncTryCatch:
     - "promise rejection becomes failure state"
 
 fromMaybe:
-  signature: "(QiError, T?) → Result<T>"
+  signature: "(T?, QiError) → Result<T>"
   laws:
     - "if value != null: result.isSuccess() == true"
     - "if value == null: result.isFailure() == true"
+    - "parameters: (maybeValue, errorIfNull) for consistency"
 
 fromEither:
   signature: "Either<QiError, T> → Result<T>"
@@ -68,11 +69,12 @@ isFailure:
     - "isFailure(success(x)) == false"
     - "isSuccess(r) XOR isFailure(r) == true"
 
-getData:
+getValue:
   signature: "Result<T> → T?"
   laws:
-    - "getData(success(x)) == x"
-    - "getData(failure(e)) == null"
+    - "getValue(success(x)) == x"
+    - "getValue(failure(e)) == null"
+    - "partial function: use with type checking"
 
 getError:
   signature: "Result<T> → QiError?"
@@ -83,7 +85,7 @@ getError:
 
 ### Transformation Operations
 ```yaml
-mapResult:
+map:
   signature: "(T → U) → Result<T> → Result<U>"
   laws:
     # Functor Laws
@@ -104,10 +106,60 @@ flatMap:
   laws:
     # Monad Laws
     - "left identity: flatMap(f)(success(x)) == f(x)"
-    - "right identity: flatMap(success) == id"
-    - "associativity: flatMap(g) ∘ flatMap(f) == flatMap(x => flatMap(g)(f(x)))"
+    - "right identity: result.flatMap(success) == result"
+    - "associativity: result.flatMap(f).flatMap(g) == result.flatMap(x => f(x).flatMap(g))"
     # Behavior Laws
     - "flatMap(f)(failure(e)) == failure(e)"
+
+andThen:
+  signature: "(T → Result<U>) → Result<T> → Result<U>"
+  laws:
+    # Alias for flatMap with clearer semantics (Rust-style naming)
+    - "andThen(f) == flatMap(f)"
+    - "andThen(f)(success(x)) == f(x)"
+    - "andThen(f)(failure(e)) == failure(e)"
+    - "more intuitive than flatMap for sequential operations"
+
+inspect:
+  signature: "(T → void) → Result<T> → Result<T>"
+  laws:
+    - "inspect(f)(success(x)) == success(x) after calling f(x)"
+    - "inspect(f)(failure(e)) == failure(e) without calling f"
+    - "used for logging, debugging, side effects"
+    - "does not change Result value or type"
+
+inspectErr:
+  signature: "(QiError → void) → Result<T> → Result<T>"
+  laws:
+    - "inspectErr(f)(failure(e)) == failure(e) after calling f(e)"
+    - "inspectErr(f)(success(x)) == success(x) without calling f"
+    - "used for error logging, debugging"
+    - "does not change Result value or type"
+
+collect:
+  signature: "Result<Result<T>> → Result<T>"
+  laws:
+    # Flattens nested Results (join/flatten operation)
+    - "collect(success(success(x))) == success(x)"
+    - "collect(success(failure(e))) == failure(e)"
+    - "collect(failure(e)) == failure(e)"
+    - "equivalent to flatMap(identity)"
+
+filter:
+  signature: "(T → Boolean) → Result<T> → Result<T>"
+  laws:
+    - "filter(pred)(success(x)) == success(x) if pred(x) is true"
+    - "filter(pred)(success(x)) == failure(FILTERED_ERROR) if pred(x) is false"
+    - "filter(pred)(failure(e)) == failure(e)"
+    - "essential for validation pipelines"
+
+orElse:
+  signature: "(QiError → Result<T>) → Result<T> → Result<T>"
+  laws:
+    - "orElse(alt)(success(x)) == success(x)"
+    - "orElse(alt)(failure(e)) == alt(e)"
+    - "provides error recovery mechanism"
+    - "enables fallback strategies"
 ```
 
 ### Extraction Operations
@@ -155,6 +207,101 @@ traverse:
   laws:
     - "traverse(f) == sequence ∘ map(f)"
     - "maintains order: preserves input list order"
+
+partition:
+  signature: "List<Result<T>> → (List<T>, List<QiError>)"
+  laws:
+    - "splits Results into separate success and error lists"
+    - "preserves order within each list"
+    - "total function: handles all Results"
+    - "partition(results) == (successes, failures)"
+
+lefts:
+  signature: "List<Result<T>> → List<QiError>"
+  laws:
+    - "extracts all errors from Result list"
+    - "lefts(results) == errors where result.isFailure()"
+    - "preserves order of errors"
+
+rights:
+  signature: "List<Result<T>> → List<T>"
+  laws:
+    - "extracts all successes from Result list"
+    - "rights(results) == values where result.isSuccess()"
+    - "preserves order of values"
+
+combine2:
+  signature: "Result<T> → Result<U> → ((T, U) → V) → Result<V>"
+  laws:
+    - "combine2(success(x), success(y), f) == success(f(x, y))"
+    - "if either Result is failure, return first failure"
+    - "enables applicative combination of two Results"
+    - "fails fast on first error"
+```
+
+### Applicative Operations
+```yaml
+apply:
+  signature: "Result<(T → U)> → Result<T> → Result<U>"
+  laws:
+    # Applicative Laws
+    - "identity: apply(success(id))(result) == result"
+    - "composition: apply(apply(apply(success(compose))(f))(g))(x) == apply(f)(apply(g)(x))"
+    - "homomorphism: apply(success(f))(success(x)) == success(f(x))"
+    - "interchange: apply(f)(success(x)) == apply(success(f => f(x)))(f)"
+    # Behavior Laws
+    - "apply(success(f))(success(x)) == success(f(x))"
+    - "apply(failure(e))(result) == failure(e)"
+    - "apply(success(f))(failure(e)) == failure(e)"
+
+pure:
+  signature: "T → Result<T>"
+  laws:
+    - "pure(x) == success(x)"
+    - "applicative unit operation"
+    - "alias for success in applicative context"
+```
+
+### Async Operations
+```yaml
+asyncMap:
+  signature: "(T → Promise<U>) → Result<T> → Promise<Result<U>>"
+  laws:
+    - "asyncMap(f)(success(x)) == Promise.resolve(success(await f(x)))"
+    - "asyncMap(f)(failure(e)) == Promise.resolve(failure(e))"
+    - "preserves Result semantics in async context"
+    - "handles async function exceptions as failures"
+
+asyncAndThen:
+  signature: "(T → Promise<Result<U>>) → Result<T> → Promise<Result<U>>"
+  laws:
+    - "async version of andThen/flatMap"
+    - "asyncAndThen(f)(success(x)) == f(x)"
+    - "asyncAndThen(f)(failure(e)) == Promise.resolve(failure(e))"
+    - "handles Promise rejection as failure"
+
+asyncSequence:
+  signature: "List<Promise<Result<T>>> → Promise<Result<List<T>>>"
+  laws:
+    - "resolves all promises, then applies sequence logic"
+    - "if all Results are success: returns success with all values"
+    - "if any Result is failure: returns first failure"
+    - "maintains async semantics with Result logic"
+
+fromPromise:
+  signature: "Promise<T> → Promise<Result<T>>"
+  laws:
+    - "converts Promise<T> to Promise<Result<T>>"
+    - "Promise resolution becomes success"
+    - "Promise rejection becomes failure with QiError"
+    - "preserves async timing"
+
+toPromise:
+  signature: "Result<T> → Promise<T>"
+  laws:
+    - "success(x) becomes Promise.resolve(x)"
+    - "failure(e) becomes Promise.reject(e)"
+    - "converts Result back to Promise semantics"
 ```
 
 ## 2. QiError Behavioral Contract
@@ -285,6 +432,37 @@ withSeverity:
   laws:
     - "preserves all fields except severity"
     - "immutable: original error unchanged"
+
+chain:
+  signature: "QiError → QiError → QiError"
+  laws:
+    - "creates error chain preserving both errors"
+    - "chain(cause, effect) links cause as root of effect"
+    - "different from withCause: preserves both error contexts"
+    - "maintains causal relationship"
+
+getRootError:
+  signature: "QiError → QiError"
+  laws:
+    - "follows cause chain to find original error"
+    - "getRootError(error) == error if no cause"
+    - "terminates: cause chains are finite"
+    - "more explicit than getRootCause"
+
+hasCategory:
+  signature: "ErrorCategory → QiError → Boolean"
+  laws:
+    - "hasCategory(cat, error) == (error.category == cat)"
+    - "O(1) operation for category checking"
+    - "used for retry strategy decisions"
+
+formatChain:
+  signature: "QiError → String"
+  laws:
+    - "returns human-readable error chain"
+    - "includes all errors in causal order"
+    - "suitable for logging and debugging"
+    - "consistent format across implementations"
 ```
 
 ## 3. ErrorCategory Enumeration Contract
@@ -319,6 +497,30 @@ categories:
     retry_strategy: "timeout_backoff"
     description: "Operation time limit exceeded"
   
+  ASYNC:
+    retry_strategy: "exponential_backoff"
+    description: "Async operation failures (cancellation, await issues)"
+  
+  CONCURRENCY:
+    retry_strategy: "linear_backoff"
+    description: "Thread safety, locking, race conditions"
+  
+  RESOURCE:
+    retry_strategy: "linear_backoff"
+    description: "Memory, file handles, connection limits"
+  
+  CONFIGURATION:
+    retry_strategy: "never"
+    description: "Config loading, validation, missing keys"
+  
+  SERIALIZATION:
+    retry_strategy: "never"
+    description: "JSON/YAML parsing, data conversion"
+  
+  FILESYSTEM:
+    retry_strategy: "linear_backoff"
+    description: "File I/O operations, permissions"
+  
   UNKNOWN:
     retry_strategy: "cautious"
     description: "Unclassified errors"
@@ -327,6 +529,7 @@ laws:
   - "complete enumeration: covers all expected error types"
   - "mutually exclusive: each error has exactly one category"
   - "retry strategy: category determines retry behavior"
+  - "categories reflect modern async/concurrent programming needs"
 ```
 
 ## 4. Advanced Behavioral Contracts
