@@ -1,6 +1,6 @@
-# QiCore v4.0 Foundation
+# QiCore Foundation
 
-**Mathematical foundation types and essential infrastructure services for QiCore v4.0 platform**
+**Mathematical foundation types and essential infrastructure services for QiCore platform**
 
 ## Overview
 
@@ -14,13 +14,13 @@ QiCore Foundation provides the mathematical and infrastructure building blocks t
 ```
 qi-v2-qicore/
 ├── docs/contracts/                    # Language-agnostic behavioral contracts
-│   ├── qi.v4.base.contracts.md       # Result<T>, QiError contracts
-│   ├── qi.v4.core.contracts.md       # Config, Logger, Cache contracts  
-│   └── qi.v4.component.contracts.md  # Component architecture
+│   ├── qi.base.contracts.md          # Result<T>, QiError contracts
+│   ├── qi.core.contracts.md          # Config, Logger, Cache contracts  
+│   └── qi.component.contracts.md     # Component architecture
 ├── haskell/                          # Haskell implementation
-├── typescript/                       # TypeScript implementation (future)
-├── python/                          # Python implementation (future)
-└── rust/                            # Rust implementation (future)
+├── typescript/                       # TypeScript implementation
+├── python/                           # Python implementation
+└── cpp/                              # C++ implementation
 ```
 
 ## Core Components
@@ -106,6 +106,15 @@ cabal build qi-base qi-core
 cabal test
 ```
 
+### Implementation Status
+
+| Language   | Status | Version | Features |
+|------------|--------|---------|----------|
+| **Haskell** | 🚧 In Progress | GHC 9.12+ | Category theory foundation, STM concurrency |
+| **TypeScript** | 📋 Specified | 5.8+ | Modern type system, async/await patterns |
+| **Python** | 📋 Specified | 3.13+ | JIT optimization, No-GIL mode |
+| **C++** | 📋 Specified | C++23/26 | std::expected, modules, SIMD |
+
 ### Cross-Language Compatibility
 
 The foundation contracts ensure identical behavior across all language implementations:
@@ -126,13 +135,28 @@ configuration_monoid_laws:
 ## Dependencies
 
 ### Haskell
-- **GHC 9.10+**: Modern Haskell with GHC2024 language edition
+- **GHC 9.12+**: Modern Haskell with latest language features
 - **Core Libraries**: text, containers, stm, aeson, time
 - **Development**: hspec, QuickCheck, tasty (for testing)
 
+### TypeScript
+- **TypeScript 5.8+**: Latest type system features
+- **Node.js 22+**: Modern JavaScript runtime
+- **Testing**: Vitest, Node.js built-in test runner
+
+### Python
+- **Python 3.13+**: JIT optimization and No-GIL mode support
+- **Core Libraries**: dataclasses, typing, asyncio
+- **Testing**: pytest, hypothesis (property-based testing)
+
+### C++
+- **C++23/26**: std::expected, modules, reflection
+- **Compilers**: GCC 14+, Clang 17+, MSVC 19.40+
+- **Build**: CMake 3.28+ for module support
+
 ### Build Requirements
-- **Nix**: Reproducible development environment
-- **Cabal 3.6+**: Modern Haskell build system
+- **Nix**: Reproducible development environment (Haskell)
+- **Language-specific**: See individual implementation directories
 
 ## Testing
 
@@ -166,7 +190,7 @@ cabal test --test-options="--quickcheck-tests=1000"
 
 ## Contract Compliance
 
-This implementation satisfies **ALL** contracts defined in the language-agnostic specifications. Any implementation claiming QiCore v4.0 compatibility must pass the same contract verification tests.
+All implementations satisfy **ALL** contracts defined in the language-agnostic specifications. Any implementation claiming QiCore compatibility must pass the same contract verification tests.
 
 ---
 
