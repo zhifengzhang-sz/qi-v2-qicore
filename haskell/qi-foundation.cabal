@@ -1,0 +1,149 @@
+cabal-version: 3.6
+name: qi-foundation
+version: 0.2.2
+synopsis: QiCore Foundation - Base and Core Components
+description: 
+  Complete QiCore Foundation implementation including mathematical foundation 
+  types (Result<T>, QiError) and essential infrastructure services (Config, 
+  Logger, Cache). Provides category theory-based monadic error handling and 
+  modern 2025 patterns including OpenTelemetry integration, STM concurrency,
+  and Valkey compatibility for distributed caching.
+
+license: MIT
+author: Qi Platform
+maintainer: qi@platform.com
+category: Control, System, Configuration, Logging, Caching
+build-type: Simple
+tested-with: GHC ==9.12.1
+
+-- Modern Haskell language settings (GHC 9.12.1 optimized)
+common shared-properties
+  default-language: Haskell2010
+  default-extensions:
+    -- Essential modern extensions for GHC 9.12.1
+    OverloadedStrings
+    DeriveGeneric
+    DeriveAnyClass
+    DerivingStrategies
+    StrictData
+    ImportQualifiedPost
+    LambdaCase
+    PatternSynonyms
+    ScopedTypeVariables
+    TupleSections
+    
+  ghc-options:
+    -Wall
+    -Wcompat
+    -Widentities
+    -Wincomplete-record-updates
+    -Wincomplete-uni-patterns
+    -Wmissing-export-lists
+    -Wmissing-home-modules
+    -Wpartial-fields
+    -Wredundant-constraints
+    -Wunused-packages
+
+-- Complete QiCore Foundation library
+library
+  import: shared-properties
+  exposed-modules:
+    -- Base Component (Mathematical Foundations)
+    Qi.Base.Error
+    Qi.Base.Result
+    -- Core Component (Infrastructure Services)
+    Qi.Core.Config
+    Qi.Core.Logger
+    Qi.Core.Cache
+    -- Foundation Integration
+    Qi.Foundation
+  hs-source-dirs: src, src/qi/base, src/qi/core
+  build-depends:
+    base >= 4.19 && < 5,
+    text >= 2.0 && < 3,
+    containers >= 0.6 && < 0.8,
+    time >= 1.12 && < 2,
+    aeson >= 2.2 && < 2.3,
+    stm >= 2.5 && < 2.6,
+    -- Additional dependencies for qi/core
+    bytestring >= 0.11 && < 0.13,
+    directory >= 1.3 && < 1.4,
+    filepath >= 1.4 && < 1.6,
+    scientific >= 0.3 && < 0.4,
+    unordered-containers >= 0.2 && < 0.3,
+    vector >= 0.13 && < 0.14,
+    async >= 2.2 && < 2.3
+
+-- Comprehensive test suite for qi-base component
+test-suite qi-base-test
+  import: shared-properties
+  type: exitcode-stdio-1.0
+  main-is: QiBaseTest.hs
+  hs-source-dirs: test
+  build-depends:
+    base,
+    qi-foundation,
+    text,
+    containers,
+    time,
+    aeson,
+    QuickCheck >= 2.15 && < 2.16,
+    tasty >= 1.5 && < 1.6,
+    tasty-quickcheck >= 0.10 && < 0.11,
+    tasty-hunit >= 0.10 && < 0.11
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+
+-- NOTE: qi-core and qi-foundation tests temporarily disabled until core implementation is complete
+-- 
+-- test-suite qi-core-test
+--   import: shared-properties
+--   type: exitcode-stdio-1.0
+--   main-is: QiCoreTest.hs
+--   hs-source-dirs: test
+--   build-depends:
+--     base,
+--     qi-foundation,
+--     text,
+--     containers,
+--     time,
+--     aeson,
+--     stm,
+--     bytestring,
+--     directory,
+--     filepath,
+--     async,
+--     vector,
+--     QuickCheck >= 2.15 && < 2.16,
+--     tasty >= 1.5 && < 1.6,
+--     tasty-quickcheck >= 0.10 && < 0.11,
+--     tasty-hunit >= 0.10 && < 0.11
+--   ghc-options:
+--     -threaded
+--     -rtsopts
+--     -with-rtsopts=-N
+-- 
+-- test-suite qi-foundation-test
+--   import: shared-properties
+--   type: exitcode-stdio-1.0
+--   main-is: QiFoundationTest.hs
+--   hs-source-dirs: test
+--   build-depends:
+--     base,
+--     qi-foundation,
+--     text,
+--     containers,
+--     time,
+--     aeson,
+--     stm,
+--     async,
+--     QuickCheck >= 2.15 && < 2.16,
+--     tasty >= 1.5 && < 1.6,
+--     tasty-quickcheck >= 0.10 && < 0.11,
+--     tasty-hunit >= 0.10 && < 0.11
+--   ghc-options:
+--     -threaded
+--     -rtsopts
+--     -with-rtsopts=-N

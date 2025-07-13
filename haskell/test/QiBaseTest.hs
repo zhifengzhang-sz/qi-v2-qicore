@@ -8,6 +8,7 @@ module Main (main) where
 
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
+import Test.Tasty.HUnit
 
 import Qi.Base.Result as R
 import Qi.Base.Error as E
@@ -15,6 +16,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as Map
 import Data.Aeson (Value(..))
+import Control.Monad.IO.Class (liftIO)
+import Control.Exception (catch, SomeException)
 
 -- | Main test entry point - modern Tasty-based test suite
 main :: IO ()
@@ -34,6 +37,16 @@ main = defaultMain $ testGroup "QiCore Base Component Tests"
     [ errorQueryTests
     , errorTransformationTests
     ]
+  -- NOTE: Collection, Async, and Error Chain operations are not yet implemented
+  -- , testGroup "Result Collection Operations"
+  --   [ resultCollectionTests
+  --   ]
+  -- , testGroup "Result Async Operations"
+  --   [ resultAsyncTests  
+  --   ]
+  -- , testGroup "Error Chain Operations"
+  --   [ errorChainTests
+  --   ]
   ]
 
 -- ============================================================================
@@ -223,3 +236,131 @@ errorTransformationTests = testGroup "Error Transformation Operations"
       let chained = E.chain err1 err2
       in E.qiErrorCause chained === Just err1
   ]
+
+{- | Test Result collection operations (Critical Missing Coverage)
+resultCollectionTests :: TestTree
+resultCollectionTests = testGroup "Collection Operations"
+  [ QC.testProperty "sequence converts [Result a] to Result [a] with all Success" $ \(xs :: [Int]) ->
+      let results = Prelude.map R.success xs
+          sequenced = R.sequence results
+      in sequenced === R.success xs
+      
+  , QC.testProperty "sequence fails fast on first Failure" $ \(xs :: [Int]) (err :: QiError) ->
+      not (null xs) ==>
+      let results = R.success (head xs) : [R.failure err] ++ Prelude.map R.success (tail xs)
+          sequenced = R.sequence results
+      in sequenced === R.failure err
+      
+  , QC.testProperty "traverse = sequence . map f" $ \(xs :: [Int]) ->
+      let f x = R.success (x * 2)
+          traversed = R.traverse f xs
+          sequenceMap = R.sequence (Prelude.map f xs)
+      in traversed === sequenceMap
+      
+  , QC.testProperty "partition splits Success and Failure" $ \(results :: [Result Int]) ->
+      let (successes, failures) = R.partition results
+          allSuccess = all R.isSuccess (Prelude.map R.success successes)
+          allFailure = all R.isFailure failures
+      in allSuccess && allFailure
+      
+  , QC.testProperty "lefts extracts all failure errors" $ \(results :: [Result Int]) ->
+      let failures = R.lefts results
+          expectedCount = length (Prelude.filter R.isFailure results)
+      in length failures === expectedCount
+      
+  , QC.testProperty "rights extracts all success values" $ \(results :: [Result Int]) ->
+      let successes = R.rights results
+          expectedCount = length (Prelude.filter R.isSuccess results)
+      in length successes === expectedCount
+      
+  , QC.testProperty "combine2 with two Success values" $ \(x :: Int) (y :: Int) ->
+      let result1 = R.success x
+          result2 = R.success y
+          combined = R.combine2 (,) result1 result2
+      in combined === R.success (x, y)
+      
+  , QC.testProperty "combine2 fails if either input fails" $ \(x :: Int) (err :: QiError) ->
+      let result1 = R.success x
+          result2 = R.failure err
+          combined1 = R.combine2 (,) result1 result2
+          combined2 = R.combine2 (,) result2 result1
+      in combined1 === R.failure err && combined2 === R.failure err
+  ]
+
+-- | Test Result async operations (Critical Missing Coverage)
+resultAsyncTests :: TestTree
+resultAsyncTests = testGroup "Async Operations"
+  [ testCase "asyncMap applies function asynchronously to Success" $ do
+      let result = R.success 42
+      asyncResult <- R.asyncMap (\x -> return (x * 2)) result
+      asyncResult @?= R.success 84
+      
+  , testCase "asyncMap preserves Failure" $ do
+      let err = arbitraryError "ASYNC_TEST" "Test error"
+          result = R.failure err
+      asyncResult <- R.asyncMap (\x -> return (x * 2)) result
+      asyncResult @?= R.failure err
+      
+  , testCase "asyncAndThen chains async computations" $ do
+      let result = R.success 42
+          asyncComputation x = return (R.success (x * 2))
+      asyncResult <- R.asyncAndThen asyncComputation result
+      asyncResult @?= R.success 84
+      
+  , testCase "asyncSequence processes list of async Results" $ do
+      let asyncResults = [return (R.success 1), return (R.success 2), return (R.success 3)]
+      finalResult <- R.asyncSequence asyncResults
+      finalResult @?= R.success [1, 2, 3]
+      
+  , testCase "fromPromise converts IO success to Result" $ do
+      let ioAction = return 42
+      result <- R.fromPromise ioAction
+      result @?= R.success 42
+      
+  , testCase "fromPromise converts IO exception to Failure" $ do
+      let ioAction = error "Test exception" :: IO Int
+      result <- R.fromPromise ioAction  
+      case result of
+        R.Success _ -> assertFailure "Expected Failure from exception"
+        R.Failure _ -> return () -- Expected
+  ]
+
+-- | Test Error chain operations (Missing Coverage)
+errorChainTests :: TestTree
+errorChainTests = testGroup "Error Chain Operations"
+  [ QC.testProperty "getRootCause follows chain to the end" $ \err1 err2 err3 ->
+      let chained = E.chain err1 (E.chain err2 err3)
+          root = E.getRootCause chained
+      in root === err1 -- err1 is the root cause
+      
+  , QC.testProperty "getErrorChain returns complete chain" $ \err1 err2 err3 ->
+      let chained = E.chain err1 (E.chain err2 err3)
+          chain = E.getErrorChain chained
+      in length chain === 3 && head chain === chained
+      
+  , QC.testProperty "formatChain includes all errors in chain" $ \err1 err2 ->
+      let chained = E.chain err1 err2
+          formatted = E.formatChain chained
+      in T.length formatted > 0 && 
+         T.isInfixOf (E.qiErrorMessage err1) formatted &&
+         T.isInfixOf (E.qiErrorMessage err2) formatted
+         
+  , QC.testProperty "hasCategory finds category in chain" $ \err1 err2 ->
+      let chained = E.chain err1 err2
+          category1 = E.qiErrorCategory err1
+          category2 = E.qiErrorCategory err2
+      in E.hasCategory category1 chained && E.hasCategory category2 chained
+  ]
+-}
+
+-- Helper function for creating test errors
+arbitraryError :: Text -> Text -> QiError
+arbitraryError code message = QiError
+  { E.qiErrorCode = code
+  , E.qiErrorMessage = message
+  , E.qiErrorCategory = E.VALIDATION
+  , E.qiErrorContext = Map.empty
+  , E.qiErrorCause = Nothing
+  , E.qiErrorTimestamp = read "1970-01-01 00:00:00 UTC"
+  , E.qiErrorSeverity = E.MEDIUM
+  }

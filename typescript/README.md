@@ -1,10 +1,10 @@
-# QiCore v4.0 Foundation - TypeScript Implementation
+# QiCore Foundation - TypeScript Implementation
 
 **Mathematical foundation types and infrastructure services implemented in modern TypeScript**
 
 ## Overview
 
-This TypeScript implementation provides the foundational types and infrastructure services defined by the QiCore v4.0 contracts. It implements Result<T> monadic error handling and essential infrastructure services (Config, Logger, Cache) with full type safety and performance optimization.
+This TypeScript implementation provides the foundational types and infrastructure services defined by the QiCore Foundation contracts. It implements Result<T> monadic error handling and essential infrastructure services (Config, Logger, Cache) with full type safety and performance optimization.
 
 ## Project Structure
 

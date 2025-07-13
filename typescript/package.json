@@ -1,7 +1,7 @@
 {
   "name": "@qi/qicore-foundation",
-  "version": "4.0.0",
-  "description": "QiCore v4.0 Foundation - Mathematical foundation types and infrastructure services",
+  "version": "0.2.2",
+  "description": "QiCore Foundation - Mathematical foundation types and infrastructure services",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.mjs", 
