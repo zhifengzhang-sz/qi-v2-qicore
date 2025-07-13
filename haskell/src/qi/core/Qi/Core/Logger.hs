@@ -29,6 +29,7 @@ module Qi.Core.Logger
   , LogLevel(..)
   , LogFormat(..)
   , LogDestination(..)
+  , OTelExporter(..)
   , LoggerConfig(..)
   , LogContext(..)
   , LogMessage(..)
@@ -86,11 +87,12 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.Text.IO qualified as TIO
-import Data.Time (UTCTime(..), getCurrentTime, formatTime, defaultTimeLocale)
+import Data.Time (UTCTime(..), getCurrentTime, formatTime, defaultTimeLocale, diffUTCTime)
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (secondsToDiffTime)
 import GHC.Generics (Generic)
 import System.IO (Handle, stdout, stderr)
+import Network.Socket (PortNumber)
 
 import Qi.Base.Error (QiError, ErrorCategory(..), ErrorSeverity(..))
 import Qi.Base.Error qualified as Error
@@ -125,13 +127,30 @@ data LogFormat
   | CUSTOM  -- ^ Custom formatting function
   deriving (Show, Eq, Generic)
 
+-- | OpenTelemetry exporter configuration
+data OTelExporter
+  = JaegerExporter Text Int          -- ^ Jaeger exporter (host, port)
+  | ZipkinExporter Text Int          -- ^ Zipkin exporter (host, port)  
+  | OTLPExporter Text Int            -- ^ OTLP/gRPC exporter (host, port)
+  | ConsoleExporter                  -- ^ Console exporter for debugging
+  | CustomExporter Text (LogMessage -> IO ()) -- ^ Custom exporter function
+  deriving (Generic)
+
+instance Show OTelExporter where
+  show (JaegerExporter host port) = "JaegerExporter " <> T.unpack host <> ":" <> show port
+  show (ZipkinExporter host port) = "ZipkinExporter " <> T.unpack host <> ":" <> show port
+  show (OTLPExporter host port) = "OTLPExporter " <> T.unpack host <> ":" <> show port
+  show ConsoleExporter = "ConsoleExporter"
+  show (CustomExporter name _) = "CustomExporter " <> T.unpack name
+
 -- | Log output destinations
 data LogDestination
   = Console Handle       -- ^ Console output (stdout/stderr)
   | File FilePath        -- ^ File output with path
   | Network Text Int     -- ^ Network output (host, port)
+  | OpenTelemetry OTelExporter -- ^ OpenTelemetry exporter
   | Multiple [LogDestination]  -- ^ Multiple destinations
-  deriving (Show, Eq, Generic)
+  deriving (Show, Generic)
 
 -- | Logger configuration specification
 data LoggerConfig = LoggerConfig
@@ -625,7 +644,110 @@ outputMessage config msg = do
             ]
       -- Write to stderr as fallback since network would require HTTP client
       TIO.hPutStrLn stderr $ "Network log [" <> host <> ":" <> T.pack (show port) <> "]: " <> TE.decodeUtf8 (BSL.toStrict logEntry)
+    OpenTelemetry exporter -> exportToOpenTelemetry exporter msg
     Multiple dests -> mapM_ (\dest -> outputMessage config { loggerDestination = dest } msg) dests
+
+-- | Export log message to OpenTelemetry backend
+exportToOpenTelemetry :: OTelExporter -> LogMessage -> IO ()
+exportToOpenTelemetry exporter msg = case exporter of
+  JaegerExporter host port -> exportToJaeger host port msg
+  ZipkinExporter host port -> exportToZipkin host port msg
+  OTLPExporter host port -> exportToOTLP host port msg
+  ConsoleExporter -> exportToConsole msg
+  CustomExporter _ exportFunc -> exportFunc msg
+
+-- | Export to Jaeger via structured output (simplified for foundation)
+exportToJaeger :: Text -> Int -> LogMessage -> IO ()
+exportToJaeger host port msg = do
+  let jaegerSpan = JSON.object
+        [ "traceID" .= fromMaybe "" (logContextTraceId (logMessageContext msg))
+        , "spanID" .= fromMaybe "" (logContextSpanId (logMessageContext msg))
+        , "operationName" .= logMessageText msg
+        , "startTime" .= (toMicroseconds (logMessageTimestamp msg))
+        , "duration" .= (1000 :: Int) -- 1ms default duration
+        , "tags" .= logContextFields (logMessageContext msg)
+        , "logs" .= [JSON.object
+            [ "timestamp" .= toMicroseconds (logMessageTimestamp msg)
+            , "fields" .= [JSON.object ["key" .= ("level" :: Text), "value" .= show (logMessageLevel msg)]]
+            ]]
+        ]
+  
+  let requestBody = JSON.object ["spans" .= [jaegerSpan]]
+  TIO.hPutStrLn stderr $ "JAEGER[" <> host <> ":" <> T.pack (show port) <> "]: " <> TE.decodeUtf8 (BSL.toStrict (JSON.encode requestBody))
+  where
+    toMicroseconds :: UTCTime -> Integer
+    toMicroseconds utc = floor (realToFrac (utc `diffUTCTime` epoch) * 1000000)
+    epoch = UTCTime (fromGregorian 1970 1 1) 0
+
+-- | Export to Zipkin via structured output (simplified for foundation)  
+exportToZipkin :: Text -> Int -> LogMessage -> IO ()
+exportToZipkin host port msg = do
+  let zipkinSpan = JSON.object
+        [ "traceId" .= fromMaybe "unknown" (logContextTraceId (logMessageContext msg))
+        , "id" .= fromMaybe "unknown" (logContextSpanId (logMessageContext msg))
+        , "name" .= logMessageText msg
+        , "timestamp" .= toMicroseconds (logMessageTimestamp msg)
+        , "duration" .= (1000 :: Int) -- 1ms default duration
+        , "tags" .= logContextFields (logMessageContext msg)
+        , "annotations" .= [JSON.object
+            [ "timestamp" .= toMicroseconds (logMessageTimestamp msg)
+            , "value" .= show (logMessageLevel msg)
+            ]]
+        ]
+  
+  TIO.hPutStrLn stderr $ "ZIPKIN[" <> host <> ":" <> T.pack (show port) <> "]: " <> TE.decodeUtf8 (BSL.toStrict (JSON.encode [zipkinSpan]))
+  where
+    toMicroseconds :: UTCTime -> Integer
+    toMicroseconds utc = floor (realToFrac (utc `diffUTCTime` epoch) * 1000000)
+    epoch = UTCTime (fromGregorian 1970 1 1) 0
+
+-- | Export to OTLP endpoint via structured output (simplified for foundation)
+exportToOTLP :: Text -> Int -> LogMessage -> IO ()
+exportToOTLP host port msg = do
+  let otlpLog = JSON.object
+        [ "resource" .= JSON.object
+            [ "attributes" .= [JSON.object ["key" .= ("service.name" :: Text), "value" .= ("qicore-foundation" :: Text)]]
+            ]
+        , "scopeLogs" .= [JSON.object
+            [ "scope" .= JSON.object ["name" .= ("qi.core.logger" :: Text)]
+            , "logRecords" .= [JSON.object
+                [ "timeUnixNano" .= show (toNanoseconds (logMessageTimestamp msg))
+                , "severityNumber" .= levelToSeverityNumber (logMessageLevel msg)
+                , "severityText" .= levelToText (logMessageLevel msg)
+                , "body" .= JSON.object ["stringValue" .= logMessageText msg]
+                , "attributes" .= logContextFields (logMessageContext msg)
+                , "traceId" .= fromMaybe "" (logContextTraceId (logMessageContext msg))
+                , "spanId" .= fromMaybe "" (logContextSpanId (logMessageContext msg))
+                ]]
+            ]]
+        ]
+  
+  TIO.hPutStrLn stderr $ "OTLP[" <> host <> ":" <> T.pack (show port) <> "]: " <> TE.decodeUtf8 (BSL.toStrict (JSON.encode otlpLog))
+  where
+    toNanoseconds :: UTCTime -> Integer
+    toNanoseconds utc = floor (realToFrac (utc `diffUTCTime` epoch) * 1000000000)
+    epoch = UTCTime (fromGregorian 1970 1 1) 0
+    
+    levelToSeverityNumber :: LogLevel -> Int
+    levelToSeverityNumber DEBUG = 5
+    levelToSeverityNumber INFO = 9
+    levelToSeverityNumber WARN = 13
+    levelToSeverityNumber ERROR = 17
+    levelToSeverityNumber FATAL = 21
+
+-- | Export to console for debugging
+exportToConsole :: LogMessage -> IO ()
+exportToConsole msg = do
+  let otelFormat = JSON.object
+        [ "timestamp" .= logMessageTimestamp msg
+        , "level" .= logMessageLevel msg
+        , "message" .= logMessageText msg
+        , "traceId" .= logContextTraceId (logMessageContext msg)
+        , "spanId" .= logContextSpanId (logMessageContext msg)
+        , "correlationId" .= logContextCorrelationId (logMessageContext msg)
+        , "context" .= logContextFields (logMessageContext msg)
+        ]
+  TIO.putStrLn $ "OTEL: " <> TE.decodeUtf8 (BSL.toStrict (JSON.encode otelFormat))
 
 -- Default FromJSON instances for configuration
 

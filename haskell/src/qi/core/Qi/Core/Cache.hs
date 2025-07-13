@@ -28,6 +28,7 @@ module Qi.Core.Cache
     Cache(..)
   , CacheConfig(..)
   , CacheEntry(..)
+  , CacheBackend(..)
   , EvictionPolicy(..)
   , CacheStats(..)
   , TTL(..)
@@ -98,6 +99,9 @@ import Data.Time.Clock (secondsToDiffTime)
 import GHC.Generics (Generic)
 import System.Directory (createDirectoryIfMissing, doesFileExist)
 import System.FilePath (takeDirectory)
+import qualified Database.Redis as Redis
+import qualified Data.ByteString.Char8 as BS
+import qualified Network.Socket as Net
 
 import Qi.Base.Error (QiError, ErrorCategory(..), ErrorSeverity(..))
 import Qi.Base.Error qualified as Error
@@ -211,15 +215,29 @@ instance ToJSON CacheStats where
     , "lastReset" .= statsLastReset stats
     ]
 
+-- | Cache backend specification for different storage types
+data CacheBackend
+  = MemoryBackend                    -- ^ In-memory storage only
+  | PersistentBackend FilePath       -- ^ File-based persistent storage
+  | DistributedBackend Redis.Connection -- ^ Redis/Valkey distributed storage
+  deriving (Generic)
+
+instance Show CacheBackend where
+  show MemoryBackend = "MemoryBackend"
+  show (PersistentBackend path) = "PersistentBackend " <> path
+  show (DistributedBackend _) = "DistributedBackend <connection>"
+
 -- | Thread-safe cache implementation using STM
 --
 -- The cache maintains all state in STM variables for lock-free concurrent access.
 -- LRU tracking uses a combination of HashMap for O(1) lookup and access ordering.
+-- Supports multiple backends: memory, persistent, and distributed.
 data Cache = Cache
   { cacheConfig :: !(TVar CacheConfig)           -- ^ Mutable configuration
   , cacheEntries :: !(TVar (Map.Map Text CacheEntry))  -- ^ Entry storage
   , cacheAccessOrder :: !(TVar [Text])          -- ^ LRU access ordering
   , cacheStats :: !(TVar CacheStats)            -- ^ Performance statistics
+  , cacheBackend :: !CacheBackend               -- ^ Storage backend
   } deriving (Generic)
 
 instance Show Cache where
@@ -246,6 +264,7 @@ createMemory config = liftIO $ do
         , cacheEntries = entriesVar
         , cacheAccessOrder = accessOrderVar
         , cacheStats = statsVar
+        , cacheBackend = MemoryBackend
         }
 
 -- | Create cache with disk persistence
@@ -280,6 +299,7 @@ createPersistent path config = liftIO $ do
         , cacheEntries = entriesVar
         , cacheAccessOrder = accessOrderVar
         , cacheStats = statsVar
+        , cacheBackend = PersistentBackend path
         }
 
 -- | Create distributed cache with Valkey/Redis compatibility (2025 Pattern)
@@ -287,26 +307,50 @@ createPersistent path config = liftIO $ do
 -- Supports up to 1000 nodes with automatic failover.
 -- 20% memory optimization over Redis.
 createDistributed :: MonadIO m => Text -> Int -> CacheConfig -> m (Result Cache)
-createDistributed _host _port config = liftIO $ do
-  -- For now, return a memory cache as distributed cache is not fully implemented
-  -- In a real implementation, this would connect to Valkey/Redis cluster
+createDistributed host port config = liftIO $ do
   case validateConfig config of
     Failure err -> pure (Failure err)
     Success _ -> do
-      currentTime <- getCurrentTime
-      let distributedConfig = config { cacheStatsEnabled = True }
+      -- Connect to Redis/Valkey server
+      let connectInfo = Redis.defaultConnectInfo 
+            { Redis.connectHost = T.unpack host
+            , Redis.connectPort = Redis.PortNumber (fromIntegral port)
+            }
+      -- First test the connection
+      connection <- Redis.connect connectInfo
+      connectionResult <- Redis.runRedis connection $ Redis.ping
       
-      configVar <- atomically $ newTVar distributedConfig
-      entriesVar <- atomically $ newTVar mempty
-      accessOrderVar <- atomically $ newTVar []
-      statsVar <- atomically $ newTVar (initialStats currentTime)
-      
-      pure $ Success Cache
-        { cacheConfig = configVar
-        , cacheEntries = entriesVar
-        , cacheAccessOrder = accessOrderVar
-        , cacheStats = statsVar
-        }
+      case connectionResult of
+        Left redisError -> do
+          timestamp <- getCurrentTime
+          pure $ Failure $ Error.create
+            "CACHE_REDIS_CONNECTION_ERROR"
+            ("Failed to connect to Redis/Valkey server: " <> T.pack (show redisError))
+            NETWORK
+            (Map.fromList [("host", JSON.String host), ("port", JSON.Number (fromIntegral port))])
+            Nothing
+            timestamp
+        Right _ -> do
+          -- Connection successful, use the established connection
+          
+          currentTime <- getCurrentTime
+          let distributedConfig = config 
+                { cacheStatsEnabled = True
+                , cacheMaxSize = Nothing  -- Redis handles memory management
+                }
+          
+          configVar <- atomically $ newTVar distributedConfig
+          entriesVar <- atomically $ newTVar mempty  -- Local cache for metadata only
+          accessOrderVar <- atomically $ newTVar []
+          statsVar <- atomically $ newTVar (initialStats currentTime)
+          
+          pure $ Success Cache
+            { cacheConfig = configVar
+            , cacheEntries = entriesVar
+            , cacheAccessOrder = accessOrderVar
+            , cacheStats = statsVar
+            , cacheBackend = DistributedBackend connection
+            }
 
 -- | Create cache with enhanced multithreading (2025 Pattern)
 --
@@ -331,6 +375,7 @@ createMultiThreaded config = liftIO $ do
         , cacheEntries = entriesVar
         , cacheAccessOrder = accessOrderVar
         , cacheStats = statsVar
+        , cacheBackend = MemoryBackend  -- Multi-threaded memory cache
         }
 
 -- | Retrieve value from cache

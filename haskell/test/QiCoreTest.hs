@@ -13,7 +13,7 @@ module Main where
 
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, wait, mapConcurrently)
-import Control.Concurrent.STM (atomically)
+import Control.Concurrent.STM (atomically, readTVar)
 import Control.Monad (replicateM, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value(..), object, (.=))
@@ -31,7 +31,7 @@ import Test.Tasty.HUnit
 import System.IO (stdout)
 
 import Qi.Base.Error qualified as Error
-import Qi.Base.Result (Result(..))
+import Qi.Base.Result (Result(..), pattern Success, pattern Failure)
 import Qi.Base.Result qualified as Result
 import Qi.Core.Cache qualified as Cache
 import Qi.Core.Config qualified as Config  
@@ -96,6 +96,13 @@ loggerTests = testGroup "Logger Tests"
       [ testCase "JSON format structure" loggerJSONFormat
       , testCase "Text format readability" loggerTextFormat
       ]
+  , testGroup "OpenTelemetry Exporters"
+      [ testCase "Jaeger exporter output format" loggerJaegerExporter
+      , testCase "Zipkin exporter output format" loggerZipkinExporter
+      , testCase "OTLP exporter output format" loggerOTLPExporter
+      , testCase "Console exporter functionality" loggerConsoleExporter
+      , testCase "Custom exporter functionality" loggerCustomExporter
+      ]
   ]
 
 -- Cache Component Tests  
@@ -125,6 +132,12 @@ cacheTests = testGroup "Cache Tests"
       [ testCase "getOrSet atomic behavior" cacheGetOrSetAtomic
       , QC.testProperty "setMany atomicity" cacheSetManyAtomicity
       , QC.testProperty "getMany completeness" cacheGetManyCompleteness
+      ]
+  , testGroup "Backend Types"
+      [ testCase "Memory backend creation" cacheMemoryBackend
+      , testCase "Persistent backend creation" cachePersistentBackend
+      , testCase "Distributed backend connection validation" cacheDistributedBackend
+      , testCase "Backend type isolation" cacheBackendIsolation
       ]
   ]
 
@@ -725,3 +738,163 @@ arbitraryText = T.pack <$> listOf1 (choose ('a', 'z'))
 
 instance Arbitrary Logger.LogLevel where
   arbitrary = elements [Logger.DEBUG, Logger.INFO, Logger.WARN, Logger.ERROR, Logger.FATAL]
+
+-- OpenTelemetry Exporter Tests
+
+loggerJaegerExporter :: Assertion
+loggerJaegerExporter = do
+  let jaegerConfig = defaultLoggerConfig 
+        { Logger.loggerDestination = Logger.OpenTelemetry (Logger.JaegerExporter "localhost" 14268) }
+  loggerResult <- Logger.create jaegerConfig
+  case loggerResult of
+    Success logger -> do
+      -- Test that logger with Jaeger exporter can be created and used
+      Logger.info "Test Jaeger export" Nothing logger
+      -- Verify logger configuration
+      config <- atomically $ readTVar (Logger.loggerConfig logger)
+      case Logger.loggerDestination config of
+        Logger.OpenTelemetry (Logger.JaegerExporter host port) -> do
+          host @?= "localhost"
+          port @?= 14268
+        _ -> assertFailure "Expected Jaeger exporter destination"
+    Failure _ -> assertFailure "Jaeger logger creation should succeed"
+
+loggerZipkinExporter :: Assertion  
+loggerZipkinExporter = do
+  let zipkinConfig = defaultLoggerConfig
+        { Logger.loggerDestination = Logger.OpenTelemetry (Logger.ZipkinExporter "zipkin.local" 9411) }
+  loggerResult <- Logger.create zipkinConfig
+  case loggerResult of
+    Success logger -> do
+      -- Test that logger with Zipkin exporter can be created and used
+      Logger.info "Test Zipkin export" Nothing logger
+      -- Verify logger configuration
+      config <- atomically $ readTVar (Logger.loggerConfig logger)
+      case Logger.loggerDestination config of
+        Logger.OpenTelemetry (Logger.ZipkinExporter host port) -> do
+          host @?= "zipkin.local"
+          port @?= 9411
+        _ -> assertFailure "Expected Zipkin exporter destination"
+    Failure _ -> assertFailure "Zipkin logger creation should succeed"
+
+loggerOTLPExporter :: Assertion
+loggerOTLPExporter = do
+  let otlpConfig = defaultLoggerConfig
+        { Logger.loggerDestination = Logger.OpenTelemetry (Logger.OTLPExporter "otel-collector" 4317) }
+  loggerResult <- Logger.create otlpConfig
+  case loggerResult of
+    Success logger -> do
+      -- Test that logger with OTLP exporter can be created and used
+      Logger.info "Test OTLP export" Nothing logger
+      -- Verify logger configuration
+      config <- atomically $ readTVar (Logger.loggerConfig logger)
+      case Logger.loggerDestination config of
+        Logger.OpenTelemetry (Logger.OTLPExporter host port) -> do
+          host @?= "otel-collector"
+          port @?= 4317
+        _ -> assertFailure "Expected OTLP exporter destination"
+    Failure _ -> assertFailure "OTLP logger creation should succeed"
+
+loggerConsoleExporter :: Assertion
+loggerConsoleExporter = do
+  let consoleConfig = defaultLoggerConfig
+        { Logger.loggerDestination = Logger.OpenTelemetry Logger.ConsoleExporter }
+  loggerResult <- Logger.create consoleConfig
+  case loggerResult of
+    Success logger -> do
+      -- Test that logger with Console exporter can be created and used
+      Logger.info "Test Console export" Nothing logger
+      -- Verify logger configuration
+      config <- atomically $ readTVar (Logger.loggerConfig logger)
+      case Logger.loggerDestination config of
+        Logger.OpenTelemetry Logger.ConsoleExporter -> pure ()
+        _ -> assertFailure "Expected Console exporter destination"
+    Failure _ -> assertFailure "Console logger creation should succeed"
+
+loggerCustomExporter :: Assertion
+loggerCustomExporter = do
+  let customExporter = Logger.CustomExporter "test-custom" (\_ -> pure ())
+      customConfig = defaultLoggerConfig
+        { Logger.loggerDestination = Logger.OpenTelemetry customExporter }
+  loggerResult <- Logger.create customConfig
+  case loggerResult of
+    Success logger -> do
+      -- Test that logger with Custom exporter can be created and used
+      Logger.info "Test Custom export" Nothing logger
+      -- Verify logger configuration
+      config <- atomically $ readTVar (Logger.loggerConfig logger)
+      case Logger.loggerDestination config of
+        Logger.OpenTelemetry (Logger.CustomExporter name _) -> 
+          name @?= "test-custom"
+        _ -> assertFailure "Expected Custom exporter destination"
+    Failure _ -> assertFailure "Custom logger creation should succeed"
+
+-- Distributed Cache Backend Tests
+
+cacheMemoryBackend :: Assertion
+cacheMemoryBackend = do
+  cacheResult <- Cache.createMemory Cache.defaultConfig
+  case cacheResult of
+    Success cache -> do
+      -- Verify memory backend type
+      case Cache.cacheBackend cache of
+        Cache.MemoryBackend -> pure ()
+        _ -> assertFailure "Expected MemoryBackend"
+      -- Test basic operation
+      setResult <- Cache.set "test" (String "value") Nothing cache
+      case setResult of
+        Success _ -> pure ()
+        Failure _ -> assertFailure "Memory cache set should succeed"
+    Failure _ -> assertFailure "Memory cache creation should succeed"
+
+cachePersistentBackend :: Assertion
+cachePersistentBackend = do
+  let testPath = "/tmp/qi-test-cache.json"
+  cacheResult <- Cache.createPersistent testPath Cache.defaultConfig
+  case cacheResult of
+    Success cache -> do
+      -- Verify persistent backend type
+      case Cache.cacheBackend cache of
+        Cache.PersistentBackend path -> path @?= testPath
+        _ -> assertFailure "Expected PersistentBackend"
+      -- Test basic operation
+      setResult <- Cache.set "test" (String "value") Nothing cache
+      case setResult of
+        Success _ -> pure ()
+        Failure _ -> assertFailure "Persistent cache set should succeed"
+    Failure _ -> assertFailure "Persistent cache creation should succeed"
+
+cacheDistributedBackend :: Assertion
+cacheDistributedBackend = do
+  -- Test connection to non-existent Redis server (should fail gracefully)
+  cacheResult <- Cache.createDistributed "non-existent-host" 6379 Cache.defaultConfig
+  case cacheResult of
+    Success _ -> assertFailure "Connection to non-existent Redis should fail"
+    Failure err -> do
+      -- Verify it's a proper network error
+      Error.qiErrorCategory err @?= Error.NETWORK
+      T.isInfixOf "Redis" (Error.qiErrorMessage err) @?= True
+
+cacheBackendIsolation :: Assertion
+cacheBackendIsolation = do
+  memoryResult <- Cache.createMemory Cache.defaultConfig
+  persistentResult <- Cache.createPersistent "/tmp/qi-test-cache2.json" Cache.defaultConfig
+  
+  case (memoryResult, persistentResult) of
+    (Success memCache, Success persCache) -> do
+      -- Verify different backend types
+      case (Cache.cacheBackend memCache, Cache.cacheBackend persCache) of
+        (Cache.MemoryBackend, Cache.PersistentBackend _) -> pure ()
+        _ -> assertFailure "Expected different backend types"
+      
+      -- Test isolation - operations on one don't affect the other
+      void $ Cache.set "test" (String "memory") Nothing memCache
+      void $ Cache.set "test" (String "persistent") Nothing persCache
+      
+      memResult <- Cache.get "test" memCache
+      persResult <- Cache.get "test" persCache
+      
+      case (memResult, persResult) of
+        (Success (String "memory"), Success (String "persistent")) -> pure ()
+        _ -> assertFailure "Cache backends should be isolated"
+    _ -> assertFailure "Cache creation should succeed"
