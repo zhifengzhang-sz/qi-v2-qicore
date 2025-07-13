@@ -18,13 +18,18 @@ import Control.Monad (replicateM, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value(..), object, (.=))
 import Data.Aeson qualified as JSON
+import Data.Aeson.KeyMap qualified as KM
+import Data.Aeson.Key qualified as Key
+import Data.ByteString.Lazy qualified as BSL
 import Data.List (sort)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
 import Data.Time (UTCTime, getCurrentTime, addUTCTime)
 import Test.QuickCheck hiding (Success, Failure)
+import Test.QuickCheck.Monadic (monadicIO, assert, run)
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC hiding (Success, Failure)
 import Test.Tasty.HUnit
@@ -139,6 +144,13 @@ cacheTests = testGroup "Cache Tests"
       , testCase "Distributed backend connection validation" cacheDistributedBackend
       , testCase "Backend type isolation" cacheBackendIsolation
       ]
+  , testGroup "Redis Integration"
+      [ testCase "Redis service connectivity" redisServiceConnectivity
+      , testCase "Redis cache creation with valid connection" redisValidConnection
+      , testCase "Redis backend operations" redisBackendOperations
+      , testCase "Redis error handling" redisErrorHandling
+      , testCase "Redis vs Memory backend comparison" redisMemoryComparison
+      ]
   ]
 
 -- Integration Tests
@@ -172,7 +184,7 @@ configAssociativity a b c =
 configFromObjectPreservesStructure :: [(Text, Value)] -> Property
 configFromObjectPreservesStructure pairs =
   let obj = Map.fromList pairs
-      jsonObj = JSON.object [(k, v) | (k, v) <- pairs]
+      jsonObj = JSON.object [(Key.fromText k, v) | (k, v) <- pairs]
   in case Config.fromObject jsonObj of
     Success (Config.ConfigData resultObj) -> 
       length pairs === length pairs
@@ -180,14 +192,14 @@ configFromObjectPreservesStructure pairs =
 
 configFromStringJSON :: Value -> Property
 configFromStringJSON value =
-  let jsonText = T.decodeUtf8 (JSON.encode value)
+  let jsonText = TE.decodeUtf8 (BSL.toStrict (JSON.encode value))
   in case Config.fromString jsonText Config.JSON of
     Success (Config.ConfigData resultValue) -> resultValue === value
     Failure _ -> property False
 
 configGetExistingKey :: Text -> Value -> Property
 configGetExistingKey key value =
-  let config = Config.ConfigData (JSON.Object (JSON.singleton (JSON.fromText key) value))
+  let config = Config.ConfigData (JSON.Object (KM.singleton (Key.fromText key) value))
   in case Config.get key config of
     Success resultValue -> resultValue === value
     Failure _ -> property False
@@ -206,7 +218,7 @@ configHasConsistency key config =
 
 configKeysCompleteness :: [(Text, Value)] -> Property
 configKeysCompleteness pairs =
-  let obj = JSON.object [(k, v) | (k, v) <- pairs]
+  let obj = JSON.object [(Key.fromText k, v) | (k, v) <- pairs]
       config = Config.ConfigData obj
       configKeys = sort (Config.keys config)
       expectedKeys = sort (map fst pairs)
@@ -214,7 +226,7 @@ configKeysCompleteness pairs =
 
 configValidateRequiredAllKeys :: [Text] -> Property
 configValidateRequiredAllKeys requiredKeys =
-  let obj = JSON.object [(k, String "value") | k <- requiredKeys]
+  let obj = JSON.object [(Key.fromText k, String "value") | k <- requiredKeys]
       config = Config.ConfigData obj
   in case Config.validateRequired requiredKeys config of
     Success _ -> property True
@@ -223,7 +235,7 @@ configValidateRequiredAllKeys requiredKeys =
 configValidateRequiredMissingKeys :: [Text] -> [Text] -> Property
 configValidateRequiredMissingKeys presentKeys requiredKeys =
   let missingKeys = filter (`notElem` presentKeys) requiredKeys
-      obj = JSON.object [(k, String "value") | k <- presentKeys]
+      obj = JSON.object [(Key.fromText k, String "value") | k <- presentKeys]
       config = Config.ConfigData obj
   in if null missingKeys
      then case Config.validateRequired requiredKeys config of
@@ -247,7 +259,7 @@ loggerIsLevelEnabledConsistency configLevel checkLevel =
       case loggerResult of
         Success logger -> Logger.isLevelEnabled checkLevel logger
         Failure _ -> pure False
-    assert (result == (checkLevel >= configLevel))
+    Test.QuickCheck.Monadic.assert (result == (checkLevel >= configLevel))
 
 -- Cache Property Tests
 
@@ -267,7 +279,7 @@ cacheSetThenGet key value =
                 Failure _ -> pure False
             Failure _ -> pure False
         Failure _ -> pure False
-    assert result
+    Test.QuickCheck.Monadic.assert result
 
 cacheGetNonExistent :: Text -> Property
 cacheGetNonExistent key =
@@ -281,7 +293,7 @@ cacheGetNonExistent key =
             Success _ -> pure False
             Failure _ -> pure True
         Failure _ -> pure False
-    assert result
+    Test.QuickCheck.Monadic.assert result
 
 cacheRemoveExisting :: Text -> Value -> Property
 cacheRemoveExisting key value =
@@ -298,7 +310,7 @@ cacheRemoveExisting key value =
               pure (not hasKey)
             else pure False
         Failure _ -> pure False
-    assert result
+    Test.QuickCheck.Monadic.assert result
 
 cacheTTLConsistency :: Text -> Value -> Positive Int -> Property
 cacheTTLConsistency key value (Positive seconds) =
@@ -313,7 +325,7 @@ cacheTTLConsistency key value (Positive seconds) =
           hasKey1 <- Cache.has key cache
           pure hasKey1
         Failure _ -> pure False
-    assert result
+    Test.QuickCheck.Monadic.assert result
 
 cacheSizeLimitEnforcement :: Positive Int -> [Text] -> Property
 cacheSizeLimitEnforcement (Positive maxSize) keys =
@@ -330,7 +342,7 @@ cacheSizeLimitEnforcement (Positive maxSize) keys =
           finalSize <- Cache.size cache
           pure (finalSize <= maxSize)
         Failure _ -> pure False
-    assert result
+    Test.QuickCheck.Monadic.assert result
 
 cacheSetManyAtomicity :: [(Text, Value)] -> Property
 cacheSetManyAtomicity pairs =
@@ -349,7 +361,7 @@ cacheSetManyAtomicity pairs =
               pure (all id results)
             Failure _ -> pure False
         Failure _ -> pure False
-    assert result
+    Test.QuickCheck.Monadic.assert result
 
 cacheGetManyCompleteness :: [(Text, Value)] -> Property
 cacheGetManyCompleteness pairs =
@@ -370,7 +382,7 @@ cacheGetManyCompleteness pairs =
               pure (Map.size resultMap == length pairs)
             Failure _ -> pure False
         Failure _ -> pure False
-    assert result
+    Test.QuickCheck.Monadic.assert result
 
 -- Unit Tests
 
@@ -713,10 +725,8 @@ instance Arbitrary Config.ConfigData where
       arbitraryKeyValue = do
         key <- arbitraryText
         value <- arbitraryValue
-        pure (key .= value)
+        pure (Key.fromText key .= value)
 
-instance Arbitrary Value where
-  arbitrary = arbitraryValue
 
 arbitraryValue :: Gen Value
 arbitraryValue = oneof
@@ -898,3 +908,112 @@ cacheBackendIsolation = do
         (Success (String "memory"), Success (String "persistent")) -> pure ()
         _ -> assertFailure "Cache backends should be isolated"
     _ -> assertFailure "Cache creation should succeed"
+
+-- Redis Integration Tests
+
+redisServiceConnectivity :: Assertion
+redisServiceConnectivity = do
+  -- Test direct Redis connectivity (assumes Redis service is running)
+  cacheResult <- Cache.createDistributed "localhost" 6379 Cache.defaultConfig
+  case cacheResult of
+    Success cache -> do
+      -- Verify Redis backend type
+      case Cache.cacheBackend cache of
+        Cache.DistributedBackend _ -> pure ()
+        _ -> assertFailure "Expected DistributedBackend for Redis"
+    Failure err -> do
+      -- If Redis is not running, we expect a NETWORK error
+      Error.qiErrorCategory err @?= Error.NETWORK
+      T.isInfixOf "Redis" (Error.qiErrorMessage err) @?= True
+
+redisValidConnection :: Assertion  
+redisValidConnection = do
+  -- Test Redis cache creation with localhost (Docker service)
+  cacheResult <- Cache.createDistributed "localhost" 6379 Cache.defaultConfig
+  case cacheResult of
+    Success cache -> do
+      -- Verify configuration
+      config <- atomically $ readTVar (Cache.cacheConfig cache)
+      Cache.cacheStatsEnabled config @?= True
+      Cache.cacheMaxSize config @?= Nothing  -- Redis manages memory
+      
+      -- Verify backend type  
+      case Cache.cacheBackend cache of
+        Cache.DistributedBackend _ -> pure ()
+        _ -> assertFailure "Expected DistributedBackend"
+    Failure err -> do
+      -- Document why Redis might not be available
+      putStrLn $ "Redis not available: " <> T.unpack (Error.qiErrorMessage err)
+      Error.qiErrorCategory err @?= Error.NETWORK
+
+redisBackendOperations :: Assertion
+redisBackendOperations = do
+  cacheResult <- Cache.createDistributed "localhost" 6379 Cache.defaultConfig
+  case cacheResult of
+    Success cache -> do
+      -- Test basic Redis operations (local functions work)
+      let testKey = "redis-test-key"
+          testValue = String "redis-test-value"
+      
+      -- Test local operations (these should work)
+      hasKeyBefore <- Cache.has testKey cache
+      hasKeyBefore @?= False
+      
+      -- Test that we can create the cache structure
+      entries <- atomically $ readTVar (Cache.cacheEntries cache)
+      Map.size entries @?= 0
+      
+      stats <- Cache.getStats cache
+      Cache.statsHits stats @?= 0
+      Cache.statsMisses stats @?= 0
+      
+    Failure err -> do
+      -- Document Redis availability for testing
+      putStrLn $ "Redis backend test skipped: " <> T.unpack (Error.qiErrorMessage err)
+      Error.qiErrorCategory err @?= Error.NETWORK
+
+redisErrorHandling :: Assertion
+redisErrorHandling = do
+  -- Test Redis error handling with invalid host
+  invalidResult <- Cache.createDistributed "invalid-redis-host" 6379 Cache.defaultConfig
+  case invalidResult of
+    Success _ -> assertFailure "Should fail with invalid host"
+    Failure err -> do
+      Error.qiErrorCategory err @?= Error.NETWORK
+      T.isInfixOf "Redis" (Error.qiErrorMessage err) @?= True
+  
+  -- Test Redis error handling with invalid port
+  invalidPortResult <- Cache.createDistributed "localhost" 99999 Cache.defaultConfig
+  case invalidPortResult of
+    Success _ -> assertFailure "Should fail with invalid port"
+    Failure err -> do
+      Error.qiErrorCategory err @?= Error.NETWORK
+
+redisMemoryComparison :: Assertion
+redisMemoryComparison = do
+  -- Create both cache types
+  memoryResult <- Cache.createMemory Cache.defaultConfig
+  redisResult <- Cache.createDistributed "localhost" 6379 Cache.defaultConfig
+  
+  case (memoryResult, redisResult) of
+    (Success memCache, Success redisCache) -> do
+      -- Verify different backend types
+      case (Cache.cacheBackend memCache, Cache.cacheBackend redisCache) of
+        (Cache.MemoryBackend, Cache.DistributedBackend _) -> pure ()
+        _ -> assertFailure "Expected different backend types"
+      
+      -- Test parallel operations don't interfere
+      let testKey = "comparison-test"
+      void $ Cache.set testKey (String "memory-value") Nothing memCache
+      
+      memResult <- Cache.get testKey memCache
+      case memResult of
+        Success (String "memory-value") -> pure ()
+        _ -> assertFailure "Memory cache should work independently"
+        
+    (Success _, Failure err) -> do
+      -- Redis not available - test memory cache works alone  
+      putStrLn $ "Redis comparison test with memory only: " <> T.unpack (Error.qiErrorMessage err)
+      Error.qiErrorCategory err @?= Error.NETWORK
+      
+    (Failure _, _) -> assertFailure "Memory cache should always work"

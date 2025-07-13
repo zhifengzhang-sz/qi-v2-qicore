@@ -385,6 +385,16 @@ createMultiThreaded config = liftIO $ do
 -- O(1) average case performance.
 get :: MonadIO m => Text -> Cache -> m (Result Value)
 get key cache = liftIO $ do
+  case cacheBackend cache of
+    DistributedBackend _ -> do
+      -- For now, use local cache for distributed backend (metadata)
+      -- Full Redis operations will be implemented in future version
+      getLocal key cache
+    _ -> getLocal key cache
+
+-- | Get value from local cache (memory/persistent)
+getLocal :: Text -> Cache -> IO (Result Value)
+getLocal key cache = do
   currentTime <- getCurrentTime
   result <- atomically $ do
     entries <- readTVar (cacheEntries cache)
@@ -432,6 +442,7 @@ get key cache = liftIO $ do
   
   pure result
 
+
 -- | Store value in cache
 --
 -- Overwrites existing value for same key.
@@ -439,6 +450,16 @@ get key cache = liftIO $ do
 -- May trigger eviction if cache full.
 set :: MonadIO m => Text -> Value -> Maybe TTL -> Cache -> m (Result ())
 set key value maybeTTL cache = liftIO $ do
+  case cacheBackend cache of
+    DistributedBackend _ -> do
+      -- For now, use local cache for distributed backend (metadata)
+      -- Full Redis operations will be implemented in future version
+      setLocal key value maybeTTL cache
+    _ -> setLocal key value maybeTTL cache
+
+-- | Set value in local cache (memory/persistent)
+setLocal :: Text -> Value -> Maybe TTL -> Cache -> IO (Result ())
+setLocal key value maybeTTL cache = do
   currentTime <- getCurrentTime
   config <- atomically $ readTVar (cacheConfig cache)
   
@@ -487,6 +508,13 @@ set key value maybeTTL cache = liftIO $ do
 -- O(1) average case performance.
 has :: MonadIO m => Text -> Cache -> m Bool
 has key cache = liftIO $ do
+  case cacheBackend cache of
+    DistributedBackend _ -> hasLocal key cache
+    _ -> hasLocal key cache
+
+-- | Check key existence in local cache
+hasLocal :: Text -> Cache -> IO Bool
+hasLocal key cache = do
   currentTime <- getCurrentTime
   atomically $ do
     entries <- readTVar (cacheEntries cache)
@@ -494,18 +522,27 @@ has key cache = liftIO $ do
       Nothing -> pure False
       Just entry -> pure (not (isEntryExpired currentTime entry))
 
+
 -- | Remove key from cache
 --
 -- Returns true if key existed, false otherwise.
 -- Idempotent: safe to call multiple times.
 remove :: MonadIO m => Text -> Cache -> m Bool
-remove key cache = liftIO $ atomically $ do
+remove key cache = liftIO $ do
+  case cacheBackend cache of
+    DistributedBackend _ -> removeLocal key cache
+    _ -> removeLocal key cache
+
+-- | Remove key from local cache
+removeLocal :: Text -> Cache -> IO Bool
+removeLocal key cache = atomically $ do
   entries <- readTVar (cacheEntries cache)
   let existed = Map.member key entries
   when existed $ do
     modifyTVar' (cacheEntries cache) (Map.delete key)
     modifyTVar' (cacheAccessOrder cache) (filter (/= key))
   pure existed
+
 
 -- | Remove all entries from cache
 --
@@ -514,6 +551,13 @@ remove key cache = liftIO $ atomically $ do
 -- O(n) operation where n is cache size.
 clear :: MonadIO m => Cache -> m ()
 clear cache = liftIO $ do
+  case cacheBackend cache of
+    DistributedBackend _ -> clearLocal cache
+    _ -> clearLocal cache
+
+-- | Clear local cache
+clearLocal :: Cache -> IO ()
+clearLocal cache = do
   currentTime <- getCurrentTime
   atomically $ do
     writeTVar (cacheEntries cache) mempty
@@ -523,12 +567,20 @@ clear cache = liftIO $ do
       , statsEvictions = statsEvictions stats + statsSize stats
       }
 
+
 -- | Get number of entries in cache
 --
 -- Returns current count of non-expired entries.
 -- O(1) operation.
 size :: MonadIO m => Cache -> m Int
 size cache = liftIO $ do
+  case cacheBackend cache of
+    DistributedBackend _ -> sizeLocal cache
+    _ -> sizeLocal cache
+
+-- | Get size of local cache
+sizeLocal :: Cache -> IO Int
+sizeLocal cache = do
   currentTime <- getCurrentTime
   atomically $ do
     entries <- readTVar (cacheEntries cache)
@@ -541,6 +593,7 @@ size cache = liftIO $ do
     modifyTVar' (cacheAccessOrder cache) (\order -> filter (`notElem` expiredKeys) order)
     
     pure actualSize
+
 
 -- | Get value or compute and cache if missing
 --
@@ -568,24 +621,40 @@ getOrSet key factory maybeTTL cache = do
 -- Applies same TTL to all entries.
 -- Atomic: either all succeed or all fail.
 setMany :: MonadIO m => Map.Map Text Value -> Maybe TTL -> Cache -> m (Result ())
-setMany kvPairs maybeTTL cache = do
-  results <- mapM (\(k, v) -> set k v maybeTTL cache) (Map.toList kvPairs)
+setMany kvPairs maybeTTL cache = liftIO $ do
+  case cacheBackend cache of
+    DistributedBackend _ -> setManyLocal kvPairs maybeTTL cache
+    _ -> setManyLocal kvPairs maybeTTL cache
+
+-- | Set multiple values in local cache
+setManyLocal :: Map.Map Text Value -> Maybe TTL -> Cache -> IO (Result ())
+setManyLocal kvPairs maybeTTL cache = do
+  results <- mapM (\(k, v) -> setLocal k v maybeTTL cache) (Map.toList kvPairs)
   let failures = [err | Failure err <- results]
   if null failures
     then pure (Success ())
     else pure (Failure (head failures))
+
 
 -- | Get multiple values by keys
 --
 -- Returns only keys that exist and haven't expired.
 -- Missing keys not included in result.
 getMany :: MonadIO m => [Text] -> Cache -> m (Result (Map.Map Text Value))
-getMany keys cache = do
+getMany keys cache = liftIO $ do
+  case cacheBackend cache of
+    DistributedBackend _ -> getManyLocal keys cache
+    _ -> getManyLocal keys cache
+
+-- | Get multiple values from local cache
+getManyLocal :: [Text] -> Cache -> IO (Result (Map.Map Text Value))
+getManyLocal keys cache = do
   results <- mapM (\k -> do
-    result <- get k cache
+    result <- getLocal k cache
     pure (k, result)) keys
   let successes = [(k, v) | (k, Success v) <- results]
   pure $ Success (Map.fromList successes)
+
 
 -- | Manually expire a key
 --

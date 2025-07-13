@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: qicore-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    environment:
+      - REDIS_REPLICATION_MODE=master
+    networks:
+      - qicore-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: qicore-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=qicore-redis:qicore-redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - qicore-network
+    profiles:
+      - tools
+
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    container_name: qicore-valkey
+    ports:
+      - "6380:6379"
+    volumes:
+      - valkey_data:/data
+      - ./valkey/valkey.conf:/usr/local/etc/valkey/valkey.conf
+    command: valkey-server /usr/local/etc/valkey/valkey.conf
+    restart: unless-stopped
+    networks:
+      - qicore-network
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - valkey
+
+volumes:
+  redis_data:
+    driver: local
+  valkey_data:
+    driver: local
+
+networks:
+  qicore-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
