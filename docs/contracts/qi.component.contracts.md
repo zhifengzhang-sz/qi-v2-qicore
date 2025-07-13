@@ -1,14 +1,14 @@
-# QiCore v4.0 Foundation Architecture Specification
+# QiCore Foundation Architecture Specification
 
-This document defines the component-level architecture for QiCore v4.0 Foundation. The Foundation consists of two core components that provide mathematical foundation types and essential infrastructure services.
+This document defines the component-level architecture for QiCore Foundation. The Foundation consists of two core components that provide mathematical foundation types and essential infrastructure services.
 
 ## Foundation Architecture Overview
 
-QiCore v4.0 Foundation is organized into two components with a clear dependency hierarchy:
+QiCore Foundation is organized into two components with a clear dependency hierarchy:
 
 ```mermaid
 graph TD
-    subgraph "QiCore v4.0 Foundation Architecture"
+    subgraph "QiCore Foundation Architecture"
         subgraph "Core Component"
             CoreComp[Core Component<br/>Config, Logger, Cache]
         end
@@ -52,7 +52,7 @@ BaseComponent provides:
 - **Result<T>**: Type-safe error handling with functional composition
 - **QiError**: Structured error representation with context and chaining
 
-**📋 Complete Base Contracts**: See [qi.v4.base.contracts.md](qi.v4.base.contracts.md) for detailed behavioral specifications.
+**📋 Complete Base Contracts**: See [qi.base.contracts.md](qi.base.contracts.md) for detailed behavioral specifications.
 
 ### Dependencies
 - **None**: Base component has no dependencies
@@ -112,7 +112,7 @@ CoreComponent provides:
 - **Logging**: Simple effect interface with level-based filtering
 - **Cache**: High-performance caching with eviction policies
 
-**📋 Complete Core Contracts**: See [qi.v4.core.contracts.md](qi.v4.core.contracts.md) for detailed behavioral specifications.
+**📋 Complete Core Contracts**: See [qi.core.contracts.md](qi.core.contracts.md) for detailed behavioral specifications.
 
 ### Dependencies
 - **Base Component**: Uses Result<T> and QiError throughout
@@ -271,12 +271,12 @@ end
 ## Dependencies and References
 
 - **Depends on**: 
-  - [Base Component Contracts](qi.v4.base.contracts.md) - Defines Result<T> and QiError behavioral contracts
-  - [Core Component Contracts](qi.v4.core.contracts.md) - Defines Configuration, Logger, and Cache behavioral contracts
-- **Architecture Summary**: Five components (Base, Core, HTTP, Document, CLP) with clear dependency hierarchy
+  - [Base Component Contracts](qi.base.contracts.md) - Defines Result<T> and QiError behavioral contracts
+  - [Core Component Contracts](qi.core.contracts.md) - Defines Configuration, Logger, and Cache behavioral contracts
+- **Architecture Summary**: Two components (Base, Core) with clear dependency hierarchy
 - **Contract Compliance**: All components must satisfy the behavioral contracts defined in their respective specifications
-- **Language Agnostic**: Component architecture applies to all QiCore v4.0 implementations regardless of programming language
+- **Language Agnostic**: Component architecture applies to all QiCore implementations regardless of programming language
 
 ---
 
-**Component Architecture**: QiCore v4.0 organizes behavioral contracts into five components with clear dependencies, initialization patterns, and integration requirements that apply across all programming language implementations.
+**Component Architecture**: QiCore organizes behavioral contracts into two foundation components with clear dependencies, initialization patterns, and integration requirements that apply across all programming language implementations.

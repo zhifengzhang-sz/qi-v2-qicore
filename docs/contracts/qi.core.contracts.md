@@ -1,8 +1,8 @@
-# QiCore v4.0 Core Component Contracts
+# QiCore Core Component Contracts
 
-This document defines pure behavioral contracts for QiCore v4.0 **Core Component** types (Configuration, Logger, Cache). These contracts are completely language-agnostic and specify only the mathematical and behavioral properties that any implementation must satisfy.
+This document defines pure behavioral contracts for QiCore **Core Component** types (Configuration, Logger, Cache). These contracts are completely language-agnostic and specify only the mathematical and behavioral properties that any implementation must satisfy.
 
-**Dependencies**: This specification depends on [Base Component Contracts](qi.v4.base.contracts.md) for Result<T> and QiError types.
+**Dependencies**: This specification depends on [Base Component Contracts](qi.base.contracts.md) for Result<T> and QiError types.
 
 ## 1. Configuration Behavioral Contract
 
@@ -594,4 +594,4 @@ cache_tests:
 
 ---
 
-**Contract Compliance**: Any implementation claiming QiCore v4.0 Core Component compatibility must satisfy ALL contracts defined in this specification for Configuration, Logger, and Cache components.
+**Contract Compliance**: Any implementation claiming QiCore Core Component compatibility must satisfy ALL contracts defined in this specification for Configuration, Logger, and Cache components.

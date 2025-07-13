@@ -1,6 +1,6 @@
-# QiCore v4.0 Base Component Contracts
+# QiCore Base Component Contracts
 
-This document defines pure behavioral contracts for QiCore v4.0 **Base Component** types (Result<T> and QiError). These contracts are completely language-agnostic and specify only the mathematical and behavioral properties that any implementation must satisfy.
+This document defines pure behavioral contracts for QiCore **Base Component** types (Result<T> and QiError). These contracts are completely language-agnostic and specify only the mathematical and behavioral properties that any implementation must satisfy.
 
 ## 1. Result<T> Behavioral Contract
 
@@ -653,4 +653,4 @@ performance:
 
 ---
 
-**Contract Compliance**: Any implementation claiming QiCore v4.0 compatibility must satisfy ALL laws and properties defined in this specification.
+**Contract Compliance**: Any implementation claiming QiCore compatibility must satisfy ALL laws and properties defined in this specification.
