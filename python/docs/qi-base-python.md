@@ -1,6 +1,6 @@
 # QiCore Base Component - Python Implementation Specification
 
-This document provides Python-specific implementation guidance for the QiCore Base Component, mapping the language-agnostic contracts from [qi.v4.base.contracts.md](../../docs/contracts/qi.v4.base.contracts.md) to idiomatic Python patterns with Python 3.13+ features including experimental JIT and No-GIL mode.
+This document provides Python-specific implementation guidance for the QiCore Base Component, mapping the language-agnostic contracts from [qi.base.contracts.md](../../docs/contracts/qi.base.contracts.md) to idiomatic Python patterns with Python 3.13+ features including experimental JIT and No-GIL mode.
 
 ## Language Mapping Overview
 

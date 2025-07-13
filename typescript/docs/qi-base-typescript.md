@@ -1,6 +1,6 @@
 # QiCore Base Component - TypeScript Implementation Specification
 
-This document provides TypeScript-specific implementation guidance for the QiCore Base Component, mapping the language-agnostic contracts from [qi.v4.base.contracts.md](../../docs/contracts/qi.v4.base.contracts.md) to idiomatic TypeScript patterns.
+This document provides TypeScript-specific implementation guidance for the QiCore Base Component, mapping the language-agnostic contracts from [qi.base.contracts.md](../../docs/contracts/qi.base.contracts.md) to idiomatic TypeScript patterns.
 
 ## Language Mapping Overview
 

@@ -1,6 +1,6 @@
 # QiCore Base Component - Haskell Implementation Specification
 
-This document provides Haskell-specific implementation guidance for the QiCore Base Component, mapping the language-agnostic contracts from [qi.v4.base.contracts.md](../../docs/contracts/qi.v4.base.contracts.md) to idiomatic Haskell patterns with GHC 9.12+ features.
+This document provides Haskell-specific implementation guidance for the QiCore Base Component, mapping the language-agnostic contracts from [qi.base.contracts.md](../../docs/contracts/qi.base.contracts.md) to idiomatic Haskell patterns with GHC 9.12+ features.
 
 ## Language Mapping Overview
 

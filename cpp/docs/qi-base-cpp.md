@@ -1,6 +1,6 @@
 # QiCore Base Component - C++ Implementation Specification
 
-This document provides C++-specific implementation guidance for the QiCore Base Component, mapping the language-agnostic contracts from [qi.v4.base.contracts.md](../../docs/contracts/qi.v4.base.contracts.md) to idiomatic C++ patterns with C++23/26 features including modules, `std::expected`, and upcoming reflection.
+This document provides C++-specific implementation guidance for the QiCore Base Component, mapping the language-agnostic contracts from [qi.base.contracts.md](../../docs/contracts/qi.base.contracts.md) to idiomatic C++ patterns with C++23/26 features including modules, `std::expected`, and upcoming reflection.
 
 ## Language Mapping Overview
 

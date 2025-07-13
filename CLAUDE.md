@@ -74,14 +74,14 @@ bun run bench
 
 ### For Base Component Changes (Result<T>, QiError)
 1. **Always** verify mathematical laws hold with property-based tests
-2. Update contracts in `docs/contracts/qi.v4.base.contracts.md` if behavior changes
+2. Update contracts in `docs/contracts/qi.base.contracts.md` if behavior changes
 3. Ensure cross-language consistency - changes must be implementable in all target languages
 4. Run full test suite: `cabal test --test-options="--quickcheck-tests=1000"`
 
 ### For Core Component Changes (Config, Logger, Cache)
 1. Test performance contracts are maintained (O(1) operations)
 2. Verify STM concurrency safety in Haskell implementation
-3. Update contracts in `docs/contracts/qi.v4.core.contracts.md` if needed
+3. Update contracts in `docs/contracts/qi.core.contracts.md` if needed
 4. Test resource cleanup and error handling
 
 ### Contract Compliance
