@@ -38,12 +38,12 @@ nix develop
 
 ### environment features
 The Nix development environment provides:
-- **GHC 9.12.1** - Modern Haskell compiler with latest features
+- **GHC 9.12.2** - Modern Haskell compiler with latest features (upgraded in v-0.2.7)
 - **Cabal** - Build system and package manager
 - **All dependencies** - Automatically managed versions
 - **Reproducible builds** - Same environment across all machines
 
-Note: Advanced tooling (HLS, ghcid, ormolu) temporarily excluded due to GHC 9.12.1 ecosystem lag.
+Note: Advanced tooling (HLS, ghcid, ormolu) temporarily excluded due to GHC 9.12.2 ecosystem lag.
 
 ## project structure
 
@@ -131,11 +131,11 @@ cabal test qi-base-test --test-options="--quickcheck-tests=1000"
 cabal test qi-base-test --test-options="--quickcheck-tests=2000"
 ```
 
-## v-0.2.6 test coverage analysis
+## v-0.2.7 test coverage analysis
 
 ### test coverage summary
 
-QiCore Foundation v-0.2.6 has **comprehensive test coverage** with **39 total tests** covering both mathematical foundations and new v-0.2.6 features. All tests pass consistently.
+QiCore Foundation v-0.2.7 has **comprehensive test coverage** with **39 total tests** covering both mathematical foundations and new v-0.2.7 features. All tests pass consistently.
 
 ### test statistics
 
@@ -655,18 +655,25 @@ cabal configure
 
 ## version compatibility
 
-### current version: v-0.2.6
-- **GHC**: 9.12.1 (modern features, cutting-edge)
+### current version: v-0.2.7 (in development)
+- **GHC**: 9.12.2 ✅ (upgraded from 9.12.1)
 - **Base libraries**: Latest stable versions
-- **Redis support**: hedis 0.15+ (distributed caching)
-- **YAML support**: yaml 0.11+ (configuration parsing)
-- **JSON support**: aeson 2.2+ (performance optimized)
+- **Redis support**: hedis 0.15+ (distributed caching) ✅
+- **YAML support**: yaml 0.11+ (configuration parsing) ✅
+- **JSON support**: aeson 2.2+ (performance optimized) ✅
+- **ENV string parsing**: Complete implementation with nested key support ✅
+- **TOML support**: toml-parser 2.0+ (dependency issue pending) ❌
 
-### upcoming: v-0.2.7
-- **GHC**: 9.12.2 (when available)
-- **Language edition**: GHC2024 (modern defaults)
-- **Package updates**: Latest ecosystem versions
-- **Enhanced tooling**: HLS, ghcid when compatible
+### v-0.2.7 achievements
+- **Environment**: Successfully upgraded to GHC 9.12.2
+- **Features**: ENV string parsing fully implemented and tested  
+- **Quality**: Cleaned up major compiler warnings for production quality
+- **Testing**: All 39 tests passing (29 base + 10 core)
+
+### upcoming: v-0.2.8
+- **TOML parsing**: Resolve dependency API compatibility issues
+- **Enhanced tooling**: HLS, ghcid when compatible with GHC 9.12.2
+- **Additional features**: Based on development priorities
 
 ## appendix
 

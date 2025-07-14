@@ -66,19 +66,16 @@ module Qi.Core.Config
   , showConfig
   ) where
 
-import Control.Applicative ((<|>))
-import Control.Monad (unless, when)
+import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Aeson (Value(..), Object, ToJSON(..), FromJSON(..), (.=), (.:), (.:?))
-import Data.Aeson qualified as JSON
-import Data.Aeson.KeyMap qualified as KM
+import Data.Aeson (Value(..), Object, ToJSON(..), FromJSON(..))
 import Data.Aeson.Key qualified as Key
+import Data.Aeson.KeyMap qualified as KM
+import Data.Aeson qualified as JSON
 import Data.ByteString.Lazy qualified as BSL
-import Data.HashMap.Strict qualified as HM
-import Data.List (intercalate, sort)
+import Data.List (sort)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (fromMaybe, isJust, mapMaybe)
-import Data.Scientific (Scientific)
+import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
@@ -86,23 +83,22 @@ import Data.Text.IO qualified as TIO
 import Data.Time (UTCTime(..), getCurrentTime)
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (secondsToDiffTime)
-import Data.Vector qualified as V
 import GHC.Generics (Generic)
 import System.Environment (getEnvironment)
 import System.FilePath (takeExtension)
 import Text.Read (readMaybe)
 import Data.Yaml qualified as YAML
 
-import Qi.Base.Error (QiError, ErrorCategory(..), ErrorSeverity(..))
+import Qi.Base.Error (QiError, ErrorCategory(..))
 import Qi.Base.Error qualified as Error
-import Qi.Base.Result (Result(..), pattern Success, pattern Failure)
+import Qi.Base.Result (Result, pattern Success, pattern Failure)
 import Qi.Base.Result qualified as Result
 
 -- | Supported configuration formats for parsing
 data ConfigFormat 
   = JSON    -- ^ JavaScript Object Notation
   | YAML    -- ^ YAML Ain't Markup Language  
-  | TOML    -- ^ Tom's Obvious Minimal Language
+  | TOML    -- ^ Tom's Obvious Minimal Language (removed in v-0.2.7)
   | ENV     -- ^ Environment variables
   deriving (Show, Eq, Ord, Generic)
 
@@ -172,7 +168,7 @@ mergeTwo (ConfigData v1) (ConfigData v2) = ConfigData (mergeValues v1 v2)
     mergeValues :: Value -> Value -> Value
     mergeValues (Object o1) (Object o2) = Object (KM.unionWith mergeValues o1 o2)
     mergeValues (Array a1) (Array a2) = Array (a1 <> a2)  -- Concatenate arrays
-    mergeValues _ v2 = v2  -- Right-biased for primitives
+    mergeValues _ rightValue = rightValue  -- Right-biased for primitives
 
 -- | Merge multiple configurations (monoid operation)
 --
@@ -225,25 +221,13 @@ fromObject obj = Success (ConfigData (Object obj))
 -- Preserves type information where possible.
 fromString :: Text -> ConfigFormat -> Result ConfigData
 fromString content format = case format of
-  JSON -> parseJSON content
-  YAML -> parseYAML content  
-  TOML -> Failure $ Error.create
-    "CONFIG_TOML_NOT_SUPPORTED"
-    "TOML format removed in v-0.2.7 for clean production release"
-    VALIDATION
-    mempty
-    Nothing
-    configErrorTimestamp
-  ENV -> Failure $ Error.create
-    "CONFIG_ENV_STRING_NOT_SUPPORTED"
-    "ENV string parsing removed in v-0.2.7 - use fromEnvironment function instead"
-    VALIDATION
-    mempty
-    Nothing
-    configErrorTimestamp
+  JSON -> parseJSONContent content
+  YAML -> parseYAMLContent content  
+  TOML -> parseTOML content
+  ENV -> parseENVContent content
   where
-    parseJSON :: Text -> Result ConfigData
-    parseJSON txt = case JSON.decode (BSL.fromStrict (TE.encodeUtf8 txt)) of
+    parseJSONContent :: Text -> Result ConfigData
+    parseJSONContent txt = case JSON.decode (BSL.fromStrict (TE.encodeUtf8 txt)) of
       Nothing -> Failure $ Error.create
         "CONFIG_JSON_PARSE_ERROR"
         "Failed to parse JSON configuration"
@@ -253,19 +237,76 @@ fromString content format = case format of
         configErrorTimestamp
       Just value -> Success (ConfigData value)
     
-    parseYAML :: Text -> Result ConfigData
-    parseYAML content = case YAML.decodeEither' (TE.encodeUtf8 content) of
+    parseYAMLContent :: Text -> Result ConfigData
+    parseYAMLContent yamlContent = case YAML.decodeEither' (TE.encodeUtf8 yamlContent) of
       Left yamlError -> Failure $ Error.create
         "CONFIG_YAML_PARSE_ERROR"
         ("YAML parsing failed: " <> T.pack (YAML.prettyPrintParseException yamlError))
         CONFIGURATION
-        (Map.fromList [("yamlError", JSON.String (T.pack (show yamlError))), ("content", JSON.String (T.take 100 content))])
+        (Map.fromList [("yamlError", JSON.String (T.pack (show yamlError))), ("content", JSON.String (T.take 100 yamlContent))])
         Nothing
         configErrorTimestamp
       Right value -> Success (ConfigData value)
     
-    -- TOML and ENV string parsing removed in v-0.2.7 for clean production release
-    -- Use fromEnvironment for environment variable loading
+    parseTOML :: Text -> Result ConfigData
+    parseTOML _content = Failure $ Error.create
+      "CONFIG_TOML_NOT_SUPPORTED"
+      "TOML parsing removed in v-0.2.7 - API compatibility issues with available libraries"
+      VALIDATION
+      (Map.fromList [("reason", String "API_INCOMPATIBILITY"), ("alternatives", String "JSON,YAML,ENV")])
+      Nothing
+      configErrorTimestamp
+    
+    parseENVContent :: Text -> Result ConfigData
+    parseENVContent envContent = do
+      let envLines = filter (not . T.null) $ map T.strip (T.lines envContent)
+      envPairs <- Result.sequence (map parseEnvLine envLines)
+      let configMap = buildNestedConfigFromPairs envPairs
+      Success (ConfigData (Object configMap))
+      where
+        parseEnvLine :: Text -> Result (Text, Value)
+        parseEnvLine line = case T.breakOn "=" line of
+          (_, value) | T.null value -> Failure $ Error.create
+            "CONFIG_ENV_INVALID_FORMAT"
+            ("Invalid ENV format, missing '=' in line: " <> line)
+            PARSING
+            (Map.fromList [("line", String line)])
+            Nothing
+            configErrorTimestamp
+          (key, value) -> 
+            let cleanKey = T.toLower (T.replace "_" "." key)
+                cleanValue = T.drop 1 value  -- Remove the '=' character
+                typedValue = coerceEnvValue cleanValue
+            in Success (cleanKey, typedValue)
+        
+        coerceEnvValue :: Text -> Value
+        coerceEnvValue txt
+          | txt == "true" = Bool True
+          | txt == "false" = Bool False
+          | Just n <- readMaybe (T.unpack txt) = Number (fromRational (toRational (n :: Double)))
+          | otherwise = String txt
+        
+        buildNestedConfigFromPairs :: [(Text, Value)] -> KM.KeyMap Value
+        buildNestedConfigFromPairs pairs = 
+          foldl insertNestedPair KM.empty pairs
+        
+        insertNestedPair :: KM.KeyMap Value -> (Text, Value) -> KM.KeyMap Value
+        insertNestedPair obj (key, value) = 
+          let keyParts = T.splitOn "." key
+          in insertAtPath obj keyParts value
+        
+        insertAtPath :: KM.KeyMap Value -> [Text] -> Value -> KM.KeyMap Value
+        insertAtPath obj [] _ = obj
+        insertAtPath obj [k] v = KM.insert (Key.fromText k) v obj
+        insertAtPath obj (k:ks) v = 
+          let key = Key.fromText k
+              existing = KM.lookup key obj
+              nested = case existing of
+                Just (Object o) -> insertAtPath o ks v
+                _ -> insertAtPath KM.empty ks v
+          in KM.insert key (Object nested) obj
+
+-- TOML helper functions removed - will be restored when toml-parser dependency is resolved
 
 -- | Load configuration from environment variables with optional prefix
 --
@@ -324,9 +365,9 @@ fromSources :: MonadIO m => [ConfigSource] -> m (Result ConfigData)
 fromSources sources = do
   results <- mapM loadSource sources
   let (errors, configs) = partitionResults results
-  if null errors
-    then pure (merge configs)
-    else pure $ Failure $ head errors  -- Return first error
+  case errors of
+    [] -> pure (merge configs)
+    (firstError:_) -> pure $ Failure firstError  -- Return first error
   where
     loadSource :: MonadIO m => ConfigSource -> m (Result ConfigData)
     loadSource source = case configSourcePath source of
@@ -491,11 +532,11 @@ validateDependencies deps config = do
   
   -- Check for circular dependencies
   case detectCircularDeps deps of
-    Just cycle -> Result.failure $ Error.create
+    Just depCycle -> Result.failure $ Error.create
       "CONFIG_CIRCULAR_DEPENDENCY"
-      ("Circular dependency detected: " <> T.intercalate " -> " cycle)
+      ("Circular dependency detected: " <> T.intercalate " -> " depCycle)
       VALIDATION
-      (Map.fromList [("cycle", JSON.toJSON cycle)])
+      (Map.fromList [("cycle", JSON.toJSON depCycle)])
       Nothing
       configErrorTimestamp
     Nothing -> Success ()
@@ -617,5 +658,5 @@ detectCircularDeps deps = detectCycle [] (Map.keys deps)
       | otherwise = case Map.lookup node deps of
           Nothing -> detectCycle visited nodes
           Just nodeDeps -> case detectCycle (node:visited) nodeDeps of
-            Just cycle -> Just cycle
+            Just depCycle -> Just depCycle
             Nothing -> detectCycle visited nodes
