@@ -124,16 +124,35 @@ empty:
     - "has(anyKey, empty()) == false"
 ```
 
-### Validation Operations
+### Schema Validation Operations (MANDATORY - 2025 Requirement)
 
 ```yaml
 validate:
-  signature: "Schema → ConfigData → Result<ConfigData>"
-  behavior: "Validate configuration against schema"
+  signature: "ZodSchema → ConfigData → Result<ConfigData>"
+  behavior: "Validate configuration against Zod schema with runtime type safety"
   laws:
     - "returns original config if valid"
-    - "returns VALIDATION error with details if invalid"
-    - "schema defines required/optional keys and types"
+    - "returns VALIDATION error with detailed Zod error information"
+    - "schema provides TypeScript type inference"
+    - "supports type coercion (string to number/boolean)"
+    - "enables custom refinements with .refine() method"
+
+validateWithTransform:
+  signature: "ZodSchema → ConfigData → Result<TransformedConfigData>"
+  behavior: "Validate and transform configuration data"
+  laws:
+    - "applies type transformations (string to number, etc.)"
+    - "returns transformed config if validation passes"
+    - "preserves all transformation errors in Result"
+
+safeParse:
+  signature: "ZodSchema → ConfigData → SafeParseResult<ConfigData>"
+  behavior: "Safe validation without throwing exceptions"
+  laws:
+    - "returns success object with data if valid"
+    - "returns error object with detailed issues if invalid"
+    - "never throws exceptions (total function)"
+    - "provides discriminated union result type"
 
 validateRequired:
   signature: "List<Key> → ConfigData → Result<ConfigData>"
