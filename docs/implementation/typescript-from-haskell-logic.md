@@ -462,9 +462,9 @@ const traverse = async <T, U>(
 }
 ```
 
-## Configuration Service Migration
+## Configuration Module Implementation
 
-### Type-Safe Configuration
+### Type-Safe Configuration Module
 
 #### Haskell: Configuration with Reader Monad
 ```haskell
@@ -535,9 +535,9 @@ const loadConfig = async (): Promise<Result<AppConfig>> => {
 }
 ```
 
-## Logging Service Migration
+## Logging Module Implementation
 
-### Structured Logging Translation
+### Structured Logging Module
 
 #### Haskell: Katip Structured Logging
 ```haskell
@@ -606,9 +606,9 @@ class Logger {
 }
 ```
 
-## Cache Service Migration
+## Cache Module Implementation
 
-### STM to Async Patterns
+### Cache Module with Async Patterns
 
 #### Haskell: Software Transactional Memory
 ```haskell

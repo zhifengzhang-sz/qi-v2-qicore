@@ -472,7 +472,7 @@ const message = match(result, {
   failure: error => `Error: ${error}`
 })
 
-// Service initialization
+// Module initialization  
 const config = Config.fromObject({
   logger: { level: 'info' },
   cache: { maxSize: 1000 }
