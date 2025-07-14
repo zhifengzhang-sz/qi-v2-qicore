@@ -12,24 +12,41 @@ import type { QiError } from './error.js'
  *
  * Uses TypeScript discriminated unions for compile-time safety and runtime type checking.
  * The 'tag' field enables exhaustive pattern matching and type narrowing.
+ * Also provides convenience methods for easier usage.
  */
 export type Result<T, E = QiError> =
-  | { readonly tag: 'success'; readonly value: T }
-  | { readonly tag: 'failure'; readonly error: E }
+  | { readonly tag: 'success'; readonly value: T; readonly error?: never; isOk(): true; isErr(): false }
+  | { readonly tag: 'failure'; readonly error: E; readonly value?: never; isOk(): false; isErr(): true }
+
+/**
+ * Success variant type for cleaner type guards
+ */
+export type Success<T> = { readonly tag: 'success'; readonly value: T; readonly error?: never; isOk(): true; isErr(): false }
+
+/**
+ * Failure variant type for cleaner type guards
+ */
+export type Failure<E> = { readonly tag: 'failure'; readonly error: E; readonly value?: never; isOk(): false; isErr(): true }
 
 /**
  * Type guard to check if Result is in success state
  */
 export const isSuccess = <T, E>(
   result: Result<T, E>
-): result is { readonly tag: 'success'; readonly value: T } => result.tag === 'success'
+): result is Success<T> => result.tag === 'success'
 
 /**
  * Type guard to check if Result is in failure state
  */
 export const isFailure = <T, E>(
   result: Result<T, E>
-): result is { readonly tag: 'failure'; readonly error: E } => result.tag === 'failure'
+): result is Failure<E> => result.tag === 'failure'
+
+/**
+ * Convenience method-style type guards for familiarity
+ */
+export const isOk = isSuccess
+export const isErr = isFailure
 
 /**
  * Pattern matching for Result<T> with exhaustive checking
@@ -56,18 +73,30 @@ export const match = <T, E, R>(
 /**
  * Factory function to create successful Result
  */
-export const Ok = <T, E = QiError>(value: T): Result<T, E> => ({
-  tag: 'success',
-  value,
-})
+export const Ok = <T, E = QiError>(value: T): Result<T, E> => {
+  const result = {
+    tag: 'success' as const,
+    value,
+    error: undefined as never,
+    isOk: () => true as const,
+    isErr: () => false as const,
+  }
+  return result as Result<T, E>
+}
 
 /**
  * Factory function to create failed Result
  */
-export const Err = <E = QiError, T = unknown>(error: E): Result<T, E> => ({
-  tag: 'failure',
-  error,
-})
+export const Err = <E = QiError, T = unknown>(error: E): Result<T, E> => {
+  const result = {
+    tag: 'failure' as const,
+    error,
+    value: undefined as never,
+    isOk: () => false as const,
+    isErr: () => true as const,
+  }
+  return result as Result<T, E>
+}
 
 /**
  * Fluent API Builder for Result<T> operations
@@ -87,7 +116,7 @@ export class ResultBuilder<T, E = QiError> {
    */
   map<U>(fn: (value: T) => U): ResultBuilder<U, E> {
     return new ResultBuilder(
-      this.result.tag === 'success' ? { tag: 'success', value: fn(this.result.value) } : this.result
+      this.result.tag === 'success' ? Ok(fn(this.result.value)) : this.result as Result<U, E>
     )
   }
 
@@ -113,7 +142,7 @@ export class ResultBuilder<T, E = QiError> {
       this.result.tag === 'success' && predicate(this.result.value)
         ? this.result
         : this.result.tag === 'success'
-          ? { tag: 'failure', error: errorFn() }
+          ? Err(errorFn())
           : this.result
     )
   }
@@ -125,10 +154,10 @@ export class ResultBuilder<T, E = QiError> {
    */
   apply<U>(fnResult: Result<(value: T) => U, E>): ResultBuilder<U, E> {
     if (this.result.tag === 'success' && fnResult.tag === 'success') {
-      return new ResultBuilder({ tag: 'success', value: fnResult.value(this.result.value) })
+      return new ResultBuilder(Ok(fnResult.value(this.result.value)))
     }
     if (this.result.tag === 'failure') {
-      return new ResultBuilder(this.result)
+      return new ResultBuilder(this.result as Result<U, E>)
     }
     return new ResultBuilder(fnResult as Result<U, E>)
   }
@@ -142,12 +171,9 @@ export class ResultBuilder<T, E = QiError> {
     if (this.result.tag === 'success') {
       try {
         const value = await fn(this.result.value)
-        return new ResultBuilder({ tag: 'success', value })
+        return new ResultBuilder(Ok(value))
       } catch (error) {
-        return new ResultBuilder({
-          tag: 'failure',
-          error: error as E | Error,
-        })
+        return new ResultBuilder(Err(error as E | Error))
       }
     }
     return new ResultBuilder(this.result as Result<U, E>)
@@ -162,10 +188,7 @@ export class ResultBuilder<T, E = QiError> {
         const result = await fn(this.result.value)
         return new ResultBuilder(result)
       } catch (error) {
-        return new ResultBuilder({
-          tag: 'failure',
-          error: error as E,
-        })
+        return new ResultBuilder(Err(error as E))
       }
     }
     return new ResultBuilder(this.result as Result<U, E>)

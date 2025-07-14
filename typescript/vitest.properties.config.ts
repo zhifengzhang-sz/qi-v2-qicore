@@ -4,16 +4,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['./tests/setup.ts'],
-    include: ['tests/properties/**/*.test.ts'],
+    setupFiles: ['./lib/tests/setup.ts'],
+    include: ['lib/tests/properties/**/*.test.ts'],
     testTimeout: 30000, // Longer timeout for property tests
     pool: 'threads',
   },
   resolve: {
     alias: {
-      '@': new URL('./src', import.meta.url).pathname,
-      '@/base': new URL('./src/base', import.meta.url).pathname,
-      '@/core': new URL('./src/core', import.meta.url).pathname,
+      '@qi/base': new URL('./lib/src/base/index.ts', import.meta.url).pathname,
+      '@qi/core': new URL('./lib/src/core/index.ts', import.meta.url).pathname,
     },
   },
 })

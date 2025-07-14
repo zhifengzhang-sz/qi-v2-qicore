@@ -20,11 +20,12 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/base/*": ["./src/base/*"],
-      "@/core/*": ["./src/core/*"]
+      "@qi/base": ["./lib/src/base/index.ts"],
+      "@qi/base/*": ["./lib/src/base/*"],
+      "@qi/core": ["./lib/src/core/index.ts"],
+      "@qi/core/*": ["./lib/src/core/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["lib/src/**/*", "lib/tests/**/*", "app/**/*"],
   "exclude": ["node_modules", "dist"]
 }

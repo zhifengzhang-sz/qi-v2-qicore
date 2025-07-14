@@ -9,81 +9,150 @@ This proposal outlines a **TypeScript-native implementation** of QiCore Foundati
 - **Leverage TypeScript Strengths**: Advanced type system, excellent tooling, async/await, native JSON/Object handling
 - **Embrace JavaScript Runtime**: Event loop, Promise-based async, prototype-based objects, V8 optimizations
 - **Modern TypeScript Patterns**: Template literal types, conditional types, mapped types, branded types
-- **Fluent API Pattern (MANDATORY)**: Method chaining and builder patterns while preserving mathematical laws
+- **Selective Fluent API Pattern**: Method chaining only for qi/core/config; pure functions for qi/base
 - **Native Ecosystem Integration**: Node.js/Bun runtime, npm ecosystem, existing JavaScript libraries
 - **Contract Compliance**: Maintain mathematical laws and behavioral contracts with TypeScript-native ergonomics
 
 ### Key Objectives (v-0.3.x Scope)
 
 - **TypeScript-Native Architecture**: Design patterns that feel natural in TypeScript, not Haskell translations
-- **Fluent API Implementation**: Mandatory method chaining and builder patterns for all core operations
+- **Fluent API Implementation**: Method chaining only for qi/core/config operations
 - **JavaScript Runtime Optimization**: Leverage V8/Bun JIT, async I/O, and JavaScript object performance
 - **Modern Type System**: Use TypeScript 5.x advanced features for type safety and developer experience
 - **Ecosystem Harmony**: Integrate seamlessly with existing JavaScript/TypeScript tooling and libraries
 - **Contract Compliance**: Prove behavioral consistency through different implementation approaches
 
-## TypeScript-Native Architecture
+## TypeScript-Native Architecture: Hybrid Approach
 
-### 1. Result<T> Implementation: Fluent API with Native Union Types
+### Design Philosophy: Right Pattern for Right Purpose
 
-Combine TypeScript's discriminated unions with mandatory fluent API pattern for optimal developer experience:
+**DECISION**: Use **pure functions for qi/base** (mathematical foundation) and **fluent APIs only for qi/core/config** (configuration operations).
 
-- **TypeScript-native discriminated unions** (not Haskell-style monads)
+### 1. Result<T> Implementation: Pure Functions (Following Haskell Reference)
+
+Mirror the Haskell implementation exactly with pure discriminated unions and standalone functions:
+
+- **Pure discriminated unions** (exactly like Haskell's `Either QiError a`)
+- **Standalone transformation functions** (mirroring Haskell function signatures)
 - **Pattern matching with exhaustive checking** using switch statements
-- **Fluent API with ResultBuilder class** that maintains mathematical laws while feeling natural in TypeScript
-- **Functor/Monad law compliance** with fluent chaining
-- **TypeScript-style async error handling** with native async/await patterns
-- **Factory functions with TypeScript inference** (Ok, Err, from)
-- **Async result helpers** that work naturally with TypeScript async/await
+- **Zero TypeScript type issues** (no complex intersections or method attachments)
+- **Cross-language consistency** with Haskell reference implementation
+- **Mathematical law compliance** through proven Haskell-equivalent implementation
 
-### Fluent API Usage Patterns (MANDATORY Implementation)
+#### Core Function Definitions
 
-- **Basic fluent pipeline**: Chain map → filter → flatMap → unwrapOr with mathematical law preservation
-- **Async fluent pipeline**: Combine mapAsync and flatMap with proper TypeScript async/await semantics
-- **Error recovery pipeline**: Use orElse for fallback operations while maintaining fluent chaining
-- **Complex validation pipeline**: Multi-step validation with context accumulation and side effects
-- **JavaScript ecosystem integration**: Natural integration with Express, React, Next.js, and other frameworks
+**map**: Transforms the value inside a Result
+```typescript
+map<T, U, E>(fn: (value: T) => U, result: Result<T, E>): Result<U, E>
+```
+The function `fn` operates on values, `map` lifts it to work on Results.
 
-### 2. Configuration: Fluent API with Native JavaScript Objects + TypeScript Types
+**flatMap**: Handles functions that already return Results
+```typescript
+flatMap<T, U, E>(fn: (value: T) => Result<U, E>, result: Result<T, E>): Result<U, E>
+```
+Prevents nested Results by flattening `Result<Result<U>>` to `Result<U>`.
 
-Combine fluent method chaining with TypeScript's excellent object and JSON handling:
+#### Pure Discriminated Union Structure
 
-- **TypeScript branded types** for compile-time type safety
-- **Native JavaScript object manipulation** with TypeScript safety
-- **Factory methods** using native JavaScript patterns (fromObject, fromFile)
-- **Native JavaScript property access** with TypeScript type checking
-- **Template literal types** for compile-time path validation
-- **Native object merging** (right-biased) using JavaScript spread
-- **Fluent API for configuration operations** with validation chaining
-- **Schema definition** using TypeScript interfaces
+```typescript
+// Pure discriminated union (mirrors Haskell's Either QiError a)
+export type Result<T, E = QiError> = 
+  | { readonly tag: 'success'; readonly value: T }
+  | { readonly tag: 'failure'; readonly error: E }
 
-### 3. Logger: Event-Driven with Native Async/Await
+// Factory functions (mirrors Haskell pattern constructors)
+export const Ok = <T>(value: T): Result<T, never> => ({ tag: 'success', value })
+export const Err = <E>(error: E): Result<never, E> => ({ tag: 'failure', error })
 
-Embrace JavaScript's event-driven nature and async I/O instead of forcing STM patterns:
+// Standalone functions (mirrors Haskell functions exactly)
+export const map = <T, U, E>(fn: (value: T) => U, result: Result<T, E>): Result<U, E> =>
+  result.tag === 'success' ? Ok(fn(result.value)) : result
 
-- **Event-driven logger** using native JavaScript EventEmitter patterns
-- **O(1) level checking** using native JavaScript comparison
-- **Native async/await** with structured logging
-- **Automatic trace context** from async_hooks (Node.js native)
-- **Event-driven extensibility** with JavaScript event patterns
-- **Async parallel output** to all configured destinations
-- **Fluent API with method chaining** (JavaScript/TypeScript idiom)
-- **OpenTelemetry integration** using native JavaScript patterns
-- **Native JavaScript formatters** (JSON, Text)
-- **Stream-based outputs** using Node.js/Bun native streams
+export const flatMap = <T, U, E>(fn: (value: T) => Result<U, E>, result: Result<T, E>): Result<U, E> =>
+  result.tag === 'success' ? fn(result.value) : result
+```
 
-### 4. Cache: Native JavaScript Map + Modern Async Patterns
+#### Usage Examples
 
-Use JavaScript's native Map and modern async patterns instead of forcing STM:
+```typescript
+// Pure function composition (mirrors Haskell usage)
+const parseNumber = (s: string): Result<number> => {
+  const n = parseInt(s)
+  return isNaN(n) ? Err(validationError('Invalid number')) : Ok(n)
+}
 
-- **Modern JavaScript cache** using native Map and async patterns
-- **Native JavaScript Promise-based locking** (no STM needed)
-- **Native Map operations** with async/await
-- **LRU eviction** using native array operations
-- **Modern async iteration** using native JavaScript generators
-- **Batch operations** using native Promise.allSettled
-- **Native JavaScript backend abstraction** for memory/Redis consistency
-- **Redis backend** using native JavaScript Redis client
+// Explicit sequential operations
+const step1 = map((s: string) => s.trim(), Ok("  123  "))
+const step2 = flatMap(parseNumber, step1)
+const step3 = map((n: number) => n * 2, step2)
+const result = unwrapOr(0, step3)
+
+// Function composition for complex pipelines
+const processInput = (input: string): Result<number> => 
+  flatMap(
+    (n: number) => Ok(n * 2),
+    flatMap(
+      parseNumber,
+      map((s: string) => s.trim(), Ok(input))
+    )
+  )
+```
+
+#### Required Functions
+
+- **map(fn: (T) => U, result: Result<T>)**: Transform success values
+- **flatMap(fn: (T) => Result<U>, result: Result<T>)**: Chain operations that return Results
+- **filter(predicate: (T) => boolean, error: E, result: Result<T>)**: Filter values with predicate
+- **unwrapOr(defaultValue: T, result: Result<T>)**: Extract value or return default
+- **orElse(fn: (E) => Result<T>, result: Result<T>)**: Error recovery fallback
+
+### 2. Configuration: Fluent API with Schema Validation + TypeScript Safety
+
+**MANDATORY: Fluent API Pattern with Schema Validation**
+
+Combine fluent method chaining with TypeScript-first schema validation using Zod:
+
+- **Zod schema validation**: TypeScript-first validation with static type inference and zero dependencies
+- **zod-config integration**: Multi-source configuration loading with adapter pattern
+- **Runtime type safety**: Early validation at application startup with clear error messages
+- **Fluent configuration builder**: MANDATORY method chaining for all operations  
+- **Multi-format parsing**: JSON, YAML (yaml), TOML (smol-toml), environment variables (dotenv) using zod-config adapters
+- **Type transformation**: Built-in coercion for strings to numbers/booleans with validation
+- **Error handling**: safeParse() pattern for graceful validation with detailed error reporting
+- **Custom refinements**: Advanced validation logic using .refine() method
+- **Global type extension**: Extend ProcessEnv interface with inferred types
+- **Multi-source merging**: Deep merge from multiple configuration sources with precedence
+
+### 3. Logger: Event-Driven with Pino (Future Implementation)
+
+Leverage pino's high-performance logging with functional patterns:
+
+- **Pino integration**: Use fastest Node.js logger for structured JSON output
+- **Functional API**: Simple functions for logger creation and configuration
+- **Child logger pattern**: Context addition with pino.child()
+- **Event-driven extensibility** using eventemitter3 for high-performance events
+- **O(1) level checking** using pino's optimized level comparison
+- **Structured logging**: Native JSON output with context correlation
+- **OpenTelemetry integration** with trace correlation and span IDs
+- **Environment-aware formatting**: pino-pretty for development, JSON for production
+- **Async output handling**: Non-blocking I/O with pino's async transports
+- **Error serialization**: Built-in error object serialization and stack traces
+
+### 4. Cache: ioredis + Memory (Future Implementation)
+
+Use ioredis for distributed caching with functional patterns:
+
+- **Functional API**: Simple functions for cache creation and configuration
+- **ioredis integration**: Battle-tested Redis client with connection pooling
+- **Memory cache fallback**: Native Map with LRU eviction for local caching
+- **eventemitter3 events**: High-performance event system for cache operations
+- **Unified interface**: Same functional API for memory and Redis backends
+- **Pipeline operations**: Batch Redis operations using ioredis pipelines
+- **TTL management**: Automatic expiration with Redis SETEX/EXPIRE commands
+- **Connection management**: Automatic reconnection and error handling
+- **Performance monitoring**: Cache hit/miss statistics and memory usage tracking
+- **Async/await patterns**: Native Promise-based operations throughout
 
 ## Technology Stack: Max-Min Design Principle
 
@@ -104,6 +173,13 @@ Use JavaScript's native Map and modern async patterns instead of forcing STM:
 - **eventemitter3**: High-performance event system, 30M+ downloads/week
 - **OpenTelemetry**: Official SDK with auto-instrumentation for observability
 
+#### Configuration Management Libraries: 2025 Best Practices
+- **zod**: TypeScript-first schema validation with static type inference, zero dependencies
+- **zod-config**: Multi-source configuration loading with Zod validation, supports Zod 3 & 4
+- **yaml**: YAML parser used by zod-config yamlAdapter (peer dependency)
+- **smol-toml**: High-performance TOML parser used by zod-config tomlAdapter (peer dependency)
+- **dotenv**: Environment variable management used by zod-config dotenvAdapter (peer dependency)
+
 #### Development Tools: 2025 Best-in-Class Selection
 
 - **Biome**: Unified ESLint+Prettier replacement, 95% faster than Prettier
@@ -120,6 +196,8 @@ Use JavaScript's native Map and modern async patterns instead of forcing STM:
 - **Redis Client**: Use ioredis for battle-tested connection pooling
 - **JSON Logging**: Use pino for production-optimized serialization
 - **Event System**: Use eventemitter3 for high-performance events
+- **Configuration Parsing**: Use zod-config with adapters (yaml, smol-toml, dotenv)
+- **Schema Validation**: Use zod for TypeScript-first validation with runtime safety
 - **Build Tools**: Use tsup+esbuild for zero-config dual publishing
 - **Linting/Formatting**: Use Biome for unified toolchain
 - **Test Runner**: Use Vitest for native TypeScript support
@@ -211,20 +289,22 @@ This approach delivers a foundation that feels native to TypeScript developers w
 TypeScript developers expect method chaining and builder patterns for complex operations. While Haskell uses pure functional composition, TypeScript requires a more ergonomic approach that still preserves mathematical laws.
 
 ### Decision
-ALL QiCore Foundation TypeScript implementations MUST provide fluent API patterns:
+QiCore Foundation TypeScript implementations MUST provide fluent API patterns ONLY for configuration:
 
-1. **Result<T> Operations**: All transformation operations return ResultBuilder for chaining
-2. **Service APIs**: Configuration, Logger, Cache services provide fluent builder patterns  
-3. **Mathematical Law Preservation**: Fluent APIs MUST maintain functor/monad/applicative laws
-4. **Type Safety**: TypeScript type inference MUST work seamlessly throughout chains
-5. **Performance**: Fluent chaining MUST have minimal overhead for V8 optimization
+1. **Result<T> Operations**: Pure functional patterns (no fluent API)
+2. **Configuration Module**: MANDATORY fluent builder for all config operations (fromFile, merge, validate, etc.)
+3. **Logger Module**: Functional patterns (no fluent API)
+4. **Cache Module**: Functional patterns (no fluent API)
+5. **Mathematical Law Preservation**: Pure functions maintain functor/monad/applicative laws
+6. **Type Safety**: TypeScript type inference works seamlessly
+7. **Performance**: Pure functions optimized for V8
 
 ### Consequences
-- **Developer Experience**: Superior ergonomics for TypeScript developers
-- **Mathematical Correctness**: All laws preserved within fluent context
+- **Developer Experience**: Superior ergonomics for configuration operations
+- **Mathematical Correctness**: All laws preserved with pure functions
 - **Ecosystem Integration**: Natural integration with JavaScript/TypeScript patterns
 - **Performance**: Optimized for JavaScript runtime characteristics
-- **Maintainability**: Familiar patterns reduce learning curve
+- **Maintainability**: Familiar patterns where appropriate, pure functions where mathematical
 
 
 This architectural decision ensures QiCore Foundation TypeScript implementation provides both mathematical rigor AND exceptional developer experience through fluent API patterns.
@@ -233,7 +313,7 @@ This architectural decision ensures QiCore Foundation TypeScript implementation 
 
 ### Max-Min Principle Achievement
 
-✅ **70% Leverage High-Quality Packages**: ioredis, pino, eventemitter3, Biome, Vitest, fast-check, tsup, Bun  
+✅ **70% Leverage High-Quality Packages**: zod, zod-config, yaml, smol-toml, dotenv, ioredis, pino, eventemitter3, Biome, Vitest, fast-check, tsup, Bun  
 ✅ **30% Strategic Custom Implementation**: Result<T> fluent API, QiError context, type-safe configuration  
 ✅ **Research-Validated Selection**: All packages chosen based on 2025 performance data and adoption metrics  
 ✅ **Zero Reinvention**: No custom Redis clients, loggers, bundlers, test runners, or formatters  

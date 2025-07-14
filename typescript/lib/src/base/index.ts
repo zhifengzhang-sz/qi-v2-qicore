@@ -6,27 +6,44 @@
  */
 
 // Result<T> exports
-export type { Result } from './result.js'
+export type { Result, Success, Failure } from './result.js'
 export {
-  isSuccess,
-  isFailure,
-  match,
+  // Factory operations
   Ok,
   Err,
-  ResultBuilder,
-  from,
+  fromNullable,
   tryCatch,
   asyncTryCatch,
-  fromNullable,
+  // Query operations
+  isSuccess,
+  isFailure,
+  getValue,
+  getError,
+  // Transformation operations
+  map,
+  mapError,
+  flatMap,
+  andThen,
+  filter,
+  orElse,
+  // Extraction operations
+  unwrapOr,
+  unwrap,
+  match,
+  // Collection operations
   sequence,
   traverse,
-  traverseAsync,
-  combine2,
   partition,
-  rights,
-  lefts,
-  fromPromise,
+  combine2,
+  // Applicative operations
+  apply,
+  pure,
+  // Async operations
+  asyncMap,
+  asyncAndThen,
   asyncSequence,
+  fromPromise,
+  toPromise,
 } from './result.js'
 
 // QiError exports

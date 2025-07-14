@@ -23,7 +23,7 @@ import {
   systemError,
   validationError,
   withContext,
-} from '@/base/error.js'
+} from '@qi/base'
 import { beforeEach, describe, expect, test } from 'vitest'
 
 describe('Error Code Creation', () => {
@@ -68,8 +68,9 @@ describe('Error Category Validation', () => {
       'TIMEOUT',
       'RESOURCE',
       'CONCURRENCY',
+      'LOGGER',
     ])
-    expect(ErrorCategories).toHaveLength(10)
+    expect(ErrorCategories).toHaveLength(11)
   })
 })
 

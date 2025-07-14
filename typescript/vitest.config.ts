@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./lib/tests/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -29,9 +29,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': new URL('./src', import.meta.url).pathname,
-      '@/base': new URL('./src/base', import.meta.url).pathname,
-      '@/core': new URL('./src/core', import.meta.url).pathname,
+      '@qi/base': new URL('./lib/src/base/index.ts', import.meta.url).pathname,
+      '@qi/core': new URL('./lib/src/core/index.ts', import.meta.url).pathname,
     },
   },
 })

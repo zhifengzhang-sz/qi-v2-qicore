@@ -26,6 +26,7 @@ export type ErrorCategory =
   | 'TIMEOUT' // Timeout errors - retry with backoff
   | 'RESOURCE' // Resource exhaustion/unavailable - retry with backoff
   | 'CONCURRENCY' // Concurrency conflicts - retry with jitter
+  | 'LOGGER' // Logger-related errors - no retry
 
 /**
  * Comprehensive error information structure
@@ -66,6 +67,7 @@ export const ErrorCategories: ReadonlyArray<ErrorCategory> = [
   'TIMEOUT',
   'RESOURCE',
   'CONCURRENCY',
+  'LOGGER',
 ] as const
 
 /**
@@ -324,6 +326,10 @@ export const getRetryStrategy = (error: QiError): RetryStrategy => {
         backoffMs: 100,
         maxBackoffMs: 5000,
       }
+    case 'LOGGER':
+      return { shouldRetry: false, maxRetries: 0 }
+    default:
+      return { shouldRetry: false, maxRetries: 0 }
   }
 }
 
