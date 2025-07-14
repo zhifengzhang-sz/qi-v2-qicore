@@ -1,6 +1,6 @@
 cabal-version: 3.6
 name: qi-foundation
-version: 0.2.6
+version: 0.2.7
 synopsis: QiCore Foundation - Base and Core Components
 description: 
   Complete QiCore Foundation implementation including mathematical foundation 
@@ -14,13 +14,13 @@ author: Qi Platform
 maintainer: qi@platform.com
 category: Control, System, Configuration, Logging, Caching
 build-type: Simple
-tested-with: GHC ==9.12.1
+tested-with: GHC ==9.12.2
 
--- Modern Haskell language settings (GHC 9.12.1 optimized)
+-- Modern Haskell language settings (GHC 9.12.2 optimized)
 common shared-properties
   default-language: Haskell2010
   default-extensions:
-    -- Essential modern extensions for GHC 9.12.1
+    -- Essential modern extensions for GHC 9.12.2
     OverloadedStrings
     DeriveGeneric
     DeriveAnyClass

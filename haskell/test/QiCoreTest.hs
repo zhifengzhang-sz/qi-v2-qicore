@@ -2,13 +2,13 @@
 
 -- |
 -- Module: QiCoreTest  
--- Description: Comprehensive test suite for QiCore v-0.2.6 infrastructure services
+-- Description: Comprehensive test suite for QiCore v-0.2.7 infrastructure services
 --
--- This module provides thorough testing for QiCore v-0.2.6 infrastructure components:
+-- This module provides thorough testing for QiCore v-0.2.7 infrastructure components:
 -- - Cache operations (memory and Redis with distributed caching)
--- - Configuration parsing (JSON and YAML with proper error handling)
+-- - Configuration parsing (JSON, YAML, and NEW ENV string parsing)
 -- - Integration workflows between components
--- - v-0.2.6 feature verification with real Redis operations
+-- - v-0.2.7 feature verification with real Redis operations and ENV parsing
 module Main where
 
 import Control.Monad (void)
@@ -30,19 +30,19 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "QiCore v-0.2.6 Tests"
+tests = testGroup "QiCore v-0.2.7 Tests"
   [ cacheTests
   , configTests
   , integrationTests
   ]
 
--- Cache Tests (Focus on Redis v-0.2.6 features)
+-- Cache Tests (Redis features stable since v-0.2.6, verified in v-0.2.7)
 cacheTests :: TestTree
 cacheTests = testGroup "Cache Tests"
   [ testGroup "Memory Cache" 
       [ testCase "Memory cache basic operations" memoryBasicOps
       ]
-  , testGroup "Redis Integration (v-0.2.6)"
+  , testGroup "Redis Integration (stable since v-0.2.6)"
       [ testCase "Redis connection test" redisConnectionTest  
       , testCase "Redis SET/GET operations" redisSetGetTest
       , testCase "Redis TTL operations" redisTTLTest
@@ -51,13 +51,13 @@ cacheTests = testGroup "Cache Tests"
       ]
   ]
 
--- Config Tests (Focus on YAML v-0.2.6 features)  
+-- Config Tests (YAML stable since v-0.2.6, ENV string parsing NEW in v-0.2.7)  
 configTests :: TestTree
 configTests = testGroup "Config Tests"
   [ testGroup "JSON Parsing"
       [ testCase "JSON config parsing" jsonConfigTest
       ]
-  , testGroup "YAML Parsing (v-0.2.6)"
+  , testGroup "YAML Parsing (stable since v-0.2.6)"
       [ testCase "YAML config success" yamlConfigSuccessTest
       , testCase "YAML config error handling" yamlConfigErrorTest
       ]
@@ -198,7 +198,7 @@ cacheConfigIntegration = do
         Failure err -> assertFailure $ "Failed to create cache: " <> T.unpack (Error.qiErrorMessage err)
     Failure err -> assertFailure $ "Failed to parse config: " <> T.unpack (Error.qiErrorMessage err)
 
--- Additional Redis Tests for v-0.2.6
+-- Additional Redis Tests (stable implementation since v-0.2.6)
 
 redisTTLTest :: Assertion
 redisTTLTest = do

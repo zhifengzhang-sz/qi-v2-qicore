@@ -211,8 +211,12 @@ data ConfigFormat = JSON | YAML | TOML | ENV  -- TOML marked as removed
 - **Use ENV format**: For simple key-value configurations
 
 **Future Consideration**:
-- **v-1.x.x**: May reconsider TOML if ecosystem matures and APIs stabilize
+- **v-1.x.x**: May reconsider TOML when ecosystem conditions improve:
+  - Stable API compatibility with modern GHC versions
+  - Simple parsing interface (not bidirectional codec complexity)
+  - Clear community consensus on preferred TOML library
 - **Not a priority**: JSON+YAML+ENV covers 95% of configuration use cases
+- **Decision criteria**: TOML would need compelling advantages over existing formats
 
 **Production Ready**: ENV string parsing completed and fully tested alongside existing JSON/YAML support - 3 solid formats.
 
