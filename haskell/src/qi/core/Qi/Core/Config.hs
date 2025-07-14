@@ -92,7 +92,6 @@ import System.Environment (getEnvironment)
 import System.FilePath (takeExtension)
 import Text.Read (readMaybe)
 import Data.Yaml qualified as YAML
-import Toml qualified
 
 import Qi.Base.Error (QiError, ErrorCategory(..), ErrorSeverity(..))
 import Qi.Base.Error qualified as Error

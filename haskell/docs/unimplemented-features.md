@@ -185,6 +185,13 @@ fromEnvironment maybePrefix = -- ✅ Complete implementation
 - **Clean API**: Eliminate incomplete features that confuse users
 - **Clear errors**: Explicit "not supported" messages instead of incomplete implementations
 
+**Implementation Timeline (When These Return)**:
+- **v-0.3.x**: TOML parsing implementation with proper toml-parser integration
+- **v-0.3.x**: ENV string parsing restoration with comprehensive testing  
+- **v-1.x.x**: Advanced format features (includes, variables, schema validation)
+
+**Commitment**: These features WILL return with complete implementations and full test coverage.
+
 ---
 
 ## Implementation Guidelines
