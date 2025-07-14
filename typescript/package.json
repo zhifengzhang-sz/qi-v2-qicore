@@ -1,45 +1,9 @@
 {
   "name": "@qi/qicore-foundation",
-  "version": "0.2.2",
-  "description": "QiCore Foundation - Mathematical foundation types and infrastructure services",
-  "type": "module",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs", 
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    },
-    "./base": {
-      "types": "./dist/base/index.d.ts",
-      "import": "./dist/base/index.mjs",
-      "require": "./dist/base/index.js"
-    },
-    "./core": {
-      "types": "./dist/core/index.d.ts",
-      "import": "./dist/core/index.mjs",
-      "require": "./dist/core/index.js"
-    }
-  },
+  "version": "0.3.1",
+  "description": "QiCore Foundation - TypeScript specifications and proposal (no implementation yet)",
   "scripts": {
-    "dev": "bun run src/index.ts",
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-    "build:watch": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:properties": "vitest run tests/properties/",
-    "bench": "vitest bench",
-    "format": "biome check . --write",
-    "format:check": "biome check .",
-    "lint": "biome lint .",
-    "typecheck": "tsc --noEmit",
-    "docs": "typedoc src/index.ts --out docs/api",
-    "clean": "rimraf dist docs/api",
-    "check": "bun run typecheck && bun run format && bun run test",
-    "prepublishOnly": "bun run build && bun run test && bun run format"
+    "docs": "echo 'TypeScript implementation not yet available - see docs/typescript.impl.proposal.md'"
   },
   "keywords": [
     "qicore",
@@ -65,30 +29,11 @@
   },
   "homepage": "https://github.com/qi-platform/qi-v2-qicore/tree/main/typescript",
   "files": [
-    "dist",
-    "README.md",
-    "CHANGELOG.md"
+    "docs/typescript.impl.proposal.md"
   ],
   "engines": {
-    "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "yaml": "^2.3.4"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@types/node": "^20.10.0",
-    "@vitest/coverage-v8": "^1.0.0",
-    "bun-types": "^1.1.0",
-    "fast-check": "^3.15.0",
-    "rimraf": "^5.0.5",
-    "tsup": "^8.0.0",
-    "typedoc": "^0.25.0",
-    "typescript": "^5.3.0",
-    "vitest": "^1.0.0"
-  },
-  "peerDependencies": {
-    "typescript": ">=5.0.0"
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
   },
   "publishConfig": {
     "access": "public"
