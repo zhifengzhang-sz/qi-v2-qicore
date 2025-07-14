@@ -797,59 +797,142 @@ Custom QiCore Implementation:   30%  ← Minimize to essentials
 
 This distribution ensures maximum leverage of proven solutions while focusing custom implementation only on QiCore-specific value that cannot be obtained from existing packages.
 
-### Property-Based Testing with Native TypeScript Patterns
+### Property-Based Testing: Complete Mathematical Law Verification
 
 ```typescript
-// Property testing that feels natural in TypeScript
+// MANDATORY: Complete property-based testing for all mathematical laws
 import fc from 'fast-check'
-import { describe, test, expect } from 'vitest'
-import { Ok, Err, match } from './result'
+import { test } from '@fast-check/vitest'
+import { describe, expect, bench } from 'vitest'
+import { Ok, Err, from, ErrorCategory } from './result'
 
-describe('Result Type Laws', () => {
+describe('Mathematical Law Verification', () => {
   const arbitraryResult = fc.oneof(
     fc.anything().map(Ok),
     fc.string().map(Err)
   )
 
-  test('Functor Identity Law', () => {
-    fc.assert(fc.property(arbitraryResult, (result) => {
+  // MANDATORY: Functor Laws
+  test.prop([fc.anything()])(
+    'Functor Identity Law: map(id) === id',
+    (value) => {
       const identity = <T>(x: T): T => x
-      const mapped = new ResultBuilder(result).map(identity).result
-      
-      expect(mapped).toEqual(result)
-    }))
+      const result = from(Ok(value)).map(identity).build()
+      expect(result).toEqual(Ok(value))
+    }
+  )
+
+  test.prop([fc.anything(), fc.func(fc.anything()), fc.func(fc.anything())])(
+    'Functor Composition Law: map(f ∘ g) === map(f) ∘ map(g)',
+    (value, f, g) => {
+      const composed = from(Ok(value)).map(x => f(g(x))).build()
+      const sequential = from(Ok(value)).map(g).map(f).build()
+      expect(composed).toEqual(sequential)
+    }
+  )
+
+  // MANDATORY: Monad Laws
+  test.prop([fc.anything()])(
+    'Monad Left Identity: flatMap(f)(Ok(x)) === f(x)',
+    (value) => {
+      const f = (x: any) => Ok(x.toString())
+      const leftSide = from(Ok(value)).flatMap(f).build()
+      const rightSide = f(value)
+      expect(leftSide).toEqual(rightSide)
+    }
+  )
+
+  test.prop([arbitraryResult])(
+    'Monad Right Identity: result.flatMap(Ok) === result',
+    (result) => {
+      const chained = from(result).flatMap(Ok).build()
+      expect(chained).toEqual(result)
+    }
+  )
+
+  test.prop([fc.anything(), fc.func(arbitraryResult), fc.func(arbitraryResult)])(
+    'Monad Associativity: (m >>= f) >>= g === m >>= (x => f(x) >>= g)',
+    (value, f, g) => {
+      const leftAssoc = from(Ok(value)).flatMap(f).flatMap(g).build()
+      const rightAssoc = from(Ok(value)).flatMap(x => from(f(x)).flatMap(g).build()).build()
+      expect(leftAssoc).toEqual(rightAssoc)
+    }
+  )
+
+  // MANDATORY: Applicative Laws  
+  test.prop([fc.anything()])(
+    'Applicative Identity: apply(Ok(id))(result) === result',
+    (value) => {
+      const identity = <T>(x: T): T => x
+      const result = Ok(value)
+      const applied = apply(Ok(identity))(result)
+      expect(applied).toEqual(result)
+    }
+  )
+})
+
+describe('Error Category Compliance', () => {
+  test('Error categories match contract specification', () => {
+    // Verify all required categories exist
+    expect(ErrorCategory.VALIDATION).toBe('VALIDATION')
+    expect(ErrorCategory.NETWORK).toBe('NETWORK')
+    expect(ErrorCategory.CONFIGURATION).toBe('CONFIGURATION')
+    // ... all categories from contracts
   })
 
-  test('Functor Composition Law', () => {
-    fc.assert(fc.property(
-      arbitraryResult,
-      fc.func(fc.integer()),
-      fc.func(fc.integer()),
-      (result, f, g) => {
-        const composed = new ResultBuilder(result)
-          .map(x => f(g(x)))
-          .result
+  test('Retry strategy mapping works correctly', () => {
+    const networkError = createQiError({
+      code: 'NETWORK_TIMEOUT',
+      message: 'Request timeout',
+      category: ErrorCategory.NETWORK
+    })
+    
+    expect(getRetryStrategy(networkError)).toBe('exponential_backoff')
+  })
+})
 
-        const sequential = new ResultBuilder(result)
-          .map(g)
-          .map(f)
-          .result
+describe('Performance Verification', () => {
+  bench('Result.map O(1) verification', () => {
+    const result = Ok(42)
+    const mapped = from(result).map(x => x * 2).build()
+  }, { iterations: 1000000 })
 
-        expect(composed).toEqual(sequential)
-      }
-    ))
+  bench('Fluent chaining performance', () => {
+    from(Ok(1))
+      .map(x => x + 1)
+      .map(x => x * 2)
+      .map(x => x.toString())
+      .unwrapOr('0')
+  }, { iterations: 100000 })
+
+  test('Memory efficiency verification', () => {
+    const initial = process.memoryUsage().heapUsed
+    const results = Array.from({ length: 10000 }, (_, i) => Ok(i))
+    const final = process.memoryUsage().heapUsed
+    const perResult = (final - initial) / 10000
+    
+    // Should be < 100 bytes per Result instance
+    expect(perResult).toBeLessThan(100)
+  })
+})
+
+describe('Async Pattern Verification', () => {
+  test('Promise rejection becomes Result failure', async () => {
+    const result = await asyncTryCatch(async () => {
+      throw new Error('Async failure')
+    })
+    
+    expect(result.tag).toBe('failure')
+    expect(result.error.message).toBe('Async failure')
   })
 
-  test('Pattern Matching Exhaustiveness', () => {
-    fc.assert(fc.property(arbitraryResult, (result) => {
-      const matched = match(result, {
-        success: value => `success: ${value}`,
-        failure: error => `failure: ${error}`
-      })
-      
-      expect(typeof matched).toBe('string')
-      expect(matched.startsWith('success:') || matched.startsWith('failure:')).toBe(true)
-    }))
+  test('Fluent async chaining preserves types', async () => {
+    const result = await from(Ok('123'))
+      .mapAsync(async str => parseInt(str))
+      .then(builder => builder.map(num => num * 2))
+      .then(builder => builder.build())
+    
+    expect(result).toEqual(Ok(246))
   })
 })
 ```

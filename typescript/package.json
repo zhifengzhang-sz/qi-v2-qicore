@@ -1,7 +1,7 @@
 {
   "name": "@qi/qicore-foundation",
   "version": "0.3.1",
-  "description": "QiCore Foundation - TypeScript specifications and proposal (no implementation yet)",
+  "description": "QiCore Foundation - TypeScript specifications and proposal (improved)",
   "scripts": {
     "docs": "echo 'TypeScript implementation not yet available - see docs/typescript.impl.proposal.md'"
   },
@@ -29,6 +29,7 @@
   },
   "homepage": "https://github.com/qi-platform/qi-v2-qicore/tree/main/typescript",
   "files": [
+    "dist",
     "docs/typescript.impl.proposal.md"
   ],
   "engines": {
