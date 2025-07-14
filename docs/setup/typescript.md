@@ -493,7 +493,15 @@ rm -rf node_modules/.cache
 
 # Rebuild TypeScript project references
 bun run typecheck --build --force
+
+# Check for conflicting type definitions
+bun run typecheck --listFiles | grep -E "\.d\.ts$"
 ```
+
+**Common Error Solutions:**
+- **"Cannot find module '@/base'"**: Check tsconfig.json paths configuration
+- **"Type errors in node_modules"**: Add problematic packages to tsconfig exclude
+- **"Conflicting declarations"**: Use `skipLibCheck: true` in tsconfig.json
 
 #### Biome Configuration Issues
 ```bash
@@ -502,7 +510,15 @@ bun run format:check
 
 # Fix formatting issues
 bun run format
+
+# Validate Biome configuration
+npx @biomejs/biome check --verbose
 ```
+
+**Biome Common Issues:**
+- **Rules conflict with Prettier**: Remove .prettierrc files
+- **Import organization fails**: Check organizeImports.enabled in biome.json
+- **Performance issues**: Add problematic files to biome.json ignore list
 
 #### Test Failures
 ```bash
@@ -511,15 +527,208 @@ bun run test --reporter=verbose
 
 # Run specific test file
 bun run test tests/base/result.test.ts
+
+# Debug property-based test failures
+bun run test:properties --reporter=verbose --seed=12345
 ```
 
-### Performance Debugging
+**Test Debugging:**
+- **Property tests fail randomly**: Use consistent seed for reproducibility
+- **Async tests timeout**: Increase testTimeout in vitest.config.ts
+- **Memory issues**: Run tests with `--isolate` flag
+
+#### Package Manager Issues
+```bash
+# Clear package manager cache
+bun pm cache rm
+
+# Reinstall dependencies
+rm -rf node_modules bun.lockb
+bun install
+
+# Check for peer dependency issues
+bun install --verbose
+```
+
+#### Build Issues
+```bash
+# Debug build process
+bun run build --verbose
+
+# Check for circular dependencies
+npx madge --circular --extensions ts,tsx src/
+
+# Analyze bundle size
+bun run build && npx bundlesize
+```
+
+### Development Environment Setup
+
+#### VS Code Configuration
+**Required Extensions:**
+- **Biome** (biomejs.biome) - Essential for formatting/linting
+- **TypeScript Importer** (pmneo.tsimporter) - Auto import management
+- **Error Lens** (usernamehw.errorlens) - Inline error display
+
+**Optional but Recommended:**
+- **Thunder Client** (rangav.vscode-thunder-client) - API testing
+- **GitLens** (eamodio.gitlens) - Git integration
+- **Todo Tree** (gruntfuggly.todo-tree) - TODO tracking
+
+**Workspace Settings (.vscode/settings.json):**
+```json
+{
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.codeActionsOnSave": {
+    "quickfix.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "typescript.preferences.importModuleSpecifier": "relative"
+}
+```
+
+**Debug Configuration (.vscode/launch.json):**
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "--reporter=verbose"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "NODE_ENV": "test"
+      }
+    }
+  ]
+}
+```
+
+#### CI/CD Integration
+
+**GitHub Actions (.github/workflows/typescript.yml):**
+```yaml
+name: TypeScript CI
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Type check
+        run: bun run typecheck
+        
+      - name: Format check
+        run: bun run format:check
+        
+      - name: Run tests
+        run: bun run test:coverage
+        
+      - name: Property-based tests
+        run: bun run test:properties
+        
+      - name: Build
+        run: bun run build
+```
+
+**Docker Development Environment:**
+```dockerfile
+# Dockerfile.dev
+FROM oven/bun:1.1-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json bun.lockb ./
+
+# Install dependencies
+RUN bun install
+
+# Copy source code
+COPY . .
+
+# Expose dev server port
+EXPOSE 3000
+
+CMD ["bun", "run", "dev"]
+```
+
+#### Performance Debugging
 ```bash
 # Profile test execution
 bun run test --reporter=verbose --coverage
 
 # Check bundle size
 bun run build && du -sh dist/
+
+# Analyze bundle composition
+bun run build && npx bundleanalyzer dist/
+
+# Memory usage profiling
+NODE_OPTIONS="--max-old-space-size=4096" bun run test
+```
+
+### Package.json Scripts Explained
+
+#### Core Development Scripts
+- **`bun run dev`**: Starts development server with hot reload
+- **`bun run build`**: Creates production bundle (CJS + ESM)
+- **`bun run build:watch`**: Builds in watch mode for development
+
+#### Testing Scripts  
+- **`bun run test`**: Runs all unit tests once
+- **`bun run test:watch`**: Runs tests in watch mode
+- **`bun run test:coverage`**: Runs tests with coverage report
+- **`bun run test:properties`**: Runs property-based tests (mathematical laws)
+
+#### Code Quality Scripts
+- **`bun run format`**: Formats code using Biome
+- **`bun run format:check`**: Checks formatting without fixing
+- **`bun run lint`**: Lints code using Biome rules
+- **`bun run typecheck`**: Type checks without emitting files
+
+#### Utility Scripts
+- **`bun run clean`**: Removes build artifacts
+- **`bun run check`**: Runs full validation pipeline (type + format + test)
+- **`bun run prepublishOnly`**: Pre-publication validation
+
+### Environment Variables
+
+**Development Environment (.env.development):**
+```bash
+NODE_ENV=development
+LOG_LEVEL=debug
+CACHE_TTL=300
+TEST_TIMEOUT=10000
+```
+
+**Production Environment (.env.production):**
+```bash
+NODE_ENV=production
+LOG_LEVEL=info
+CACHE_TTL=3600
+```
+
+**Testing Environment (.env.test):**
+```bash
+NODE_ENV=test
+LOG_LEVEL=error
+CACHE_TTL=60
+PROPERTY_TEST_COUNT=1000
 ```
 
 ## IDE Configuration
