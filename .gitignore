@@ -13,8 +13,11 @@ stack.yaml.lock
 result
 result-*
 
-# IDE files
-.vscode/
+# IDE files - keep shared settings, ignore personal ones
+.vscode/launch.json
+.vscode/tasks.json  
+.vscode/*.code-workspace
+.vscode/settings.local.json
 .idea/
 *.swp
 *.swo

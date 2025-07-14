@@ -1,0 +1,45 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# All files
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# TypeScript/JavaScript
+[*.{ts,js,tsx,jsx,json}]
+indent_size = 2
+
+# Haskell
+[*.{hs,lhs}]
+indent_size = 2
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# YAML
+[*.{yml,yaml}]
+indent_size = 2
+
+# Configuration files
+[*.{toml,ini}]
+indent_size = 2
+
+# Shell scripts
+[*.{sh,bash}]
+indent_size = 2
+
+# Cabal files
+[*.cabal]
+indent_size = 2
+
+# Nix files
+[*.nix]
+indent_size = 2

@@ -1,0 +1,92 @@
+{
+  "files.exclude": {
+    // Haskell build artifacts
+    "haskell/dist-newstyle": true,
+    "haskell/dist": true,
+    "haskell/.stack-work": true,
+    "result": true,
+    "result-*": true,
+    
+    // TypeScript/Node.js artifacts  
+    "typescript/node_modules": true,
+    "typescript/dist": true,
+    "typescript/coverage": true,
+    "typescript/build": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/coverage": true,
+    "**/.next/": true,
+    "**/.nuxt/": true,
+    "**/.cache/": true,
+    "**/.parcel-cache/": true,
+    "**/.rpt2_cache/": true,
+    "**/.rts2_cache_*/": true,
+    "**/.nyc_output/": true,
+    "**/build/Release/": true,
+    "**/jspm_packages/": true,
+    
+    // Environment and cache files
+    "**/.env": true,
+    "**/.env.test": true,
+    "**/.env.production": true,
+    "**/.eslintcache": true,
+    "**/.stylelintcache": true,
+    "**/.npm/": true,
+    "**/.yarn/cache/": true,
+    "**/.yarn/unplugged/": true,
+    "**/.yarn/build-state.yml": true,
+    "**/.yarn/install-state.gz": true,
+    "**/.pnp.*": true,
+    "**/.bun": true,
+    
+    // IDE and OS files
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/*.swp": true,
+    "**/*.swo": true,
+    "**/*~": true,
+    
+    // Temporary files
+    "**/*.tmp": true,
+    "**/*.temp": true,
+    "**/*.log": true,
+    "**/npm-debug.log*": true,
+    "**/yarn-debug.log*": true,
+    "**/yarn-error.log*": true,
+    "**/lerna-debug.log*": true,
+    "**/.pnpm-debug.log*": true
+  },
+  
+  "search.exclude": {
+    // Same patterns for search exclusion
+    "**/node_modules/": true,
+    "**/dist-newstyle/": true,
+    "**/typescript/dist/": true,
+    "**/coverage/": true,
+    "**/.next/": true,
+    "**/.nuxt/": true,
+    "**/.cache/": true,
+    "**/.parcel-cache/": true,
+    "**/build/Release/": true
+  },
+  
+  "files.watcherExclude": {
+    // Exclude from file watcher for performance
+    "**/node_modules/**": true,
+    "**/dist-newstyle/**": true,
+    "**/typescript/dist/**": true,
+    "**/coverage/**": true,
+    "**/.next/**": true,
+    "**/.cache/**": true
+  },
+  
+  // Git integration
+  "git.ignoreLimitWarning": true,
+  "scm.defaultViewMode": "tree",
+  
+  // TypeScript specific
+  "typescript.preferences.excludePackageJsonAutoImports": "on",
+  
+  // Haskell specific  
+  "haskell.manageHLS": "GHCup"
+}

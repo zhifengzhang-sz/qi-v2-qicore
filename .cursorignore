@@ -1,0 +1,55 @@
+# Cursor AI ignore file - prevents AI from indexing these files/directories
+# Note: This doesn't hide files from explorer, but prevents AI context pollution
+
+# Build artifacts and dependencies
+node_modules/
+dist/
+dist-newstyle/
+build/
+coverage/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+
+# TypeScript specific
+typescript/node_modules/
+typescript/dist/
+typescript/build/
+typescript/coverage/
+
+# Haskell specific  
+haskell/dist-newstyle/
+haskell/dist/
+haskell/.stack-work/
+
+# Cache and temporary files
+.rpt2_cache/
+.rts2_cache_*/
+.nyc_output/
+*.log
+*.tmp
+*.temp
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.test
+
+# Package manager files
+package-lock.json
+yarn.lock
+bun.lockb
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Specific large files that shouldn't be in AI context
+**/*.min.js
+**/*.bundle.js
+**/*.map
