@@ -36,7 +36,7 @@ describe('Logger Module', () => {
 
   beforeEach(() => {
     // Reset environment
-    delete process.env.NODE_ENV
+    process.env.NODE_ENV = undefined
   })
 
   afterEach(async () => {
@@ -147,7 +147,7 @@ describe('Logger Module', () => {
       logger.on('error', errorSpy)
 
       // Force an error by corrupting internal state
-      ;(logger as any).pino = null
+      ;(logger as unknown as { pino: null }).pino = null
 
       logger.info('This should fail')
 
@@ -442,7 +442,7 @@ describe('Logger Module', () => {
       expect(testEnvConfig).toEqual(loggerTestConfig)
 
       // Clean up
-      delete process.env.NODE_ENV
+      process.env.NODE_ENV = undefined
     })
   })
 

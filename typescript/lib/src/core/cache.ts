@@ -342,7 +342,7 @@ export class MemoryCache implements ICache {
    * Add event listener
    */
   on<K extends keyof CacheEvents>(event: K, listener: CacheEvents[K]): this {
-    this.events.on(event, listener as any)
+    this.events.on(event, listener as EventEmitter.EventListener<CacheEvents, K>)
     return this
   }
 
@@ -350,7 +350,7 @@ export class MemoryCache implements ICache {
    * Remove event listener
    */
   off<K extends keyof CacheEvents>(event: K, listener: CacheEvents[K]): this {
-    this.events.off(event, listener as any)
+    this.events.off(event, listener as EventEmitter.EventListener<CacheEvents, K>)
     return this
   }
 
@@ -622,7 +622,7 @@ export class RedisCache implements ICache {
    * Add event listener
    */
   on<K extends keyof CacheEvents>(event: K, listener: CacheEvents[K]): this {
-    this.events.on(event, listener as any)
+    this.events.on(event, listener as EventEmitter.EventListener<CacheEvents, K>)
     return this
   }
 
@@ -630,7 +630,7 @@ export class RedisCache implements ICache {
    * Remove event listener
    */
   off<K extends keyof CacheEvents>(event: K, listener: CacheEvents[K]): this {
-    this.events.off(event, listener as any)
+    this.events.off(event, listener as EventEmitter.EventListener<CacheEvents, K>)
     return this
   }
 
@@ -638,7 +638,7 @@ export class RedisCache implements ICache {
    * Execute Redis pipeline for batch operations
    */
   async pipeline(
-    operations: Array<(pipeline: any) => void>
+    operations: Array<(pipeline: unknown) => void>
   ): Promise<Result<unknown[], CacheError>> {
     try {
       const pipeline = this.redis.pipeline()
@@ -819,7 +819,7 @@ export const productionConfig: CacheConfig = {
     host: process.env.REDIS_HOST || 'localhost',
     port: Number.parseInt(process.env.REDIS_PORT || '6379'),
     password: process.env.REDIS_PASSWORD,
-  } as any,
+  } as RedisOptions,
 }
 
 /**

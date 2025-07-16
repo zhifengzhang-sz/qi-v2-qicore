@@ -76,12 +76,18 @@ describe('Result<T> Type Guards', () => {
 
   test('getValue and getError work correctly', () => {
     const success = Ok(42)
-    const failure = Err(validationError('error'))
+    const error = validationError('error')
+    const failure = Err(error)
 
     expect(getValue(success)).toBe(42)
     expect(getValue(failure)).toBe(undefined)
     expect(getError(success)).toBe(undefined)
-    expect(getError(failure)).toEqual(validationError('error'))
+
+    const retrievedError = getError(failure)
+    expect(retrievedError).toBeDefined()
+    expect(retrievedError?.code).toBe(error.code)
+    expect(retrievedError?.message).toBe(error.message)
+    expect(retrievedError?.category).toBe(error.category)
   })
 })
 

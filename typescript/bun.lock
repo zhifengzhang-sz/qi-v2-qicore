@@ -17,7 +17,7 @@
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
         "@fast-check/vitest": "^0.2.1",
-        "@types/node": "^20.10.0",
+        "@types/node": "^20.19.8",
         "@types/pino": "^7.0.5",
         "@vitest/coverage-v8": "^1.0.0",
         "bun-types": "^1.1.0",
@@ -25,7 +25,7 @@
         "rimraf": "^5.0.5",
         "tsup": "^8.0.0",
         "typedoc": "^0.25.0",
-        "typescript": "^5.3.0",
+        "typescript": "^5.8.3",
         "vite-tsconfig-paths": "^5.1.4",
         "vitest": "^1.0.0",
       },
@@ -178,7 +178,7 @@
 
     "@types/estree": ["@types/estree@1.0.8", "https://registry.npmmirror.com/@types/estree/-/estree-1.0.8.tgz", {}, "sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w=="],
 
-    "@types/node": ["@types/node@20.19.7", "https://registry.npmmirror.com/@types/node/-/node-20.19.7.tgz", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-1GM9z6BJOv86qkPvzh2i6VW5+VVrXxCLknfmTkWEqz+6DqosiY28XUWCTmBcJ0ACzKqx/iwdIREfo1fwExIlkA=="],
+    "@types/node": ["@types/node@20.19.8", "https://registry.npmmirror.com/@types/node/-/node-20.19.8.tgz", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-HzbgCY53T6bfu4tT7Aq3TvViJyHjLjPNaAS3HOuMc9pw97KHsUtXNX4L+wu59g1WnjsZSko35MbEqnO58rihhw=="],
 
     "@types/pino": ["@types/pino@7.0.5", "https://registry.npmmirror.com/@types/pino/-/pino-7.0.5.tgz", { "dependencies": { "pino": "*" } }, "sha512-wKoab31pknvILkxAF8ss+v9iNyhw5Iu/0jLtRkUD74cNfOOLJNnqfFKAv0r7wVaTQxRZtWrMpGfShwwBjOcgcg=="],
 
@@ -594,9 +594,11 @@
 
     "zod": ["zod@3.25.76", "https://registry.npmmirror.com/zod/-/zod-3.25.76.tgz", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
-    "zod-config": ["zod-config@1.1.2", "https://registry.npmmirror.com/zod-config/-/zod-config-1.1.2.tgz", { "peerDependencies": { "dotenv": ">=15", "smol-toml": "^1.x", "yaml": "^2.x", "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["dotenv", "smol-toml", "yaml"] }, "sha512-gi0YraMn4C3hSqmb9clCjYHj9YQsyQcXPr+Rj/lOCvL3vuOK/rPzObK45k4VQM5pr/RlzbAudwUmmBUFebB+vw=="],
+    "zod-config": ["zod-config@1.2.0", "https://registry.npmmirror.com/zod-config/-/zod-config-1.2.0.tgz", { "peerDependencies": { "dotenv": ">=15", "smol-toml": "^1.x", "yaml": "^2.x", "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["dotenv", "smol-toml", "yaml"] }, "sha512-/Gh+ZaEQ6G0+i8fm+CHHXCbJGfeM51OBPOGBCOBsp5Q4Nw67G4vmP7rsh5I04pc0dCEKKZSmde18GMYvlY8T9Q=="],
 
     "@types/pino/pino": ["pino@8.21.0", "https://registry.npmmirror.com/pino/-/pino-8.21.0.tgz", { "dependencies": { "atomic-sleep": "^1.0.0", "fast-redact": "^3.1.1", "on-exit-leak-free": "^2.1.0", "pino-abstract-transport": "^1.2.0", "pino-std-serializers": "^6.0.0", "process-warning": "^3.0.0", "quick-format-unescaped": "^4.0.3", "real-require": "^0.2.0", "safe-stable-stringify": "^2.3.1", "sonic-boom": "^3.7.0", "thread-stream": "^2.6.0" }, "bin": { "pino": "bin.js" } }, "sha512-ip4qdzjkAyDDZklUaZkcRFb2iA118H9SgRh8yzTkSQK8HilsOJF7rSY8HoW5+I0M46AZgX/pxbprf2vvzQCE0Q=="],
+
+    "bun-types/@types/node": ["@types/node@20.19.7", "https://registry.npmmirror.com/@types/node/-/node-20.19.7.tgz", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-1GM9z6BJOv86qkPvzh2i6VW5+VVrXxCLknfmTkWEqz+6DqosiY28XUWCTmBcJ0ACzKqx/iwdIREfo1fwExIlkA=="],
 
     "mlly/pathe": ["pathe@2.0.3", "https://registry.npmmirror.com/pathe/-/pathe-2.0.3.tgz", {}, "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w=="],
 

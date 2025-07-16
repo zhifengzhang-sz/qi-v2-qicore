@@ -123,9 +123,9 @@ host = "localhost"
       expect(data.other_var).toBeUndefined()
 
       // Clean up
-      delete process.env.TEST_APP_NAME
-      delete process.env.TEST_PORT
-      delete process.env.OTHER_VAR
+      process.env.TEST_APP_NAME = undefined
+      process.env.TEST_PORT = undefined
+      process.env.OTHER_VAR = undefined
     })
 
     test('merge combines configurations', () => {
@@ -312,7 +312,7 @@ host = "localhost"
 
       expect(config.get('key').tag).toBe('success')
 
-      delete process.env.TEST_KEY
+      process.env.TEST_KEY = undefined
     })
 
     test('empty creates empty configuration', () => {

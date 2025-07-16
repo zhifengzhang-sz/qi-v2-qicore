@@ -12,12 +12,15 @@ import {
   ConfigBuilder,
 } from '@qi/core'
 import {
+  type ICache,
+  type Logger,
   type LoggerConfig,
   // Logger
   createLogger,
   formatQiError,
 } from '@qi/core'
 import {
+  type CacheBackend,
   type CacheConfig,
   cacheAside,
   // Cache
@@ -25,6 +28,18 @@ import {
 } from '@qi/core'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { z } from 'zod'
+
+// Test configuration schemas
+const LoggingConfigSchema = z.object({
+  level: z.enum(['debug', 'info', 'warn', 'error']),
+  pretty: z.boolean(),
+})
+
+const CacheConfigSchema = z.object({
+  backend: z.enum(['memory', 'redis']),
+  maxSize: z.number().optional(),
+  defaultTtl: z.number().optional(),
+})
 
 describe('Core Module Integration', () => {
   let tempDir: string
@@ -74,9 +89,13 @@ describe('Core Module Integration', () => {
         expect(loggingConfig.tag).toBe('success')
 
         if (loggingConfig.tag === 'success') {
+          const parsedLogging = LoggingConfigSchema.safeParse(loggingConfig.value)
+          if (!parsedLogging.success) {
+            throw new Error('Invalid logging config')
+          }
           const loggerConfig: LoggerConfig = {
-            level: (loggingConfig.value as any).level,
-            pretty: (loggingConfig.value as any).pretty,
+            level: parsedLogging.data.level,
+            pretty: parsedLogging.data.pretty,
             name: appConfig.app.name,
           }
 
@@ -105,10 +124,14 @@ describe('Core Module Integration', () => {
 
       expect(cacheConfigResult.tag).toBe('success')
       if (cacheConfigResult.tag === 'success') {
+        const parsedCache = CacheConfigSchema.safeParse(cacheConfigResult.value)
+        if (!parsedCache.success) {
+          throw new Error('Invalid cache config')
+        }
         const cacheConfig: CacheConfig = {
-          backend: (cacheConfigResult.value as any).backend,
-          maxSize: (cacheConfigResult.value as any).maxSize,
-          defaultTtl: (cacheConfigResult.value as any).defaultTtl,
+          backend: parsedCache.data.backend,
+          maxSize: parsedCache.data.maxSize,
+          defaultTtl: parsedCache.data.defaultTtl,
         }
 
         const cacheResult = createCache(cacheConfig)
@@ -163,22 +186,34 @@ describe('Core Module Integration', () => {
           const loggingConfigResult = config.value.get('logging')
           const loggerResult =
             loggingConfigResult.tag === 'success'
-              ? createLogger({
-                  level: (loggingConfigResult.value as any).level,
-                  pretty: (loggingConfigResult.value as any).pretty,
-                  name: configData.app.name,
-                })
+              ? (() => {
+                  const parsedLogging = LoggingConfigSchema.safeParse(loggingConfigResult.value)
+                  if (!parsedLogging.success) {
+                    throw new Error('Invalid logging config')
+                  }
+                  return createLogger({
+                    level: parsedLogging.data.level,
+                    pretty: parsedLogging.data.pretty,
+                    name: configData.app.name,
+                  })
+                })()
               : null
 
           // Initialize cache
           const cacheConfigResult = config.value.get('cache')
           const cacheResult =
             cacheConfigResult.tag === 'success'
-              ? createCache({
-                  backend: (cacheConfigResult.value as any).backend,
-                  maxSize: (cacheConfigResult.value as any).maxSize,
-                  defaultTtl: (cacheConfigResult.value as any).defaultTtl,
-                })
+              ? (() => {
+                  const parsedCache = CacheConfigSchema.safeParse(cacheConfigResult.value)
+                  if (!parsedCache.success) {
+                    throw new Error('Invalid cache config')
+                  }
+                  return createCache({
+                    backend: parsedCache.data.backend,
+                    maxSize: parsedCache.data.maxSize,
+                    defaultTtl: parsedCache.data.defaultTtl,
+                  })
+                })()
               : null
 
           expect(loggerResult?.tag).toBe('success')
@@ -224,7 +259,7 @@ describe('Core Module Integration', () => {
           const formattedError = formatQiError(configResult.error)
           logger.value.error(
             'Configuration validation failed',
-            configResult.error as any,
+            configResult.error as unknown as Error,
             formattedError
           )
 
@@ -319,17 +354,24 @@ describe('Core Module Integration', () => {
       if (config.tag !== 'success') return
 
       // Initialize services
-      const services = {
-        logger: null as any,
-        cache: null as any,
+      const services: {
+        logger: Logger | null
+        cache: ICache | null
+      } = {
+        logger: null,
+        cache: null,
       }
 
       // Initialize logger
       const loggingConfig = config.value.get('logging')
       if (loggingConfig.tag === 'success') {
+        const parsedLogging = LoggingConfigSchema.safeParse(loggingConfig.value)
+        if (!parsedLogging.success) {
+          throw new Error('Invalid logging config')
+        }
         const loggerResult = createLogger({
-          level: (loggingConfig.value as any).level,
-          pretty: (loggingConfig.value as any).pretty,
+          level: parsedLogging.data.level,
+          pretty: parsedLogging.data.pretty,
           name: appConfigData.app.name,
         })
 
@@ -341,10 +383,14 @@ describe('Core Module Integration', () => {
       // Initialize cache
       const cacheConfig = config.value.get('cache')
       if (cacheConfig.tag === 'success') {
+        const parsedCache = CacheConfigSchema.safeParse(cacheConfig.value)
+        if (!parsedCache.success) {
+          throw new Error('Invalid cache config')
+        }
         const cacheResult = createCache({
-          backend: (cacheConfig.value as any).backend,
-          maxSize: (cacheConfig.value as any).maxSize,
-          defaultTtl: (cacheConfig.value as any).defaultTtl,
+          backend: parsedCache.data.backend,
+          maxSize: parsedCache.data.maxSize,
+          defaultTtl: parsedCache.data.defaultTtl,
         })
 
         if (cacheResult.tag === 'success') {
@@ -355,6 +401,10 @@ describe('Core Module Integration', () => {
       // Test integrated functionality
       expect(services.logger).toBeDefined()
       expect(services.cache).toBeDefined()
+
+      if (!services.logger || !services.cache) {
+        throw new Error('Services not initialized')
+      }
 
       // Use logger to log cache operations
       const logSpy = vi.fn()
@@ -385,7 +435,7 @@ describe('Core Module Integration', () => {
 
         // Try to create cache with invalid configuration
         const invalidCacheConfig: CacheConfig = {
-          backend: 'invalid-backend' as any,
+          backend: 'invalid-backend' as unknown as CacheBackend,
         }
 
         const cacheResult = createCache(invalidCacheConfig)
@@ -393,7 +443,10 @@ describe('Core Module Integration', () => {
 
         if (cacheResult.tag === 'failure') {
           // Log the service initialization failure
-          logger.value.error('Failed to initialize cache service', cacheResult.error as any)
+          logger.value.error(
+            'Failed to initialize cache service',
+            cacheResult.error as unknown as Error
+          )
 
           expect(logSpy).toHaveBeenCalled()
           const logEntry = logSpy.mock.calls[0][0]
@@ -445,7 +498,7 @@ describe('Core Module Integration', () => {
         expect(finalConfig.tag).toBe('success')
         if (finalConfig.tag === 'success') {
           // Debug: log the merged config structure
-          const allData = finalConfig.value.getAll()
+          const _allData = finalConfig.value.getAll()
 
           // Verify merging worked correctly
           expect(finalConfig.value.get('app.name').tag).toBe('success')
@@ -481,22 +534,24 @@ describe('Core Module Integration', () => {
       const envConfig = ConfigBuilder.fromEnv('MYAPP')
       const mergedConfig = ConfigBuilder.fromObject(baseConfig)
         .merge(envConfig)
-        .transform((data: any) => ({
+        .transform((data: Record<string, unknown>) => ({
           ...data,
           // Transform environment strings to appropriate types
           app: {
             ...(data.app || {}),
-            port: data.app_port ? Number.parseInt(data.app_port as string) : data.app?.port,
+            port: data.app_port
+              ? Number.parseInt(data.app_port as string)
+              : ((data.app as Record<string, unknown>)?.port as number),
           },
           logging: {
             ...(data.logging || {}),
-            level: data.log_level || data.logging?.level,
+            level: data.log_level || ((data.logging as Record<string, unknown>)?.level as string),
           },
           cache: {
             ...(data.cache || {}),
             maxSize: data.cache_size
               ? Number.parseInt(data.cache_size as string)
-              : data.cache?.maxSize,
+              : ((data.cache as Record<string, unknown>)?.maxSize as number),
           },
         }))
         .buildUnsafe()
@@ -506,9 +561,9 @@ describe('Core Module Integration', () => {
       expect(mergedConfig.getOr('cache.maxSize', 0)).toBe(1000)
 
       // Clean up environment variables
-      delete process.env.MYAPP_LOG_LEVEL
-      delete process.env.MYAPP_CACHE_SIZE
-      delete process.env.MYAPP_APP_PORT
+      process.env.MYAPP_LOG_LEVEL = undefined
+      process.env.MYAPP_CACHE_SIZE = undefined
+      process.env.MYAPP_APP_PORT = undefined
     })
   })
 
@@ -524,7 +579,7 @@ describe('Core Module Integration', () => {
       if (logger.tag !== 'success' || cache.tag !== 'success') return
 
       // Simulate request processing
-      const requestId = 'req-' + Date.now()
+      const requestId = `req-${Date.now()}`
       const requestLogger = logger.value.child({ requestId })
 
       const logSpy = vi.fn()
@@ -565,7 +620,7 @@ describe('Core Module Integration', () => {
     })
 
     test('handles configuration hot-reload simulation', async () => {
-      let currentConfig: any = {
+      let currentConfig: Record<string, unknown> = {
         app: { name: 'hot-reload-app', version: '1.0.0' },
         logging: { level: 'info' as const },
         cache: { maxSize: 100 },

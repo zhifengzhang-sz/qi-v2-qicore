@@ -11,7 +11,7 @@ export default defineConfig({
   clean: true,
   splitting: false,
   minify: true,
-  target: 'es2022',
+  target: 'es2023',
   outDir: 'dist',
   external: [],
 })

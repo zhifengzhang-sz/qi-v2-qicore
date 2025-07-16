@@ -136,9 +136,9 @@ export class Logger {
     const childPino = this.pino.child(context)
     const childLogger = new Logger(this.config)
     // Use private property access to set the child context
-    ;(childLogger as any).pino = childPino
-    ;(childLogger as any).events = this.events // Share event emitter
-    ;(childLogger as any).childContext = context
+    ;(childLogger as unknown as { pino: PinoLogger }).pino = childPino
+    ;(childLogger as unknown as { events: EventEmitter<LoggerEvents> }).events = this.events // Share event emitter
+    ;(childLogger as unknown as { childContext: LoggerContext }).childContext = context
     return childLogger
   }
 
@@ -249,7 +249,7 @@ export class Logger {
    * Add event listener
    */
   on<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): this {
-    this.events.on(event, listener as any)
+    this.events.on(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
     return this
   }
 
@@ -257,7 +257,7 @@ export class Logger {
    * Remove event listener
    */
   off<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): this {
-    this.events.off(event, listener as any)
+    this.events.off(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
     return this
   }
 
@@ -265,7 +265,7 @@ export class Logger {
    * Add one-time event listener
    */
   once<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): this {
-    this.events.once(event, listener as any)
+    this.events.once(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
     return this
   }
 
@@ -407,7 +407,7 @@ export const formatQiError = (error: QiError): LoggerContext => {
       category: error.category,
       context: error.context,
       cause: error.cause,
-      stack: (error as any).stack,
+      stack: (error as unknown as { stack?: string }).stack,
     },
   }
 }

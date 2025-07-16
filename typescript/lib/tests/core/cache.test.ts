@@ -3,6 +3,7 @@
  */
 
 import {
+  type CacheBackend,
   type CacheConfig,
   MemoryCache,
   RedisCache,
@@ -235,9 +236,40 @@ describe('Cache Module', () => {
       expect(() => new RedisCache(config)).not.toThrow()
     })
 
-    test.skip('handles Redis connection errors', async () => {
-      // Skip this test as it requires Redis connection
-      // In a real environment with Redis available, this would test connection failures
+    test('handles Redis connection errors', async () => {
+      // Test Redis connection failure by creating a cache and then disconnecting
+      const config: CacheConfig = {
+        backend: 'redis',
+        redis: {
+          host: 'localhost',
+          port: 6379,
+          connectTimeout: 100,
+          commandTimeout: 100,
+          lazyConnect: true,
+          maxRetriesPerRequest: 0,
+        },
+      }
+
+      const cache = new RedisCache(config)
+
+      // Manually disconnect the redis client to simulate connection failure
+      const redisClient = (cache as unknown as { redis: { disconnect: () => void } }).redis
+      redisClient.disconnect()
+
+      // Operations should fail when Redis is disconnected
+      const setResult = await cache.set('test', 'value')
+      expect(setResult.tag).toBe('failure')
+
+      const getResult = await cache.get('test')
+      expect(getResult.tag).toBe('failure')
+
+      // Close should handle already disconnected client gracefully
+      try {
+        await cache.close()
+      } catch (error) {
+        // Expected to fail since client is already disconnected
+        expect(error).toBeDefined()
+      }
     })
   })
 
@@ -263,7 +295,7 @@ describe('Cache Module', () => {
     })
 
     test('createCache handles invalid backend', () => {
-      const config = { backend: 'invalid' as any } as CacheConfig
+      const config = { backend: 'invalid' as unknown as CacheBackend } as CacheConfig
       const result = createCache(config)
 
       expect(result.tag).toBe('failure')
@@ -440,7 +472,7 @@ describe('Cache Module', () => {
 
       try {
         // Test development (default)
-        delete process.env.NODE_ENV
+        process.env.NODE_ENV = undefined
         const devConfig = getCacheEnvironmentConfig()
         expect(devConfig).toEqual(cacheDevelopmentConfig)
 
@@ -458,7 +490,7 @@ describe('Cache Module', () => {
         if (originalEnv !== undefined) {
           process.env.NODE_ENV = originalEnv
         } else {
-          delete process.env.NODE_ENV
+          process.env.NODE_ENV = undefined
         }
       }
     })
