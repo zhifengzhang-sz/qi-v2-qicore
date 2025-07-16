@@ -1,0 +1,24 @@
+{
+  "name": "basic-result-example",
+  "version": "1.0.0",
+  "description": "Basic Result<T> usage examples for QiCore Foundation",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@qi/qicore-foundation": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.8",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3",
+    "vitest": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

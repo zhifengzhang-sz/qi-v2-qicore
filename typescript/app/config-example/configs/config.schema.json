@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "port": { "type": "number", "minimum": 1, "maximum": 65535 },
+        "debug": { "type": "boolean", "default": false }
+      },
+      "required": ["name", "port"],
+      "additionalProperties": false
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "number", "minimum": 1, "maximum": 65535 },
+        "name": { "type": "string" }
+      },
+      "required": ["host", "port", "name"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["app", "database"],
+  "additionalProperties": false
+}

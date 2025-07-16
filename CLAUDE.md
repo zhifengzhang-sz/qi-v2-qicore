@@ -2,6 +2,34 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANT: Knowledge Source Priority
+
+**The memory MCP server is the single source of truth for project knowledge.** 
+
+1. **ALWAYS** check the memory system first using `mcp__memory__read_graph` at the start of each session
+2. Use `mcp__memory__search_nodes` to find specific information about the project
+3. The memory system contains the most up-to-date project status, requirements, and insights
+4. If there is **any conflicting information** between this CLAUDE.md file and the memory system, **alert the user immediately**
+5. Update the memory system with new knowledge as work progresses using `mcp__memory__add_observations`
+
+The information below may be outdated - always defer to the memory system for current project state.
+
+## Available MCP Servers
+
+### Sequential Thinking MCP Server
+For complex problem-solving and architectural decisions, use the sequential thinking MCP server:
+
+1. **When to use**: Complex analysis, multi-step reasoning, architectural decisions, tutorial planning
+2. **Usage**: `mcp__sequential-thinking__sequentialthinking` with structured thinking parameters
+3. **Benefits**: Breaks down complex problems, tracks reasoning steps, revises thinking as needed
+4. **Best practices**: 
+   - Use for problems requiring multiple steps or considerations
+   - Allow thoughts to evolve and revise previous thinking
+   - Generate hypotheses and verify them through the thinking process
+
+### Memory MCP Server
+As documented above, this is the single source of truth for project knowledge.
+
 ## Repository Overview
 
 QiCore Foundation provides mathematical foundation types and infrastructure services for the QiCore platform. The repository implements category theory-based Result<T> monadic error handling and essential services (Config, Logger, Cache) across multiple languages with language-agnostic behavioral contracts.
@@ -10,7 +38,7 @@ QiCore Foundation provides mathematical foundation types and infrastructure serv
 
 ### Multi-Language Implementation
 - **haskell/**: Reference implementation with mathematical rigor
-- **typescript/**: Production-ready TypeScript implementation (planned)
+- **typescript/**: Production-ready TypeScript implementation (COMPLETED - v-0.3.4)
 - **docs/contracts/**: Language-agnostic behavioral contracts that all implementations must satisfy
 
 ### Core Components
@@ -156,10 +184,12 @@ processData input = do
 - Change contracts without updating all implementations
 
 ### Always Do
+- Check memory system first using `mcp__memory__read_graph` at session start
 - Run property-based tests before committing
 - Update behavioral contracts when changing semantics
 - Maintain cross-language compatibility
 - Verify performance requirements are met
+- Update memory system with new insights using `mcp__memory__add_observations`
 
 ### Repository Structure Invariants
 - `docs/contracts/` contains the authoritative behavioral specifications

@@ -1,0 +1,161 @@
+# Base Configuration
+# This file contains the default configuration values that apply to all environments
+
+app:
+  name: "QiCore Example App"
+  version: "1.0.0"
+  port: 3000
+  host: "localhost"
+  environment: "development"
+  debug: false
+  cors:
+    enabled: true
+    origins: ["*"]
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    credentials: false
+  rateLimit:
+    enabled: true
+    windowMs: 900000  # 15 minutes
+    max: 100
+  security:
+    helmet: true
+    csrf: true
+    hsts: false
+
+server:
+  timeout: 30000
+  bodyLimit: "1mb"
+  compression: true
+  gracefulShutdown:
+    timeout: 10000
+    forceExit: true
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "qicore_example"
+  username: "postgres"
+  password: "password"
+  ssl: false
+  pool:
+    min: 2
+    max: 10
+    idle: 10000
+    acquire: 60000
+    evict: 1000
+    handleDisconnects: true
+  query:
+    timeout: 60000
+    logging: false
+    benchmark: false
+  migrations:
+    directory: "./migrations"
+    tableName: "migrations"
+    autoRun: false
+  monitoring:
+    enabled: true
+    slowQueryThreshold: 1000
+    connectionHealthCheck: true
+    healthCheckInterval: 30000
+
+auth:
+  jwt:
+    secret: "your-super-secret-jwt-key-here-minimum-32-characters-long"
+    expiresIn: "24h"
+    issuer: "qicore-example"
+    audience: "qicore-users"
+    algorithm: "HS256"
+    refreshToken:
+      enabled: true
+      expiresIn: "7d"
+  session:
+    enabled: false
+    store: "memory"
+    secret: "your-session-secret-key-here-minimum-32-characters-long"
+    maxAge: 86400000  # 24 hours
+    secure: false
+    httpOnly: true
+    sameSite: "strict"
+  password:
+    minLength: 12
+    requireUppercase: true
+    requireLowercase: true
+    requireNumbers: true
+    requireSymbols: true
+    maxAge: 7776000000  # 90 days
+    historySize: 5
+    lockoutAttempts: 5
+    lockoutDuration: 900000  # 15 minutes
+  twoFactor:
+    enabled: false
+    required: false
+    methods: ["totp"]
+    backup:
+      enabled: true
+      codeLength: 8
+      codeCount: 10
+  rateLimit:
+    enabled: true
+    login:
+      windowMs: 900000  # 15 minutes
+      max: 5
+    register:
+      windowMs: 3600000  # 1 hour
+      max: 3
+    passwordReset:
+      windowMs: 3600000  # 1 hour
+      max: 3
+  security:
+    bcryptRounds: 12
+    tokenBlacklist: true
+    ipWhitelist: []
+    deviceTracking: true
+    suspiciousActivityDetection: true
+
+cache:
+  backend: "memory"
+  ttl: 3600
+  maxSize: 1000
+  strategies:
+    writeThrough: false
+    writeAround: false
+    writeBehind: false
+    readThrough: true
+
+logging:
+  level: "info"
+  format: "json"
+  output: "console"
+  structured:
+    enabled: true
+    includeStack: false
+    maskSensitive: true
+    sensitiveFields: 
+      - "password"
+      - "token"
+      - "secret"
+      - "key"
+      - "auth"
+      - "credential"
+  telemetry:
+    enabled: false
+
+monitoring:
+  enabled: true
+  health:
+    enabled: true
+    endpoint: "/health"
+    interval: 30000
+    timeout: 5000
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+    prometheus: true
+    customMetrics: true
+  alerts:
+    enabled: false
+    thresholds:
+      errorRate: 0.05
+      responseTime: 5000
+      memoryUsage: 0.9
+      cpuUsage: 0.8

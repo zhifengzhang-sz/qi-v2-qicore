@@ -1,0 +1,9 @@
+app:
+  name: "QiCore Example"
+  port: 3000
+  debug: true
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "qicore_dev"

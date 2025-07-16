@@ -1,0 +1,28 @@
+{
+  "name": "config-example",
+  "version": "1.0.0",
+  "description": "Comprehensive configuration management example using QiCore Foundation",
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=development tsx src/index.ts",
+    "start": "NODE_ENV=production tsx src/index.ts",
+    "watch": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@qi/qicore-foundation": "workspace:*",
+    "zod-from-json-schema": "^2.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.8",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3",
+    "vitest": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

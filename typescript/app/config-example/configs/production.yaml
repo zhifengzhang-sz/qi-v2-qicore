@@ -1,0 +1,22 @@
+# Production Environment Configuration
+app:
+  name: "QiCore Example App"
+  version: "1.0.0"
+  port: 8080
+  environment: "production"
+  debug: false
+
+database:
+  host: "db.example.com"
+  port: 5432
+  name: "qicore_example_prod"
+  username: "app_user"
+  ssl: true
+
+cache:
+  backend: "redis"
+  ttl: 3600
+
+logging:
+  level: "info"
+  format: "json"
