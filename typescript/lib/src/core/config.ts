@@ -7,11 +7,13 @@
  */
 
 import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { Err, Ok, type QiError, type Result, createError } from '@qi/base'
 import { config as loadEnv } from 'dotenv'
 import { parse as parseToml } from 'smol-toml'
 import { parse as parseYaml } from 'yaml'
-import { type ZodSchema, z } from 'zod'
+import { type ZodSchema, type ZodType, z } from 'zod'
+import { convertJsonSchemaToZod } from 'zod-from-json-schema'
 
 // ============================================================================
 // Core Types
@@ -288,6 +290,23 @@ export class ConfigBuilder {
   }
 
   /**
+   * Validate configuration using external JSON schema file
+   */
+  validateWithSchemaFile(schemaPath: string): ConfigBuilder {
+    try {
+      const schemaContent = readFileSync(schemaPath, 'utf-8')
+      const jsonSchema = JSON.parse(schemaContent)
+      const zodSchema = convertJsonSchemaToZod(jsonSchema) as unknown as ZodType
+
+      return this.validateWith(zodSchema)
+    } catch (error) {
+      throw new Error(
+        `Failed to load schema from ${schemaPath}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
+  }
+
+  /**
    * Build final configuration with validation
    */
   build(): Result<Config, ConfigError> {
@@ -300,7 +319,7 @@ export class ConfigBuilder {
           configError('Schema validation failed', {
             schema: this.state.schema.constructor.name,
             context: {
-              errors: validation.error.errors.map((err) => ({
+              errors: validation.error.issues.map((err) => ({
                 path: err.path.join('.'),
                 message: err.message,
                 code: err.code,
@@ -325,6 +344,27 @@ export class ConfigBuilder {
         validated: true,
       })
     )
+  }
+
+  /**
+   * Build ValidatedConfig with validation (throws on invalid config)
+   */
+  buildValidated(): Result<ValidatedConfig, ConfigError> {
+    const buildResult = this.build()
+    if (buildResult.tag === 'failure') {
+      return buildResult
+    }
+
+    const config = buildResult.value
+    if (!config.isValidated()) {
+      return Err(
+        configError('Configuration must be validated before creating ValidatedConfig', {
+          context: { validated: config.isValidated() },
+        })
+      )
+    }
+
+    return Ok(new ValidatedConfig(config))
   }
 
   /**
@@ -481,6 +521,127 @@ export class Config {
 }
 
 // ============================================================================
+// ValidatedConfig Class
+// ============================================================================
+
+/**
+ * Configuration error for invalid access to ValidatedConfig
+ */
+export class ConfigAccessError extends Error {
+  constructor(
+    message: string,
+    public readonly path: string
+  ) {
+    super(message)
+    this.name = 'ConfigAccessError'
+  }
+}
+
+/**
+ * Validated configuration with direct value access
+ *
+ * After successful schema validation, provides direct access to configuration values
+ * without Result wrapper types. Throws ConfigAccessError for non-existent paths.
+ */
+export class ValidatedConfig {
+  constructor(private readonly config: Config) {
+    if (!config.isValidated()) {
+      throw new Error('ValidatedConfig can only be created from validated Config instances')
+    }
+  }
+
+  /**
+   * Get configuration value by path (throws if path doesn't exist)
+   *
+   * Use this for required configuration values that must exist.
+   * Throws ConfigAccessError if the path is not found.
+   */
+  get<T = unknown>(path: string): T {
+    const result = this.config.get<T>(path)
+    if (result.tag === 'failure') {
+      throw new ConfigAccessError(`Configuration path not found: ${path}`, path)
+    }
+    return result.value
+  }
+
+  /**
+   * Get configuration value by path (returns undefined if path doesn't exist)
+   *
+   * Use this for optional configuration values.
+   */
+  getOptional<T = unknown>(path: string): T | undefined {
+    const result = this.config.get<T>(path)
+    return result.tag === 'success' ? result.value : undefined
+  }
+
+  /**
+   * Get configuration value with default fallback
+   *
+   * Use this when you want a safe fallback value.
+   */
+  getOr<T>(path: string, defaultValue: T): T {
+    return this.config.getOr(path, defaultValue)
+  }
+
+  /**
+   * Check if path exists in configuration
+   */
+  has(path: string): boolean {
+    return this.config.has(path)
+  }
+
+  /**
+   * Get all configuration data as plain object
+   */
+  getAll(): ConfigData {
+    return this.config.getAll()
+  }
+
+  /**
+   * Get configuration sources used to build this config
+   */
+  getSources(): ConfigSource[] {
+    return this.config.getSources()
+  }
+
+  /**
+   * Get the schema used for validation
+   */
+  getSchema(): ZodSchema<unknown> | undefined {
+    return this.config.getSchema()
+  }
+
+  /**
+   * Convert back to regular Config for Result-based access
+   */
+  toConfig(): Config {
+    return this.config
+  }
+
+  /**
+   * Merge with another ValidatedConfig (creates new ValidatedConfig)
+   */
+  merge(other: ValidatedConfig): ValidatedConfig {
+    const mergedConfig = this.config.merge(other.config)
+    return new ValidatedConfig(mergedConfig)
+  }
+
+  /**
+   * Serialize to JSON string
+   */
+  toJson(): string {
+    return this.config.toJson()
+  }
+
+  /**
+   * Get as plain object
+   */
+  toObject(): ConfigData {
+    return this.config.toObject()
+  }
+}
+
+// ============================================================================
 // Factory Functions
 // ============================================================================
 
@@ -538,7 +699,7 @@ export const validateConfig = <T>(config: Config, schema: ZodSchema<T>): Result<
       configError('Configuration validation failed', {
         schema: schema.constructor.name,
         context: {
-          errors: validation.error.errors.map((err) => ({
+          errors: validation.error.issues.map((err) => ({
             path: err.path.join('.'),
             message: err.message,
             code: err.code,
@@ -565,7 +726,7 @@ export const safeParseConfig = <T>(
       configError('Schema parsing failed', {
         schema: schema.constructor.name,
         context: {
-          errors: validation.error.errors.map((err) => ({
+          errors: validation.error.issues.map((err) => ({
             path: err.path.join('.'),
             message: err.message,
             code: err.code,

@@ -1,6 +1,6 @@
 {
   "name": "@qi/qicore-foundation",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "QiCore Foundation - TypeScript implementation of mathematical foundation types (qi/base) and infrastructure services (qi/core)",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -16,6 +16,21 @@
       "types": "./dist/base.d.ts",
       "import": "./dist/base.js",
       "require": "./dist/base.cjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    }
+  },
+  "imports": {
+    "#qi/base": "./dist/base.js",
+    "#qi/core": "./dist/core.js"
+  },
+  "typesVersions": {
+    "*": {
+      "base": ["./dist/base.d.ts"],
+      "core": ["./dist/core.d.ts"]
     }
   },
   "scripts": {
@@ -78,12 +93,14 @@
     "dotenv": "^16.6.1",
     "eventemitter3": "^5.0.1",
     "ioredis": "^5.6.1",
+    "json-schema-to-zod": "^2.6.1",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
     "smol-toml": "^1.4.1",
     "yaml": "^2.8.0",
-    "zod": "^3.25.76",
-    "zod-config": "^1.2.0"
+    "zod": "^4.0.0",
+    "zod-config": "^1.2.0",
+    "zod-from-json-schema": "^0.4.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

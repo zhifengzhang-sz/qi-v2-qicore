@@ -4,30 +4,32 @@
     "": {
       "name": "@qi/qicore-foundation",
       "dependencies": {
-        "dotenv": "^16.4.5",
+        "dotenv": "^16.6.1",
         "eventemitter3": "^5.0.1",
-        "ioredis": "^5.4.1",
-        "pino": "^9.5.0",
+        "ioredis": "^5.6.1",
+        "json-schema-to-zod": "^2.6.1",
+        "pino": "^9.7.0",
         "pino-pretty": "^13.0.0",
-        "smol-toml": "^1.3.1",
-        "yaml": "^2.7.0",
-        "zod": "^3.25.0",
-        "zod-config": "^1.0.0",
+        "smol-toml": "^1.4.1",
+        "yaml": "^2.8.0",
+        "zod": "^4.0.0",
+        "zod-config": "^1.2.0",
+        "zod-from-json-schema": "^0.4.2",
       },
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
-        "@fast-check/vitest": "^0.2.1",
+        "@fast-check/vitest": "^0.2.2",
         "@types/node": "^20.19.8",
         "@types/pino": "^7.0.5",
-        "@vitest/coverage-v8": "^1.0.0",
-        "bun-types": "^1.1.0",
-        "fast-check": "^3.15.0",
-        "rimraf": "^5.0.5",
-        "tsup": "^8.0.0",
-        "typedoc": "^0.25.0",
+        "@vitest/coverage-v8": "^1.6.1",
+        "bun-types": "^1.2.18",
+        "fast-check": "^3.23.2",
+        "rimraf": "^5.0.10",
+        "tsup": "^8.5.0",
+        "typedoc": "^0.25.13",
         "typescript": "^5.8.3",
         "vite-tsconfig-paths": "^5.1.4",
-        "vitest": "^1.0.0",
+        "vitest": "^1.6.1",
       },
     },
   },
@@ -346,6 +348,8 @@
 
     "js-tokens": ["js-tokens@9.0.1", "https://registry.npmmirror.com/js-tokens/-/js-tokens-9.0.1.tgz", {}, "sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ=="],
 
+    "json-schema-to-zod": ["json-schema-to-zod@2.6.1", "https://registry.npmmirror.com/json-schema-to-zod/-/json-schema-to-zod-2.6.1.tgz", { "bin": { "json-schema-to-zod": "dist/cjs/cli.js" } }, "sha512-uiHmWH21h9FjKJkRBntfVGTLpYlCZ1n98D0izIlByqQLqpmkQpNTBtfbdP04Na6+43lgsvrShFh2uWLkQDKJuQ=="],
+
     "jsonc-parser": ["jsonc-parser@3.3.1", "https://registry.npmmirror.com/jsonc-parser/-/jsonc-parser-3.3.1.tgz", {}, "sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ=="],
 
     "lilconfig": ["lilconfig@3.1.3", "https://registry.npmmirror.com/lilconfig/-/lilconfig-3.1.3.tgz", {}, "sha512-/vlFKAoH5Cgt3Ie+JLhRbwOsCQePABiU3tJ1egGvyQ+33R/vcwM2Zl2QR/LzjsBeItPt3oSVXapn+m4nQDvpzw=="],
@@ -592,9 +596,11 @@
 
     "yocto-queue": ["yocto-queue@1.2.1", "https://registry.npmmirror.com/yocto-queue/-/yocto-queue-1.2.1.tgz", {}, "sha512-AyeEbWOu/TAXdxlV9wmGcR0+yh2j3vYPGOECcIj2S7MkrLyC7ne+oye2BKTItt0ii2PHk4cDy+95+LshzbXnGg=="],
 
-    "zod": ["zod@3.25.76", "https://registry.npmmirror.com/zod/-/zod-3.25.76.tgz", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+    "zod": ["zod@4.0.5", "https://registry.npmmirror.com/zod/-/zod-4.0.5.tgz", {}, "sha512-/5UuuRPStvHXu7RS+gmvRf4NXrNxpSllGwDnCBcJZtQsKrviYXm54yDGV2KYNLT5kq0lHGcl7lqWJLgSaG+tgA=="],
 
     "zod-config": ["zod-config@1.2.0", "https://registry.npmmirror.com/zod-config/-/zod-config-1.2.0.tgz", { "peerDependencies": { "dotenv": ">=15", "smol-toml": "^1.x", "yaml": "^2.x", "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["dotenv", "smol-toml", "yaml"] }, "sha512-/Gh+ZaEQ6G0+i8fm+CHHXCbJGfeM51OBPOGBCOBsp5Q4Nw67G4vmP7rsh5I04pc0dCEKKZSmde18GMYvlY8T9Q=="],
+
+    "zod-from-json-schema": ["zod-from-json-schema@0.4.2", "https://registry.npmmirror.com/zod-from-json-schema/-/zod-from-json-schema-0.4.2.tgz", { "dependencies": { "zod": "^3.25.25" } }, "sha512-U+SIzUUT7P6w1UNAz81Sj0Vko77eQPkZ8LbJeXqQbwLmq1MZlrjB3Gj4LuebqJW25/CzS9WA8SjTgR5lvuv+zA=="],
 
     "@types/pino/pino": ["pino@8.21.0", "https://registry.npmmirror.com/pino/-/pino-8.21.0.tgz", { "dependencies": { "atomic-sleep": "^1.0.0", "fast-redact": "^3.1.1", "on-exit-leak-free": "^2.1.0", "pino-abstract-transport": "^1.2.0", "pino-std-serializers": "^6.0.0", "process-warning": "^3.0.0", "quick-format-unescaped": "^4.0.3", "real-require": "^0.2.0", "safe-stable-stringify": "^2.3.1", "sonic-boom": "^3.7.0", "thread-stream": "^2.6.0" }, "bin": { "pino": "bin.js" } }, "sha512-ip4qdzjkAyDDZklUaZkcRFb2iA118H9SgRh8yzTkSQK8HilsOJF7rSY8HoW5+I0M46AZgX/pxbprf2vvzQCE0Q=="],
 
@@ -625,6 +631,8 @@
     "wrap-ansi-cjs/string-width": ["string-width@4.2.3", "https://registry.npmmirror.com/string-width/-/string-width-4.2.3.tgz", { "dependencies": { "emoji-regex": "^8.0.0", "is-fullwidth-code-point": "^3.0.0", "strip-ansi": "^6.0.1" } }, "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g=="],
 
     "wrap-ansi-cjs/strip-ansi": ["strip-ansi@6.0.1", "https://registry.npmmirror.com/strip-ansi/-/strip-ansi-6.0.1.tgz", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
+
+    "zod-from-json-schema/zod": ["zod@3.25.76", "https://registry.npmmirror.com/zod/-/zod-3.25.76.tgz", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "@types/pino/pino/pino-abstract-transport": ["pino-abstract-transport@1.2.0", "https://registry.npmmirror.com/pino-abstract-transport/-/pino-abstract-transport-1.2.0.tgz", { "dependencies": { "readable-stream": "^4.0.0", "split2": "^4.0.0" } }, "sha512-Guhh8EZfPCfH+PMXAb6rKOjGQEoy0xlAIn+irODG5kgfYV+BQ0rGYYWTIel3P5mmyXqkYkPmdIkywsn6QKUR1Q=="],
 
