@@ -1,0 +1,5 @@
+FROM deepseek-coder:33b
+
+# Optional: Add custom system prompt or temperature
+SYSTEM "You are a helpful AI coding assistant optimized for GPU acceleration."
+PARAMETER temperature 0.7

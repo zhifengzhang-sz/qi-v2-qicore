@@ -1,0 +1,7 @@
+FROM deepseek-coder:6.7b
+
+PARAMETER num_ctx 4096
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+
+SYSTEM "You are DeepSeek Coder optimized for RTX 5070 Ti GPU acceleration."
