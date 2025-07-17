@@ -186,132 +186,15 @@ match:
     - "match(onSuccess, onError)(success(x)) == onSuccess(x)"
     - "match(onSuccess, onError)(failure(e)) == onError(e)"
     - "total function: always returns value of type R"
-
-orElse:
-  signature: "(QiError → Result<T>) → Result<T> → Result<T>"
-  laws:
-    - "orElse(alt)(success(x)) == success(x)"
-    - "orElse(alt)(failure(e)) == alt(e)"
-    - "error recovery: allows chaining fallback operations"
 ```
 
-### Collection Operations
-```yaml
-sequence:
-  signature: "List<Result<T>> → Result<List<T>>"
-  laws:
-    - "if all success: returns success with all values"
-    - "if any failure: returns first failure (fail-fast)"
-    - "preserves order: success values maintain input order"
-
-traverse:
-  signature: "(A → Result<B>) → List<A> → Result<List<B>>"
-  laws:
-    - "traverse(f) == sequence ∘ map(f)"
-    - "maintains order: preserves input list order"
-
-partition:
-  signature: "List<Result<T>> → (List<T>, List<QiError>)"
-  laws:
-    - "splits Results into separate success and error lists"
-    - "preserves order within each list"
-    - "total function: handles all Results"
-    - "partition(results) == (successes, failures)"
-
-lefts:
-  signature: "List<Result<T>> → List<QiError>"
-  laws:
-    - "extracts all errors from Result list"
-    - "lefts(results) == errors where result.isFailure()"
-    - "preserves order of errors"
-
-rights:
-  signature: "List<Result<T>> → List<T>"
-  laws:
-    - "extracts all successes from Result list"
-    - "rights(results) == values where result.isSuccess()"
-    - "preserves order of values"
-
-combine2:
-  signature: "Result<T> → Result<U> → ((T, U) → V) → Result<V>"
-  laws:
-    - "combine2(success(x), success(y), f) == success(f(x, y))"
-    - "if either Result is failure, return first failure"
-    - "enables applicative combination of two Results"
-    - "fails fast on first error"
-```
-
-### Applicative Operations
-```yaml
-apply:
-  signature: "Result<(T → U)> → Result<T> → Result<U>"
-  laws:
-    # Applicative Laws
-    - "identity: apply(success(id))(result) == result"
-    - "composition: apply(apply(apply(success(compose))(f))(g))(x) == apply(f)(apply(g)(x))"
-    - "homomorphism: apply(success(f))(success(x)) == success(f(x))"
-    - "interchange: apply(f)(success(x)) == apply(success(f => f(x)))(f)"
-    # Behavior Laws
-    - "apply(success(f))(success(x)) == success(f(x))"
-    - "apply(failure(e))(result) == failure(e)"
-    - "apply(success(f))(failure(e)) == failure(e)"
-
-pure:
-  signature: "T → Result<T>"
-  laws:
-    - "pure(x) == success(x)"
-    - "applicative unit operation"
-    - "alias for success in applicative context"
-```
-
-### Async Operations
-```yaml
-asyncMap:
-  signature: "(T → Promise<U>) → Result<T> → Promise<Result<U>>"
-  laws:
-    - "asyncMap(f)(success(x)) == Promise.resolve(success(await f(x)))"
-    - "asyncMap(f)(failure(e)) == Promise.resolve(failure(e))"
-    - "preserves Result semantics in async context"
-    - "handles async function exceptions as failures"
-
-asyncAndThen:
-  signature: "(T → Promise<Result<U>>) → Result<T> → Promise<Result<U>>"
-  laws:
-    - "async version of andThen/flatMap"
-    - "asyncAndThen(f)(success(x)) == f(x)"
-    - "asyncAndThen(f)(failure(e)) == Promise.resolve(failure(e))"
-    - "handles Promise rejection as failure"
-
-asyncSequence:
-  signature: "List<Promise<Result<T>>> → Promise<Result<List<T>>>"
-  laws:
-    - "resolves all promises, then applies sequence logic"
-    - "if all Results are success: returns success with all values"
-    - "if any Result is failure: returns first failure"
-    - "maintains async semantics with Result logic"
-
-fromPromise:
-  signature: "Promise<T> → Promise<Result<T>>"
-  laws:
-    - "converts Promise<T> to Promise<Result<T>>"
-    - "Promise resolution becomes success"
-    - "Promise rejection becomes failure with QiError"
-    - "preserves async timing"
-
-toPromise:
-  signature: "Result<T> → Promise<T>"
-  laws:
-    - "success(x) becomes Promise.resolve(x)"
-    - "failure(e) becomes Promise.reject(e)"
-    - "converts Result back to Promise semantics"
-```
 
 ## 2. QiError Behavioral Contract
 
 ### Mathematical Foundation
-- **Type Definition**: Product type `Code × Message × Category × Context × Cause × Timestamp`
+- **Type Definition**: Product type `Code × Message × Category × Context?`
 - **Immutability**: All operations return new instances
-- **Composability**: Supports error chaining and context accumulation
+- **Simplicity**: Essential error information only
 
 ### Core Structure
 ```yaml
@@ -333,40 +216,35 @@ required_fields:
     laws:
       - "enum value: one of predefined categories"
       - "determines retry strategy"
-  
+
+optional_fields:
   context:
     type: "Map<String, Any>"
     laws:
+      - "optional: can be empty"
       - "immutable: operations return new instances"
-      - "accumulative: withContext merges with existing"
-  
-  cause:
-    type: "QiError?"
-    laws:
-      - "optional: can be null"
-      - "supports chaining: forms linked list of errors"
-  
-  timestamp:
-    type: "Number"
-    laws:
-      - "positive: timestamp > 0"
-      - "milliseconds since epoch"
 ```
 
 ### Factory Operations
 ```yaml
 create:
-  signature: "(String, String, ErrorCategory, Context?, QiError?, Timestamp?) → QiError"
+  signature: "(String, String, ErrorCategory, Context?) → QiError"
   laws:
     - "all required fields populated"
-    - "timestamp defaults to current time"
     - "context defaults to empty map"
+
+createError:
+  signature: "ErrorOptions → QiError"
+  behavior: "Create QiError from options object"
+  laws:
+    - "ErrorOptions: {code: String, message: String, category: ErrorCategory, context?: Context}"
+    - "all required fields populated from options"
+    - "context defaults to empty map if not provided"
 
 fromException:
   signature: "(Exception, ErrorCategory?) → QiError"
   laws:
     - "preserves exception message"
-    - "includes stack trace in context"
     - "category defaults to UNKNOWN"
 
 fromString:
@@ -374,6 +252,14 @@ fromString:
   laws:
     - "creates QiError from simple message"
     - "category defaults to UNKNOWN"
+
+loggerError:
+  signature: "(String, Context?) → LoggerError"
+  behavior: "Create logger-specific error"
+  laws:
+    - "category automatically set to LOGGER"
+    - "code automatically set to LOGGER_ERROR"
+    - "context defaults to empty map"
 ```
 
 ### Query Operations
@@ -385,31 +271,16 @@ toString:
     - "human readable format"
     - "consistent format across implementations"
 
-toStructuredData:
-  signature: "QiError → SerializableObject"
-  laws:
-    - "result is JSON serializable"
-    - "round-trip preserves all information"
-    - "nested causes properly serialized"
-
 getCategory:
   signature: "QiError → ErrorCategory"
   laws:
     - "getCategory(error) == error.category"
 
-getRootCause:
-  signature: "QiError → QiError"
+toStructuredData:
+  signature: "QiError → SerializableObject"
   laws:
-    - "if cause == null: getRootCause(error) == error"
-    - "if cause != null: getRootCause(error) == getRootCause(error.cause)"
-    - "terminates: cause chains are finite"
-
-getErrorChain:
-  signature: "QiError → List<QiError>"
-  laws:
-    - "returns complete chain from root to current"
-    - "preserves order: [root, ..., current]"
-    - "non-empty: always contains at least current error"
+    - "result is JSON serializable"
+    - "preserves all error information"
 ```
 
 ### Transformation Operations
@@ -420,51 +291,6 @@ withContext:
     - "preserves all fields except context"
     - "merges new context with existing"
     - "immutable: original error unchanged"
-    - "associative: withContext(c1)(withContext(c2)(e)) == withContext(c1 ∪ c2)(e)"
-
-withCause:
-  signature: "QiError → QiError → QiError"
-  laws:
-    - "preserves all fields except cause"
-    - "replaces existing cause"
-    - "immutable: original error unchanged"
-
-withSeverity:
-  signature: "ErrorSeverity → QiError → QiError"
-  laws:
-    - "preserves all fields except severity"
-    - "immutable: original error unchanged"
-
-chain:
-  signature: "QiError → QiError → QiError"
-  laws:
-    - "creates error chain preserving both errors"
-    - "chain(cause, effect) links cause as root of effect"
-    - "different from withCause: preserves both error contexts"
-    - "maintains causal relationship"
-
-getRootError:
-  signature: "QiError → QiError"
-  laws:
-    - "follows cause chain to find original error"
-    - "getRootError(error) == error if no cause"
-    - "terminates: cause chains are finite"
-    - "more explicit than getRootCause"
-
-hasCategory:
-  signature: "ErrorCategory → QiError → Boolean"
-  laws:
-    - "hasCategory(cat, error) == (error.category == cat)"
-    - "O(1) operation for category checking"
-    - "used for retry strategy decisions"
-
-formatChain:
-  signature: "QiError → String"
-  laws:
-    - "returns human-readable error chain"
-    - "includes all errors in causal order"
-    - "suitable for logging and debugging"
-    - "consistent format across implementations"
 ```
 
 ## 3. ErrorCategory Enumeration Contract
@@ -473,441 +299,55 @@ formatChain:
 categories:
   VALIDATION:
     retry_strategy: "never"
-    description: "Input constraint violations"
-    typescript_usage: "ConfigError, ValidationError"
+    description: "Input validation and constraint violations"
   
   NETWORK:
     retry_strategy: "exponential_backoff"
-    description: "Communication failures"
-    typescript_usage: "API calls, HTTP requests, network timeouts"
+    description: "Network communication failures"
   
   SYSTEM:
     retry_strategy: "linear_backoff"  
-    description: "Resource/infrastructure problems"
-    typescript_usage: "Memory allocation, system limits"
+    description: "System resource and infrastructure problems"
   
   BUSINESS:
     retry_strategy: "never"
-    description: "Domain rule violations"
-    typescript_usage: "Business logic validation failures"
+    description: "Business logic and domain rule violations"
   
-  SECURITY:
+  AUTHENTICATION:
     retry_strategy: "never"
-    description: "Authorization/authentication failures"
-    typescript_usage: "JWT validation, permission checks"
+    description: "Authentication failures"
   
-  PARSING:
+  AUTHORIZATION:
     retry_strategy: "never"
-    description: "Data format/syntax errors"
-    typescript_usage: "JSON.parse failures, schema validation"
-  
-  TIMEOUT:
-    retry_strategy: "timeout_backoff"
-    description: "Operation time limit exceeded"
-    typescript_usage: "Promise timeouts, async operation limits"
-  
-  ASYNC:
-    retry_strategy: "exponential_backoff"
-    description: "Async operation failures (cancellation, await issues)"
-    typescript_usage: "Promise rejections, async/await errors"
-  
-  CONCURRENCY:
-    retry_strategy: "linear_backoff"
-    description: "Thread safety, locking, race conditions"
-    typescript_usage: "Worker threads, shared state issues"
-  
-  RESOURCE:
-    retry_strategy: "linear_backoff"
-    description: "Memory, file handles, connection limits"
-    typescript_usage: "File system limits, connection pools"
+    description: "Authorization/permission failures"
   
   CONFIGURATION:
     retry_strategy: "never"
-    description: "Config loading, validation, missing keys"
-    typescript_usage: "Config file parsing, environment variables"
+    description: "Configuration/setup errors"
   
-  SERIALIZATION:
-    retry_strategy: "never"
-    description: "JSON/YAML parsing, data conversion"
-    typescript_usage: "JSON.stringify/parse, type conversion"
+  TIMEOUT:
+    retry_strategy: "exponential_backoff"
+    description: "Timeout errors"
   
-  FILESYSTEM:
+  RESOURCE:
     retry_strategy: "linear_backoff"
-    description: "File I/O operations, permissions"
-    typescript_usage: "fs.readFile, fs.writeFile, path operations"
+    description: "Resource exhaustion/unavailable"
   
-  UNKNOWN:
-    retry_strategy: "cautious"
-    description: "Unclassified errors"
-    typescript_usage: "Fallback for unhandled error types"
-
-typescript_implementation_requirements:
-  enum_definition: |
-    // MANDATORY: Exact enum mapping for TypeScript
-    export enum ErrorCategory {
-      VALIDATION = 'VALIDATION',
-      NETWORK = 'NETWORK', 
-      SYSTEM = 'SYSTEM',
-      BUSINESS = 'BUSINESS',
-      SECURITY = 'SECURITY',
-      PARSING = 'PARSING',
-      TIMEOUT = 'TIMEOUT',
-      ASYNC = 'ASYNC',
-      CONCURRENCY = 'CONCURRENCY',
-      RESOURCE = 'RESOURCE',
-      CONFIGURATION = 'CONFIGURATION',
-      SERIALIZATION = 'SERIALIZATION',
-      FILESYSTEM = 'FILESYSTEM',
-      UNKNOWN = 'UNKNOWN'
-    }
-
-  error_type_mapping: |
-    // MANDATORY: Map specific error types to categories
-    export type ConfigError = QiError<{
-      category: ErrorCategory.CONFIGURATION,
-      code: string,
-      context: { filePath?: string, key?: string }
-    }>
-    
-    export type ValidationError = QiError<{
-      category: ErrorCategory.VALIDATION,
-      code: string,
-      context: { field?: string, expectedType?: string }
-    }>
-    
-    export type NetworkError = QiError<{
-      category: ErrorCategory.NETWORK,
-      code: string,
-      context: { url?: string, statusCode?: number, timeout?: number }
-    }>
-
-  retry_strategy_integration: |
-    // MANDATORY: Retry strategy determination from category
-    export const getRetryStrategy = (error: QiError): RetryStrategy => {
-      switch (error.category) {
-        case ErrorCategory.NETWORK:
-        case ErrorCategory.ASYNC:
-          return 'exponential_backoff'
-        case ErrorCategory.SYSTEM:
-        case ErrorCategory.CONCURRENCY:
-        case ErrorCategory.RESOURCE:
-        case ErrorCategory.FILESYSTEM:
-          return 'linear_backoff'
-        case ErrorCategory.TIMEOUT:
-          return 'timeout_backoff'
-        case ErrorCategory.VALIDATION:
-        case ErrorCategory.BUSINESS:
-        case ErrorCategory.SECURITY:
-        case ErrorCategory.PARSING:
-        case ErrorCategory.CONFIGURATION:
-        case ErrorCategory.SERIALIZATION:
-          return 'never'
-        case ErrorCategory.UNKNOWN:
-          return 'cautious'
-      }
-    }
+  CONCURRENCY:
+    retry_strategy: "linear_backoff"
+    description: "Concurrency conflicts"
+  
+  LOGGER:
+    retry_strategy: "never"
+    description: "Logger-related errors"
 
 laws:
   - "complete enumeration: covers all expected error types"
-  - "mutually exclusive: each error has exactly one category"
+  - "mutually exclusive: each error has exactly one category"  
   - "retry strategy: category determines retry behavior"
-  - "categories reflect modern async/concurrent programming needs"
-  - "typescript mapping: each category maps to specific TypeScript error types"
   - "cross-language consistency: same categories across all implementations"
 ```
 
-## 4. Advanced Behavioral Contracts
-
-### Error Accumulation
-```yaml
-parallel_validation:
-  signature: "List<Validation<T>> → Result<List<T>>"
-  laws:
-    - "collects all errors instead of failing fast"
-    - "if all valid: returns success with all values"
-    - "if any invalid: returns failure with all errors"
-
-applicative_sequence:
-  signature: "List<Result<T>> → Result<List<T>>"
-  laws:
-    - "follows applicative functor laws"
-    - "accumulates errors in applicative context"
-```
-
-### Resource Management
-```yaml
-bracket:
-  signature: "Result<Resource> → (Resource → Result<A>) → (Resource → Result<()>) → Result<A>"
-  laws:
-    - "acquire-use-release pattern"
-    - "cleanup guaranteed even on failure"
-    - "exception safe: handles errors in all phases"
-
-timeout:
-  signature: "Duration → Result<T> → Result<T>"
-  laws:
-    - "operation completes within duration or fails"
-    - "timeout error includes timing information"
-    - "cancellation: stops operation on timeout"
-```
-
-### Async Operations
-```yaml
-parallel:
-  signature: "List<AsyncResult<T>> → AsyncResult<List<T>>"
-  laws:
-    - "executes operations concurrently"
-    - "fails fast on first error"
-    - "preserves result order"
-
-race:
-  signature: "List<AsyncResult<T>> → AsyncResult<T>"
-  laws:
-    - "returns first successful completion"
-    - "cancels remaining on success"
-    - "aggregates errors if all fail"
-
-retry:
-  signature: "RetryConfig → AsyncResult<T> → AsyncResult<T>"
-  laws:
-    - "respects maximum retry limit"
-    - "implements configured backoff strategy"
-    - "eventually fails after max attempts"
-```
-
-## 5. Universal Laws and Properties
-
-### Composition Laws
-```yaml
-composition:
-  associativity:
-    - "flatMap(f) ∘ flatMap(g) ∘ result == flatMap(x => flatMap(f)(g(x))) ∘ result"
-  
-  identity:
-    - "flatMap(success) ∘ result == result"
-    - "map(id) ∘ result == result"
-  
-  distributivity:
-    - "map(f) ∘ map(g) == map(f ∘ g)"
-```
-
-### Error Propagation Laws
-```yaml
-error_propagation:
-  preservation:
-    - "operations on failure results preserve the error"
-    - "error information never lost during transformations"
-  
-  accumulation:
-    - "context accumulation is associative"
-    - "error chaining preserves causal relationships"
-```
-
-### Performance Contracts
-```yaml
-performance:
-  operation_complexity:
-    - "factory operations: O(1)"
-    - "query operations: O(1)"
-    - "transformation operations: O(1) for structure, O(f) for function"
-    - "error chain traversal: O(chain_length)"
-  
-  memory_usage:
-    - "constant overhead per Result instance"
-    - "linear memory usage for error chains"
-    - "efficient context storage"
-
-typescript_performance_verification:
-  v8_optimization_requirements: |
-    // MANDATORY: V8 engine optimization compliance
-    export class ResultBuilder<T, E = Error> {
-      // Hidden class optimization: consistent object shape
-      constructor(public readonly result: Result<T, E>) {}
-      
-      // Monomorphic operations for V8 optimization
-      map<U>(fn: (value: T) => U): ResultBuilder<U, E> {
-        // Must maintain consistent return type shape
-        return new ResultBuilder(
-          this.result.tag === 'success'
-            ? { tag: 'success', value: fn(this.result.value) }
-            : this.result
-        )
-      }
-    }
-
-  benchmark_requirements: |
-    // MANDATORY: Performance benchmark tests
-    import { bench } from 'vitest'
-    
-    bench('Result.map O(1) verification', () => {
-      const result = Ok(42)
-      const mapped = from(result).map(x => x * 2).build()
-    }, { iterations: 1000000 })
-    
-    bench('ResultBuilder chaining overhead', () => {
-      from(Ok(1))
-        .map(x => x + 1)
-        .map(x => x * 2) 
-        .map(x => x.toString())
-        .unwrapOr('0')
-    }, { iterations: 100000 })
-    
-    bench('Error chain traversal O(n)', () => {
-      // Test with different chain lengths: 1, 10, 100, 1000
-      const chainedError = createErrorChain(1000)
-      chainedError.getRootCause()
-    }, { iterations: 10000 })
-
-  memory_efficiency_requirements: |
-    // MANDATORY: Memory usage verification
-    const measureMemoryUsage = () => {
-      const initial = process.memoryUsage().heapUsed
-      
-      // Create 10000 Result instances
-      const results = Array.from({ length: 10000 }, (_, i) => Ok(i))
-      
-      const afterCreation = process.memoryUsage().heapUsed
-      const perResultBytes = (afterCreation - initial) / 10000
-      
-      // Should be < 100 bytes per Result instance
-      expect(perResultBytes).toBeLessThan(100)
-    }
-
-  fluent_api_performance: |
-    // MANDATORY: Fluent chaining must have minimal overhead
-    bench('Fluent API vs direct operations', () => {
-      // Fluent API
-      const fluent = from(Ok(42))
-        .map(x => x * 2)
-        .filter(x => x > 0, () => new Error())
-        .flatMap(x => Ok(x.toString()))
-        .build()
-      
-      // Direct operations (for comparison)
-      const direct = (() => {
-        const step1 = Ok(42)
-        if (step1.tag === 'failure') return step1
-        const step2 = Ok(step1.value * 2)
-        if (step2.tag === 'failure') return step2
-        if (step2.value <= 0) return Err(new Error())
-        return Ok(step2.value.toString())
-      })()
-      
-      // Fluent API should be within 20% of direct operations
-    }, { iterations: 100000 })
-```
-
-## 6. Contract Verification Requirements
-
-### Property-Based Testing
-- All mathematical laws must be verified with property-based tests
-- Edge cases (null, empty, large data) must be covered
-- Performance requirements must be benchmarked
-
-### Type Safety Verification
-- Impossible states must be prevented at compile time where possible
-- Runtime type guards must be consistent with compile-time types
-- No undefined behavior allowed
-
-### Cross-Language Consistency
-- Identical behavior across all language implementations
-- Serialization format compatibility
-- Performance characteristics within acceptable ranges
-
-cross_language_verification:
-  behavioral_consistency: |
-    // MANDATORY: Identical behavior verification across languages
-    describe('Cross-Language Behavioral Consistency', () => {
-      test('Result operations produce identical outcomes', () => {
-        // TypeScript
-        const tsResult = from(Ok(42))
-          .map(x => x * 2)
-          .filter(x => x > 0, () => new Error('negative'))
-          .flatMap(x => Ok(x.toString()))
-          .build()
-        
-        // Should match Haskell: Ok 42 >>= (*2) >>= guard (>0) >>= return . show
-        // Should match Python: Ok(42).map(lambda x: x*2).filter(...).flat_map(...)
-        expect(tsResult).toEqual(Ok('84'))
-      })
-      
-      test('Error handling consistency', () => {
-        const error = createQiError({
-          code: 'VALIDATION_FAILED',
-          message: 'Input validation failed',
-          category: ErrorCategory.VALIDATION,
-          context: { field: 'email', value: 'invalid' }
-        })
-        
-        // JSON serialization must be identical across languages
-        const serialized = JSON.stringify(error.toStructuredData())
-        expect(serialized).toContain('"category":"VALIDATION"')
-        expect(serialized).toContain('"code":"VALIDATION_FAILED"')
-      })
-    })
-
-  serialization_compatibility: |
-    // MANDATORY: Cross-language serialization format
-    interface QiErrorSerialized {
-      code: string
-      message: string
-      category: string  // Must match Haskell ErrorCategory show instance
-      context: Record<string, unknown>
-      cause?: QiErrorSerialized
-      timestamp: number
-      severity?: string
-    }
-    
-    // Must be deserializable in Haskell, Python, etc.
-    const serializeQiError = (error: QiError): QiErrorSerialized => ({
-      code: error.code,
-      message: error.message,
-      category: error.category,  // String, not enum for cross-language compat
-      context: error.context,
-      cause: error.cause ? serializeQiError(error.cause) : undefined,
-      timestamp: error.timestamp,
-      severity: error.severity
-    })
-
-  performance_equivalence: |
-    // MANDATORY: Performance characteristics within bounds
-    const performanceContract = {
-      // TypeScript should be within these bounds of Haskell reference
-      'Result.map': { maxOverhead: '50%', complexity: 'O(1)' },
-      'Result.flatMap': { maxOverhead: '100%', complexity: 'O(1)' },
-      'Error.getRootCause': { maxOverhead: '20%', complexity: 'O(chain_length)' },
-      'fluent_chaining_10_ops': { maxOverhead: '200%', complexity: 'O(1)' }
-    }
-    
-    // Benchmark against reference implementation
-    bench('Cross-language performance verification', () => {
-      // TypeScript fluent API should be within 200% of Haskell monadic
-      const result = from(Ok(1))
-        .map(x => x + 1).map(x => x * 2).map(x => x - 1)
-        .map(x => x + 5).map(x => x / 2).map(x => x * 3)
-        .map(x => x + 2).map(x => x - 4).map(x => x * 2)
-        .unwrapOr(0)
-    })
-
-  mathematical_law_consistency: |
-    // MANDATORY: Same mathematical laws verified across all languages
-    
-    // Haskell QuickCheck equivalent:
-    // prop_functor_identity :: Result a -> Bool
-    // prop_functor_identity r = fmap id r == r
-    
-    // TypeScript fast-check equivalent:
-    test.prop([arbitraryResult])(
-      'Functor identity (cross-language consistency)',
-      (result) => {
-        const identity = <T>(x: T): T => x
-        expect(from(result).map(identity).build()).toEqual(result)
-      }
-    )
-    
-    // Python hypothesis equivalent would test same property
-    // All implementations must pass identical property tests
-
 ---
 
-**Contract Compliance**: Any implementation claiming QiCore compatibility must satisfy ALL laws and properties defined in this specification.
+**Contract Compliance**: Any implementation claiming QiCore Base Component compatibility must satisfy ALL laws and properties defined in this specification for Result<T> and QiError types.
