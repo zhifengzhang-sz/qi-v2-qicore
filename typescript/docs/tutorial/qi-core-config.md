@@ -2,13 +2,54 @@
 
 ## What It Does
 
-ConfigBuilder loads configuration from multiple sources (files, environment, objects) with validation and type safety.
+Config provides a complete configuration management system with three main concepts:
+- **Loaders**: Get configuration data from different sources
+- **Merger**: Combine multiple configurations with clear precedence
+- **Validator**: Ensure configuration correctness with schemas
 
 **See [Complete API Documentation](../api/core/config.md) for all available functions.**
 
 ## Why You Need This
 
-Every application needs configuration from different sources with clear precedence and validation. Config provides this with Result<T> error handling.
+Every application needs to load configuration from multiple sources, merge them with clear precedence, and validate the result. Config solves this common problem with Result<T> error handling.
+
+## Core Concepts
+
+### 1. Loaders
+Get configuration data from different sources:
+
+```typescript
+// Load from files
+ConfigBuilder.fromJsonFile('./config.json')
+ConfigBuilder.fromYamlFile('./config.yaml') 
+ConfigBuilder.fromTomlFile('./config.toml')
+
+// Load from environment variables
+ConfigBuilder.fromEnv('APP_')  // APP_API_URL → api.url
+
+// Load from objects (data from APIs, databases, etc.)
+ConfigBuilder.fromObject({ api: { url: 'localhost' } })
+```
+
+### 2. Merger
+Combine multiple sources with left-to-right precedence (later overrides earlier):
+
+```typescript
+const config = ConfigBuilder
+  .fromJsonFile('./base.json')        // Base configuration
+  .merge(ConfigBuilder.fromEnv('APP_'))     // Environment overrides
+  .merge(ConfigBuilder.fromObject(defaults)) // Fallback defaults
+```
+
+### 3. Validator
+Ensure configuration correctness with schemas:
+
+```typescript
+const config = ConfigBuilder
+  .fromJsonFile('./config.json')
+  .validateWith(configSchema)  // Zod schema validation
+  .build()
+```
 
 ```typescript
 // Instead of scattered configuration loading:
@@ -26,6 +67,40 @@ const configResult = ConfigBuilder
   .fromJsonFile('./config.json')
   .merge(ConfigBuilder.fromEnv('APP_'))
   .validateWith(configSchema)
+  .build()
+```
+
+## Solving Configuration Problems
+
+### Problem: Remote Configuration
+```typescript
+// Get config from remote service
+const remoteConfig = await fetch('/api/config').then(r => r.json())
+const config = ConfigBuilder
+  .fromObject(remoteConfig)              // Load from API response
+  .merge(ConfigBuilder.fromEnv('APP_'))  // Allow env overrides
+  .validateWith(configSchema)            // Ensure correctness
+  .build()
+```
+
+### Problem: Database Configuration  
+```typescript
+// Get config from database
+const dbConfig = await database.getAppConfig('user-service') 
+const config = ConfigBuilder
+  .fromObject(dbConfig.data)             // Load from database
+  .merge(ConfigBuilder.fromEnv('APP_'))  // Environment overrides
+  .build()
+```
+
+### Problem: Legacy System Integration
+```typescript
+// Get config from legacy system
+const legacyConfig = legacySystem.getConfiguration()
+const config = ConfigBuilder
+  .fromObject(legacyConfig)              // Load legacy data
+  .subset('newFeatures')                 // Extract relevant parts
+  .validateWith(newSchema)               // Validate with new requirements  
   .build()
 ```
 

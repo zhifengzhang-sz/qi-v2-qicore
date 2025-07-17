@@ -2,13 +2,78 @@
 
 ## What It Does
 
-Cache provides high-performance caching with memory and Redis backends, TTL support, and statistics. All operations return Result<T> for consistent error handling.
+Cache provides a complete caching system with three main concepts:
+- **Multiple Backends**: Memory cache for speed, Redis cache for persistence/distribution
+- **Cache Patterns**: Cache-aside, batch operations, and TTL management
+- **Performance Monitoring**: Built-in statistics and hit rate tracking
 
 **See [Complete API Documentation](../api/core/cache.md) for all available functions.**
 
 ## Why You Need This
 
-When performance matters, caching expensive operations is essential. Cache integrates with Result<T> to handle cache failures gracefully without breaking your application.
+When performance matters, caching expensive operations is essential. Cache provides graceful fallback with Result<T> - cache failures don't break your application.
+
+## Core Concepts
+
+### 1. Multiple Backends
+Choose the right backend for your needs:
+
+```typescript
+// Memory cache - fast, local, temporary
+const memoryCache = createCache<User>({
+  backend: 'memory',
+  maxSize: 1000,
+  defaultTtl: 300
+})
+
+// Redis cache - persistent, distributed, shared
+const redisCache = await createRedisCache<User>({
+  redis: {
+    host: 'redis.example.com',
+    port: 6379
+  }
+})
+```
+
+### 2. Cache Patterns
+Common caching strategies:
+
+```typescript
+// Cache-aside pattern (most common)
+async function getUser(id: string): Promise<User> {
+  // Try cache first
+  const cached = await cache.get(`user:${id}`)
+  if (cached.tag === 'success') return cached.value
+  
+  // Cache miss - load from source
+  const user = await database.findUser(id)
+  await cache.set(`user:${id}`, user, 300)  // Cache for 5 minutes
+  return user
+}
+
+// Batch operations for efficiency
+await cache.mset({
+  'user:1': user1,
+  'user:2': user2,
+  'user:3': user3
+}, 300)
+
+const users = await cache.mget(['user:1', 'user:2', 'user:3'])
+```
+
+### 3. Performance Monitoring
+Track cache effectiveness:
+
+```typescript
+// Get performance statistics
+const stats = cache.getStats()
+console.log(`Hit rate: ${(stats.hitRate * 100).toFixed(2)}%`)
+console.log(`Total operations: ${stats.hits + stats.misses}`)
+console.log(`Cache size: ${stats.size}`)
+
+// Reset statistics for new measurement period
+cache.resetStats()
+```
 
 ```typescript
 // Instead of hoping cache works:

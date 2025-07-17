@@ -2,13 +2,67 @@
 
 ## What It Does
 
-Logger provides structured logging with context accumulation and Result<T> integration. Every log entry includes structured data for better observability.
+Logger provides a complete structured logging system with three main concepts:
+- **Structured Logging**: Every log entry includes structured data for better observability
+- **Context Management**: Add context that flows through operations automatically
+- **Result<T> Integration**: Log success and failure cases consistently
 
 **See [Complete API Documentation](../api/core/logger.md) for all available functions.**
 
 ## Why You Need This
 
-You need to observe what's happening in your application, especially errors. Logger integrates with Result<T> to log both success and failure cases consistently.
+You need to observe what's happening in your application, especially errors. Logger provides structured logging that integrates seamlessly with Result<T> patterns.
+
+## Core Concepts
+
+### 1. Structured Logging
+Every log entry includes structured data:
+
+```typescript
+// Instead of plain string logging
+console.log('User updated')
+console.error('Failed to update user:', error.message)
+
+// Use structured logging
+logger.info('User updated', undefined, { userId: '123', operation: 'update' })
+logger.error('User update failed', error, { userId: '123', operation: 'update' })
+```
+
+### 2. Context Management
+Add context that flows through operations:
+
+```typescript
+// Create logger with context
+const requestLogger = logger.withContext({
+  requestId: 'req_123',
+  userId: 'user_456'
+})
+
+requestLogger.info('Processing request')  // Includes requestId and userId automatically
+
+// Add more context for specific operations
+const operationLogger = requestLogger.child({ operation: 'validation' })
+operationLogger.debug('Validating input')  // Includes requestId, userId, and operation
+```
+
+### 3. Result<T> Integration
+Log success and failure cases consistently:
+
+```typescript
+const result = await processOrder(orderData)
+
+match(
+  order => logger.info('Order processed', undefined, { 
+    orderId: order.id, 
+    amount: order.total 
+  }),
+  error => logger.error('Order failed', error, { 
+    orderId: orderData.id, 
+    stage: error.context?.stage 
+  }),
+  result
+)
+```
 
 ```typescript
 // Instead of basic console logging:

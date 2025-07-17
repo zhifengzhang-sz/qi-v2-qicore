@@ -2,13 +2,65 @@
 
 ## What It Does
 
-Result<T> replaces exceptions with explicit error handling. QiError provides structured error information with categories for retry strategies.
+qi/base provides a complete error handling framework with three main concepts:
+- **Result<T>**: Explicit success/failure types instead of exceptions
+- **Error Categories**: Structured error classification for retry strategies  
+- **Combinators**: Functions to transform and compose Results safely
 
 **See [Complete API Documentation](../api/base.md) for all available functions.**
 
 ## Why You Need This
 
-Every function that can fail should return Result<T> instead of throwing exceptions. This makes errors visible in the type system and prevents unexpected crashes.
+Every function that can fail should return Result<T> instead of throwing exceptions. This makes errors visible in function signatures and prevents unexpected crashes.
+
+## Core Concepts
+
+### 1. Result<T>
+Explicit success/failure values:
+
+```typescript
+// Instead of exceptions (invisible errors)
+function divide(a: number, b: number): number {
+  if (b === 0) throw new Error('Division by zero')  // Invisible!
+  return a / b
+}
+
+// Use Result<T> (explicit errors)
+function divide(a: number, b: number): Result<number, QiError> {
+  if (b === 0) return failure(validationError('Division by zero'))
+  return success(a / b)
+}
+```
+
+### 2. Error Categories
+Structured error classification determines how to handle errors:
+
+```typescript
+const networkErr = networkError('Connection failed')    // NETWORK - retry with backoff
+const validationErr = validationError('Invalid email')  // VALIDATION - never retry, fix input
+const businessErr = businessError('Account suspended')  // BUSINESS - never retry, business logic
+```
+
+### 3. Combinators
+Transform and compose Results safely:
+
+```typescript
+// Transform success values
+const doubled = map(x => x * 2, success(21))  // success(42)
+
+// Chain operations that might fail  
+const result = flatMap(
+  x => x > 0 ? success(Math.sqrt(x)) : failure(validationError('Must be positive')),
+  success(16)
+)  // success(4)
+
+// Handle both cases
+match(
+  value => console.log(`Success: ${value}`),
+  error => console.log(`Error: ${error.message}`),
+  result
+)
+```
 
 ```typescript
 // Instead of this (invisible errors):
