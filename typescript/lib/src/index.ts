@@ -9,5 +9,8 @@
 // Re-export everything from base module
 export * from './base/index.js'
 
-// Re-export everything from core module
+// Re-export everything from core module except conflicting exports
 export * from './core/index.js'
+
+// Explicitly re-export loggerError from core (takes precedence)
+export { loggerError } from './core/index.js'

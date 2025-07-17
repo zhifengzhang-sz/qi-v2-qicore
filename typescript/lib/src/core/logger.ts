@@ -3,10 +3,10 @@
  *
  * Event-driven logging with Pino integration using functional patterns.
  * Provides structured JSON logging with OpenTelemetry integration and
- * high-performance event system.
+ * high-performance event system. Max-Min principle: 70% pino package, 30% custom wrapper.
  */
 
-import { Err, Ok, type QiError, type Result, createError } from '@qi/base'
+import { type Result, type QiError, success, failure, create as createError } from '@qi/base'
 import { EventEmitter } from 'eventemitter3'
 import pino, { type Logger as PinoLogger, type LoggerOptions } from 'pino'
 
@@ -81,15 +81,10 @@ export type LoggerError = QiError & {
  * Create logger error
  */
 export const loggerError = (message: string, context: LoggerError['context'] = {}): LoggerError =>
-  createError({
-    code: 'LOGGER_ERROR',
-    message,
-    category: 'LOGGER',
-    context,
-  }) as LoggerError
+  createError('LOGGER_ERROR', message, 'LOGGER', context) as LoggerError
 
 // ============================================================================
-// Logger Implementation
+// Logger Implementation (70% pino package)
 // ============================================================================
 
 /**
@@ -105,7 +100,7 @@ export class Logger {
     this.config = { ...config }
     this.events = new EventEmitter<LoggerEvents>()
 
-    // Configure Pino logger
+    // Configure Pino logger (leveraging 70% of pino capabilities)
     const pinoOptions: LoggerOptions = {
       level: config.level,
       ...(config.name && { name: config.name }),
@@ -124,118 +119,78 @@ export class Logger {
       }),
     }
 
+    // Use pino's destination handling for file/stream output
     this.pino = config.destination
       ? pino(pinoOptions, pino.destination(config.destination))
       : pino(pinoOptions)
   }
 
   /**
-   * Create child logger with additional context
+   * Create child logger with additional context (using pino.child)
    */
   child(context: LoggerContext): Logger {
     const childPino = this.pino.child(context)
     const childLogger = new Logger(this.config)
-    // Use private property access to set the child context
-    ;(childLogger as unknown as { pino: PinoLogger }).pino = childPino
-    ;(childLogger as unknown as { events: EventEmitter<LoggerEvents> }).events = this.events // Share event emitter
-    ;(childLogger as unknown as { childContext: LoggerContext }).childContext = context
+
+    // Replace pino instance with child
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(childLogger as any).pino = childPino
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(childLogger as any).events = this.events // Share event emitter
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(childLogger as any).childContext = context
+
     return childLogger
   }
 
   /**
-   * Log debug message
+   * Log debug message (using pino.debug)
    */
   debug(message: string, context?: LoggerContext): void {
     this.log('debug', message, context)
   }
 
   /**
-   * Log info message
+   * Log info message (using pino.info)
    */
   info(message: string, context?: LoggerContext): void {
     this.log('info', message, context)
   }
 
   /**
-   * Log warning message
+   * Log warning message (using pino.warn)
    */
   warn(message: string, context?: LoggerContext): void {
     this.log('warn', message, context)
   }
 
   /**
-   * Log error message
+   * Log error message (using pino.error)
    */
   error(message: string, error?: Error, context?: LoggerContext): void {
     this.log('error', message, { ...context, error })
   }
 
   /**
-   * Generic log method
-   */
-  private log(level: LogLevel, message: string, context?: LoggerContext): void {
-    try {
-      // Check if level is enabled before processing
-      if (!this.isLevelEnabled(level)) {
-        return
-      }
-
-      // Merge child context with provided context
-      const mergedContext = { ...this.childContext, ...context }
-
-      // Create log entry
-      const entry: LogEntry = {
-        level,
-        message,
-        timestamp: new Date(),
-        context: mergedContext,
-        error: mergedContext?.error as Error,
-        traceId: mergedContext?.traceId as string,
-        spanId: mergedContext?.spanId as string,
-      }
-
-      // Log with Pino
-      if (context?.error) {
-        this.pino[level](context, message)
-      } else {
-        this.pino[level](context || {}, message)
-      }
-
-      // Emit event
-      this.events.emit('log', entry)
-    } catch (error) {
-      // Emit error event for logging failures
-      this.events.emit(
-        'error',
-        loggerError(`Failed to log message: ${error}`, {
-          operation: 'log',
-          level,
-          logger: this.config.name,
-        })
-      )
-    }
-  }
-
-  /**
-   * Check if level is enabled
+   * Check if log level is enabled (using pino level checking)
    */
   isLevelEnabled(level: LogLevel): boolean {
     return this.pino.isLevelEnabled(level)
   }
 
   /**
-   * Set log level
+   * Get current log level (from pino)
+   */
+  getLevel(): LogLevel {
+    return this.pino.level as LogLevel
+  }
+
+  /**
+   * Set log level (using pino.level)
    */
   setLevel(level: LogLevel): void {
     this.pino.level = level
     this.events.emit('level', level)
-  }
-
-  /**
-   * Get current log level
-   */
-  getLevel(): LogLevel {
-    return this.pino.level as LogLevel
   }
 
   /**
@@ -246,215 +201,146 @@ export class Logger {
   }
 
   /**
-   * Add event listener
+   * Event listener methods for external event handling
    */
-  on<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): this {
-    this.events.on(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
-    return this
+  on<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.events.on(event as any, listener as any)
+  }
+
+  once<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.events.once(event as any, listener as any)
+  }
+
+  off<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.events.off(event as any, listener as any)
   }
 
   /**
-   * Remove event listener
-   */
-  off<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): this {
-    this.events.off(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
-    return this
-  }
-
-  /**
-   * Add one-time event listener
-   */
-  once<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): this {
-    this.events.once(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
-    return this
-  }
-
-  /**
-   * Flush pending logs
+   * Flush any pending logs (compatibility method)
    */
   async flush(): Promise<void> {
-    return new Promise<void>((resolve) => {
-      this.pino.flush(() => resolve())
-    })
+    // Pino handles flushing internally, this is a compatibility method
+    return Promise.resolve()
   }
 
   /**
-   * Close logger and cleanup resources
+   * Close logger resources
    */
-  async close(): Promise<void> {
-    await this.flush()
+  close(): void {
     this.events.removeAllListeners()
+  }
+
+  /**
+   * Generic log method (30% custom wrapper around pino)
+   */
+  private log(level: LogLevel, message: string, context?: LoggerContext): void {
+    try {
+      // Use pino's level checking for performance
+      if (!this.isLevelEnabled(level)) {
+        return
+      }
+
+      // Merge child context with provided context
+      const mergedContext = { ...this.childContext, ...context }
+
+      // Create log entry for events
+      const entry: LogEntry = {
+        level,
+        message,
+        timestamp: new Date(),
+        context: mergedContext,
+        error: mergedContext?.error as Error,
+        traceId: mergedContext?.traceId as string,
+        spanId: mergedContext?.spanId as string,
+      }
+
+      // Use pino's appropriate logging method
+      if (context?.error) {
+        // Use pino's error object handling
+        this.pino[level](context, message)
+      } else {
+        // Use pino's context logging
+        this.pino[level](mergedContext, message)
+      }
+
+      // Emit custom event (30% custom logic)
+      this.events.emit('log', entry)
+    } catch (error) {
+      // Emit error event for custom handling
+      this.events.emit(
+        'error',
+        loggerError(`Failed to log message: ${error}`, { operation: 'log', level })
+      )
+    }
   }
 }
 
 // ============================================================================
-// Factory Functions
+// Factory Functions (30% custom logic)
 // ============================================================================
 
 /**
- * Create logger with configuration
+ * Create logger with configuration validation
  */
 export const createLogger = (config: LoggerConfig): Result<Logger, LoggerError> => {
   try {
+    // Validate log level
+    const validLevels: LogLevel[] = ['debug', 'info', 'warn', 'error']
+    if (!validLevels.includes(config.level)) {
+      return failure(
+        loggerError(`Invalid log level: ${config.level}`, {
+          operation: 'create',
+          level: config.level,
+        })
+      )
+    }
+
     const logger = new Logger(config)
-    return Ok(logger)
+    return success(logger)
   } catch (error) {
-    return Err(
-      loggerError(`Failed to create logger: ${error}`, { operation: 'create', logger: config.name })
-    )
+    return failure(loggerError(`Failed to create logger: ${error}`, { operation: 'create' }))
   }
 }
 
 /**
- * Create logger with default configuration
+ * Create logger from environment
  */
-export const defaultLogger = (): Logger => {
-  return new Logger({
-    level: 'info',
-    name: 'qicore',
-    pretty: process.env.NODE_ENV === 'development',
-  })
+export const createFromEnv = (): Result<Logger, LoggerError> => {
+  const config = getEnvironmentConfig()
+  return createLogger(config)
 }
 
-/**
- * Create logger with pretty formatting
- */
-export const prettyLogger = (level: LogLevel = 'info'): Logger => {
-  return new Logger({
-    level,
-    pretty: true,
-  })
-}
+// ============================================================================
+// Utility Functions (30% custom logic)
+// ============================================================================
 
 /**
- * Create logger with file destination
+ * Format error for logging
  */
-export const fileLogger = (
-  level: LogLevel,
-  destination: string,
-  name?: string
-): Result<Logger, LoggerError> => {
-  return createLogger({
-    level,
-    destination,
-    name,
-    pretty: false,
-  })
-}
+export const formatError = (error: Error): Record<string, unknown> => {
+  const result: Record<string, unknown> = {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+  }
 
-/**
- * Create logger with OpenTelemetry integration
- */
-export const telemetryLogger = (
-  config: LoggerConfig,
-  traceId?: string,
-  spanId?: string
-): Result<Logger, LoggerError> => {
-  const result = createLogger(config)
-
-  if (result.tag === 'success' && (traceId || spanId)) {
-    const contextLogger = result.value.child({
-      traceId,
-      spanId,
-    })
-    return Ok(contextLogger)
+  if (error.cause) {
+    result.cause = error.cause
   }
 
   return result
 }
 
-// ============================================================================
-// Logger Utilities
-// ============================================================================
-
 /**
- * Log level comparison
+ * Create request logger middleware helper
  */
-export const levelValue = (level: LogLevel): number => {
-  const levels = { debug: 0, info: 1, warn: 2, error: 3 }
-  return levels[level]
-}
-
-/**
- * Check if level is enabled for given minimum level
- */
-export const isLevelEnabled = (level: LogLevel, minLevel: LogLevel): boolean => {
-  return levelValue(level) >= levelValue(minLevel)
-}
-
-/**
- * Format error for logging
- */
-export const formatError = (error: Error): LoggerContext => {
-  return {
-    error: {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause,
-    },
-  }
-}
-
-/**
- * Format QiError for logging
- */
-export const formatQiError = (error: QiError): LoggerContext => {
-  return {
-    error: {
-      code: error.code,
-      message: error.message,
-      category: error.category,
-      context: error.context,
-      cause: error.cause,
-      stack: (error as unknown as { stack?: string }).stack,
-    },
-  }
-}
-
-/**
- * Create request context for logging
- */
-export const requestContext = (
-  requestId: string,
-  userId?: string,
-  sessionId?: string
-): LoggerContext => {
-  return {
-    requestId,
-    userId,
-    sessionId,
-    timestamp: new Date().toISOString(),
-  }
-}
-
-/**
- * Create performance context for logging
- */
-export const performanceContext = (
-  operation: string,
-  duration: number,
-  metadata?: Record<string, unknown>
-): LoggerContext => {
-  return {
-    operation,
-    duration,
-    performance: true,
-    ...metadata,
-  }
-}
-
-// ============================================================================
-// Logger Middleware
-// ============================================================================
-
-/**
- * Logger middleware for request/response logging
- */
-export const loggerMiddleware = (logger: Logger) => {
+export const createRequestLogger = (logger: Logger) => {
   return {
     /**
-     * Log request
+     * Log request (using pino structured logging)
      */
     logRequest: (
       req: { method?: string; url?: string; headers?: Record<string, string> },
@@ -469,7 +355,7 @@ export const loggerMiddleware = (logger: Logger) => {
     },
 
     /**
-     * Log response
+     * Log response (with automatic error level detection)
      */
     logResponse: (
       req: { method?: string; url?: string },
@@ -485,6 +371,7 @@ export const loggerMiddleware = (logger: Logger) => {
         duration,
         ...context,
       }
+
       if (level === 'error') {
         logger.error('Request completed', undefined, logContext)
       } else {
@@ -493,7 +380,7 @@ export const loggerMiddleware = (logger: Logger) => {
     },
 
     /**
-     * Log error
+     * Log error (with proper error object handling)
      */
     logError: (error: Error, req?: { method?: string; url?: string }, context?: LoggerContext) => {
       logger.error('Request error', error, {
@@ -507,11 +394,11 @@ export const loggerMiddleware = (logger: Logger) => {
 }
 
 // ============================================================================
-// Common Logger Configurations
+// Common Logger Configurations (30% custom logic)
 // ============================================================================
 
 /**
- * Development logger configuration
+ * Development logger configuration (with pino-pretty)
  */
 export const developmentConfig: LoggerConfig = {
   level: 'debug',
@@ -520,17 +407,18 @@ export const developmentConfig: LoggerConfig = {
 }
 
 /**
- * Production logger configuration
+ * Production logger configuration (optimized pino settings)
  */
 export const productionConfig: LoggerConfig = {
   level: 'info',
   name: 'qicore-prod',
   pretty: false,
-  redact: ['password', 'token', 'secret', 'key'],
+  redact: ['password', 'token', 'secret', 'key', 'authorization'],
+  // Note: pino serializers would be properly typed in production
 }
 
 /**
- * Test logger configuration
+ * Test logger configuration (minimal output)
  */
 export const testConfig: LoggerConfig = {
   level: 'error',
@@ -543,13 +431,25 @@ export const testConfig: LoggerConfig = {
  */
 export const getEnvironmentConfig = (): LoggerConfig => {
   const env = process.env.NODE_ENV || 'development'
+  const logLevel = (process.env.LOG_LEVEL as LogLevel) || undefined
 
-  switch (env) {
-    case 'production':
-      return productionConfig
-    case 'test':
-      return testConfig
-    default:
-      return developmentConfig
-  }
+  const baseConfig = (() => {
+    switch (env) {
+      case 'production':
+        return productionConfig
+      case 'test':
+        return testConfig
+      default:
+        return developmentConfig
+    }
+  })()
+
+  // Override with environment LOG_LEVEL if provided
+  return logLevel ? { ...baseConfig, level: logLevel } : baseConfig
 }
+
+// ============================================================================
+// Re-exports
+// ============================================================================
+
+// Types are already exported above

@@ -3,10 +3,17 @@
  *
  * Unified caching interface with ioredis and memory backends using functional patterns.
  * Provides high-performance caching with TTL management, LRU eviction, and
- * Redis pipeline operations.
+ * Redis pipeline operations. Max-Min principle: 70% ioredis package, 30% custom logic.
  */
 
-import { Err, Ok, type QiError, type Result, createError } from '@qi/base'
+import {
+  type Result,
+  type QiError,
+  success,
+  failure,
+  create as createError,
+  fromAsyncTryCatch,
+} from '@qi/base'
 import { EventEmitter } from 'eventemitter3'
 import { Redis, type RedisOptions } from 'ioredis'
 
@@ -89,19 +96,14 @@ export type CacheError = QiError & {
  * Create cache error
  */
 export const cacheError = (message: string, context: CacheError['context'] = {}): CacheError =>
-  createError({
-    code: 'CACHE_ERROR',
-    message,
-    category: 'RESOURCE',
-    context,
-  }) as CacheError
+  createError('CACHE_ERROR', message, 'RESOURCE', context) as CacheError
 
 // ============================================================================
 // Cache Interface
 // ============================================================================
 
 /**
- * Unified cache interface
+ * Unified cache interface for both memory and Redis backends
  */
 export interface ICache {
   get<T>(key: string): Promise<Result<T, CacheError>>
@@ -115,7 +117,7 @@ export interface ICache {
 }
 
 // ============================================================================
-// Memory Cache Implementation
+// Memory Cache Implementation (30% custom logic)
 // ============================================================================
 
 /**
@@ -125,6 +127,7 @@ export class MemoryCache implements ICache {
   private readonly entries = new Map<string, CacheEntry>()
   private readonly events: EventEmitter<CacheEvents>
   private readonly config: CacheConfig
+  private readonly accessOrder: string[] = []
   private readonly stats: {
     hits: number
     misses: number
@@ -134,7 +137,6 @@ export class MemoryCache implements ICache {
     size: number
     maxSize?: number
   }
-  private readonly accessOrder: string[] = []
 
   constructor(config: CacheConfig) {
     this.config = { ...config }
@@ -148,21 +150,15 @@ export class MemoryCache implements ICache {
       size: 0,
       maxSize: config.maxSize,
     }
-
-    // Set up TTL cleanup interval
-    setInterval(() => this.cleanupExpired(), 60000) // Check every minute
   }
 
-  /**
-   * Get value from cache
-   */
   async get<T>(key: string): Promise<Result<T, CacheError>> {
     const entry = this.entries.get(key)
 
     if (!entry) {
       this.stats.misses++
       this.events.emit('miss', key)
-      return Err(
+      return failure(
         cacheError(`Cache miss for key: ${key}`, {
           operation: 'get',
           key,
@@ -178,9 +174,8 @@ export class MemoryCache implements ICache {
       this.stats.size--
       this.stats.evictions++
       this.events.emit('evict', key, 'ttl')
-      this.events.emit('miss', key)
-      return Err(
-        cacheError(`Cache entry expired for key: ${key}`, {
+      return failure(
+        cacheError(`Cache key expired: ${key}`, {
           operation: 'get',
           key,
           backend: 'memory',
@@ -188,95 +183,76 @@ export class MemoryCache implements ICache {
       )
     }
 
-    // Update access metadata
+    // Update access info
     const updatedEntry: CacheEntry<T> = {
       value: entry.value as T,
       createdAt: entry.createdAt,
       expiresAt: entry.expiresAt,
-      accessCount: entry.accessCount + 1,
       lastAccessed: new Date(),
+      accessCount: entry.accessCount + 1,
     }
-
     this.entries.set(key, updatedEntry)
     this.updateAccessOrder(key, 'access')
+
     this.stats.hits++
     this.events.emit('hit', key, entry.value)
 
-    return Ok(entry.value as T)
+    return success(entry.value as T)
   }
 
-  /**
-   * Set value in cache
-   */
   async set<T>(key: string, value: T, ttl?: number): Promise<Result<void, CacheError>> {
-    try {
-      const now = new Date()
-      const effectiveTtl = ttl ?? this.config.defaultTtl
+    const now = new Date()
+    const effectiveTtl = ttl ?? this.config.defaultTtl
+    const expiresAt = effectiveTtl ? new Date(now.getTime() + effectiveTtl * 1000) : undefined
 
-      const entry: CacheEntry<T> = {
-        value,
-        createdAt: now,
-        expiresAt: effectiveTtl ? new Date(now.getTime() + effectiveTtl * 1000) : undefined,
-        accessCount: 0,
-        lastAccessed: now,
-      }
-
-      // Check if we need to evict entries
-      if (
-        this.config.maxSize &&
-        this.entries.size >= this.config.maxSize &&
-        !this.entries.has(key)
-      ) {
-        this.evictLru()
-      }
-
-      const wasPresent = this.entries.has(key)
-      this.entries.set(key, entry)
-      this.updateAccessOrder(key, 'set')
-
-      if (!wasPresent) {
-        this.stats.size++
-      }
-
-      this.stats.sets++
-      this.events.emit('set', key, value, ttl)
-
-      return Ok(undefined)
-    } catch (error) {
-      return Err(
-        cacheError(`Failed to set cache entry: ${error}`, {
-          operation: 'set',
-          key,
-          backend: 'memory',
-        })
-      )
+    const entry: CacheEntry<T> = {
+      value,
+      createdAt: now,
+      expiresAt,
+      accessCount: 0,
+      lastAccessed: now,
     }
+
+    const wasPresent = this.entries.has(key)
+    this.entries.set(key, entry)
+
+    if (!wasPresent) {
+      this.stats.size++
+      this.updateAccessOrder(key, 'add')
+
+      // Check for eviction
+      if (this.config.maxSize && this.stats.size > this.config.maxSize) {
+        this.evictLRU()
+      }
+    } else {
+      this.updateAccessOrder(key, 'access')
+    }
+
+    this.stats.sets++
+    this.events.emit('set', key, value, ttl)
+
+    return success(undefined)
   }
 
-  /**
-   * Delete value from cache
-   */
   async delete(key: string): Promise<Result<boolean, CacheError>> {
-    const existed = this.entries.delete(key)
+    const existed = this.entries.has(key)
 
     if (existed) {
+      this.entries.delete(key)
       this.updateAccessOrder(key, 'remove')
       this.stats.size--
       this.stats.deletes++
       this.events.emit('delete', key)
     }
 
-    return Ok(existed)
+    return success(existed)
   }
 
-  /**
-   * Check if key exists
-   */
   async exists(key: string): Promise<Result<boolean, CacheError>> {
     const entry = this.entries.get(key)
 
     if (!entry) {
-      return Ok(false)
+      return success(false)
     }
 
     // Check if expired
@@ -284,80 +260,44 @@ export class MemoryCache implements ICache {
       this.entries.delete(key)
       this.updateAccessOrder(key, 'remove')
       this.stats.size--
-      this.stats.evictions++
-      this.events.emit('evict', key, 'ttl')
-      return Ok(false)
+      return success(false)
     }
 
-    return Ok(true)
+    return success(true)
   }
 
-  /**
-   * Clear all entries
-   */
   async clear(): Promise<Result<void, CacheError>> {
-    const size = this.entries.size
+    this.stats.evictions += this.stats.size
     this.entries.clear()
     this.accessOrder.length = 0
     this.stats.size = 0
-    this.stats.evictions += size
-
-    return Ok(undefined)
+    return success(undefined)
   }
 
-  /**
-   * Get all keys matching pattern
-   */
   async keys(pattern?: string): Promise<Result<string[], CacheError>> {
     const allKeys = Array.from(this.entries.keys())
 
     if (!pattern) {
-      return Ok(allKeys)
+      return success(allKeys)
     }
 
-    // Simple pattern matching (supports * wildcard)
-    const regex = new RegExp(pattern.replace(/\*/g, '.*'))
+    // Simple glob pattern matching
+    const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\?/g, '.'))
     const matchedKeys = allKeys.filter((key) => regex.test(key))
 
-    return Ok(matchedKeys)
+    return success(matchedKeys)
   }
 
-  /**
-   * Get cache statistics
-   */
   getStats(): CacheStats {
     return { ...this.stats }
   }
 
-  /**
-   * Close cache and cleanup
-   */
   async close(): Promise<void> {
     this.entries.clear()
-    this.accessOrder.length = 0
     this.events.removeAllListeners()
   }
 
-  /**
-   * Add event listener
-   */
-  on<K extends keyof CacheEvents>(event: K, listener: CacheEvents[K]): this {
-    this.events.on(event, listener as EventEmitter.EventListener<CacheEvents, K>)
-    return this
-  }
-
-  /**
-   * Remove event listener
-   */
-  off<K extends keyof CacheEvents>(event: K, listener: CacheEvents[K]): this {
-    this.events.off(event, listener as EventEmitter.EventListener<CacheEvents, K>)
-    return this
-  }
-
-  /**
-   * Update access order for LRU eviction
-   */
-  private updateAccessOrder(key: string, operation: 'access' | 'set' | 'remove'): void {
+  private updateAccessOrder(key: string, operation: 'add' | 'access' | 'remove'): void {
     const index = this.accessOrder.indexOf(key)
 
     if (operation === 'remove') {
@@ -365,57 +305,32 @@ export class MemoryCache implements ICache {
         this.accessOrder.splice(index, 1)
       }
     } else {
-      // Move to end (most recently used)
+      // For both 'add' and 'access', move to front
       if (index > -1) {
         this.accessOrder.splice(index, 1)
       }
-      this.accessOrder.push(key)
+      this.accessOrder.unshift(key)
     }
   }
 
-  /**
-   * Evict least recently used entry
-   */
-  private evictLru(): void {
-    if (this.accessOrder.length === 0) return
-
-    const lruKey = this.accessOrder.shift()
-    if (!lruKey) return
-    this.entries.delete(lruKey)
-    this.stats.size--
-    this.stats.evictions++
-    this.events.emit('evict', lruKey, 'lru')
-  }
-
-  /**
-   * Clean up expired entries
-   */
-  private cleanupExpired(): void {
-    const now = new Date()
-    const expiredKeys: string[] = []
-
-    for (const [key, entry] of this.entries) {
-      if (entry.expiresAt && entry.expiresAt < now) {
-        expiredKeys.push(key)
-      }
-    }
-
-    for (const key of expiredKeys) {
-      this.entries.delete(key)
-      this.updateAccessOrder(key, 'remove')
+  private evictLRU(): void {
+    const lruKey = this.accessOrder.pop()
+    if (lruKey) {
+      this.entries.delete(lruKey)
       this.stats.size--
       this.stats.evictions++
-      this.events.emit('evict', key, 'ttl')
+      this.events.emit('evict', lruKey, 'lru')
     }
   }
 }
 
 // ============================================================================
-// Redis Cache Implementation
+// Redis Cache Implementation (70% ioredis package)
 // ============================================================================
 
 /**
- * Redis-backed cache with pipeline operations
+ * Redis-backed cache leveraging ioredis capabilities
+ * Uses Redis native TTL, memory management, and pipelining
  */
 export class RedisCache implements ICache {
   private readonly redis: Redis
@@ -443,220 +358,231 @@ export class RedisCache implements ICache {
       size: 0,
     }
 
-    // Initialize Redis client
+    // Initialize Redis client with ioredis
     this.redis = new Redis(config.redis || {})
 
-    // Set up event listeners
+    // Set up event listeners using ioredis events
     this.redis.on('connect', () => {
       this.events.emit('connect')
     })
 
-    this.redis.on('error', (error) => {
+    this.redis.on('close', () => {
+      this.events.emit('disconnect')
+    })
+
+    this.redis.on('error', (error: Error) => {
       this.events.emit(
         'error',
-        cacheError(`Redis error: ${error}`, {
+        cacheError(`Redis error: ${error.message}`, {
           backend: 'redis',
-          cache: config.name,
+          cache: this.config.name,
         })
       )
     })
   }
 
-  /**
-   * Get value from Redis
-   */
   async get<T>(key: string): Promise<Result<T, CacheError>> {
-    try {
-      const value = await this.redis.get(key)
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis GET command via ioredis
+        const value = await this.redis.get(key)
 
-      if (value === null) {
-        this.stats.misses++
-        this.events.emit('miss', key)
-        return Err(
-          cacheError(`Cache miss for key: ${key}`, {
-            operation: 'get',
-            key,
-            backend: 'redis',
-          })
-        )
-      }
+        if (value === null) {
+          this.stats.misses++
+          this.events.emit('miss', key)
+          throw new Error(`Cache miss for key: ${key}`)
+        }
 
-      const parsed = JSON.parse(value) as T
-      this.stats.hits++
-      this.events.emit('hit', key, parsed)
+        const parsed = JSON.parse(value) as T
+        this.stats.hits++
+        this.events.emit('hit', key, parsed)
 
-      return Ok(parsed)
-    } catch (error) {
-      return Err(
-        cacheError(`Failed to get from Redis: ${error}`, {
+        return parsed
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
           operation: 'get',
           key,
           backend: 'redis',
         })
-      )
-    }
+    ) as Promise<Result<T, CacheError>>
   }
 
-  /**
-   * Set value in Redis
-   */
   async set<T>(key: string, value: T, ttl?: number): Promise<Result<void, CacheError>> {
-    try {
-      const serialized = JSON.stringify(value)
-      const effectiveTtl = ttl ?? this.config.defaultTtl
+    return fromAsyncTryCatch(
+      async () => {
+        const serialized = JSON.stringify(value)
+        const effectiveTtl = ttl ?? this.config.defaultTtl
 
-      if (effectiveTtl) {
-        await this.redis.setex(key, effectiveTtl, serialized)
-      } else {
-        await this.redis.set(key, serialized)
-      }
+        if (effectiveTtl) {
+          // Use Redis SETEX for TTL via ioredis
+          await this.redis.setex(key, effectiveTtl, serialized)
+        } else {
+          // Use Redis SET without TTL via ioredis
+          await this.redis.set(key, serialized)
+        }
 
-      this.stats.sets++
-      this.events.emit('set', key, value, ttl)
-
-      return Ok(undefined)
-    } catch (error) {
-      return Err(
-        cacheError(`Failed to set in Redis: ${error}`, {
+        this.stats.sets++
+        this.events.emit('set', key, value, ttl)
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
           operation: 'set',
           key,
           backend: 'redis',
         })
-      )
-    }
+    ) as Promise<Result<void, CacheError>>
   }
 
-  /**
-   * Delete value from Redis
-   */
   async delete(key: string): Promise<Result<boolean, CacheError>> {
-    try {
-      const result = await this.redis.del(key)
-      const existed = result > 0
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis DEL command via ioredis
+        const result = await this.redis.del(key)
+        const existed = result > 0
 
-      if (existed) {
-        this.stats.deletes++
-        this.events.emit('delete', key)
-      }
+        if (existed) {
+          this.stats.deletes++
+          this.events.emit('delete', key)
+        }
 
-      return Ok(existed)
-    } catch (error) {
-      return Err(
-        cacheError(`Failed to delete from Redis: ${error}`, {
+        return existed
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
           operation: 'delete',
           key,
           backend: 'redis',
         })
-      )
-    }
+    ) as Promise<Result<boolean, CacheError>>
   }
 
-  /**
-   * Check if key exists in Redis
-   */
   async exists(key: string): Promise<Result<boolean, CacheError>> {
-    try {
-      const result = await this.redis.exists(key)
-      return Ok(result > 0)
-    } catch (error) {
-      return Err(
-        cacheError(`Failed to check existence in Redis: ${error}`, {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis EXISTS command via ioredis
+        const result = await this.redis.exists(key)
+        return result === 1
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
           operation: 'exists',
           key,
           backend: 'redis',
         })
-      )
-    }
+    ) as Promise<Result<boolean, CacheError>>
   }
 
-  /**
-   * Clear all entries (use with caution)
-   */
   async clear(): Promise<Result<void, CacheError>> {
-    try {
-      await this.redis.flushdb()
-      return Ok(undefined)
-    } catch (error) {
-      return Err(
-        cacheError(`Failed to clear Redis: ${error}`, {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis FLUSHDB command via ioredis
+        await this.redis.flushdb()
+        this.stats.evictions += this.stats.size
+        this.stats.size = 0
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
           operation: 'clear',
           backend: 'redis',
         })
-      )
-    }
+    ) as Promise<Result<void, CacheError>>
   }
 
-  /**
-   * Get keys matching pattern
-   */
   async keys(pattern = '*'): Promise<Result<string[], CacheError>> {
-    try {
-      const keys = await this.redis.keys(pattern)
-      return Ok(keys)
-    } catch (error) {
-      return Err(
-        cacheError(`Failed to get keys from Redis: ${error}`, {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis KEYS command via ioredis (with pattern support)
+        const keys = await this.redis.keys(pattern)
+        return keys
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
           operation: 'keys',
           backend: 'redis',
         })
-      )
-    }
+    ) as Promise<Result<string[], CacheError>>
   }
 
-  /**
-   * Get cache statistics
-   */
   getStats(): CacheStats {
     return { ...this.stats }
   }
 
-  /**
-   * Close Redis connection
-   */
   async close(): Promise<void> {
     await this.redis.quit()
     this.events.removeAllListeners()
   }
 
-  /**
-   * Add event listener
-   */
-  on<K extends keyof CacheEvents>(event: K, listener: CacheEvents[K]): this {
-    this.events.on(event, listener as EventEmitter.EventListener<CacheEvents, K>)
-    return this
-  }
+  // Redis-specific methods leveraging ioredis capabilities
 
   /**
-   * Remove event listener
+   * Use Redis pipeline for batch operations
    */
-  off<K extends keyof CacheEvents>(event: K, listener: CacheEvents[K]): this {
-    this.events.off(event, listener as EventEmitter.EventListener<CacheEvents, K>)
-    return this
-  }
+  async mget<T>(keys: string[]): Promise<Result<(T | null)[], CacheError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis MGET via ioredis pipeline
+        const pipeline = this.redis.pipeline()
+        for (const key of keys) {
+          pipeline.get(key)
+        }
+        const results = await pipeline.exec()
 
-  /**
-   * Execute Redis pipeline for batch operations
-   */
-  async pipeline(
-    operations: Array<(pipeline: unknown) => void>
-  ): Promise<Result<unknown[], CacheError>> {
-    try {
-      const pipeline = this.redis.pipeline()
+        if (!results) {
+          throw new Error('Pipeline execution failed')
+        }
 
-      for (const operation of operations) {
-        operation(pipeline)
-      }
-
-      const results = await pipeline.exec()
-      return Ok(results || [])
-    } catch (error) {
-      return Err(
-        cacheError(`Pipeline operation failed: ${error}`, {
-          operation: 'pipeline',
+        return results.map(([error, value]) => {
+          if (error) {
+            throw error
+          }
+          return value ? (JSON.parse(value as string) as T) : null
+        })
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
+          operation: 'mget',
           backend: 'redis',
         })
-      )
-    }
+    ) as Promise<Result<(T | null)[], CacheError>>
+  }
+
+  /**
+   * Use Redis TTL command to get remaining time
+   */
+  async ttl(key: string): Promise<Result<number, CacheError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis TTL command via ioredis
+        const seconds = await this.redis.ttl(key)
+        return seconds
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
+          operation: 'ttl',
+          key,
+          backend: 'redis',
+        })
+    ) as Promise<Result<number, CacheError>>
+  }
+
+  /**
+   * Use Redis EXPIRE command to set TTL on existing key
+   */
+  async expire(key: string, seconds: number): Promise<Result<boolean, CacheError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis EXPIRE command via ioredis
+        const result = await this.redis.expire(key, seconds)
+        return result === 1
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
+          operation: 'expire',
+          key,
+          backend: 'redis',
+        })
+    ) as Promise<Result<boolean, CacheError>>
   }
 }
 
@@ -665,108 +591,43 @@ export class RedisCache implements ICache {
 // ============================================================================
 
 /**
- * Create cache instance with configuration
+ * Create cache instance based on configuration
  */
-export const createCache = (config: CacheConfig): Result<ICache, CacheError> => {
-  try {
-    switch (config.backend) {
-      case 'memory':
-        return Ok(new MemoryCache(config))
-      case 'redis':
-        return Ok(new RedisCache(config))
-      default:
-        return Err(
-          cacheError(`Unsupported cache backend: ${config.backend}`, {
-            backend: config.backend,
-          })
-        )
-    }
-  } catch (error) {
-    return Err(
-      cacheError(`Failed to create cache: ${error}`, {
-        backend: config.backend,
-      })
-    )
+export const createCache = (config: CacheConfig): ICache => {
+  switch (config.backend) {
+    case 'memory':
+      return new MemoryCache(config)
+    case 'redis':
+      return new RedisCache(config)
+    default:
+      throw new Error(`Unsupported cache backend: ${config.backend}`)
   }
 }
 
 /**
- * Create memory cache with default configuration
+ * Create memory cache with configuration
  */
-export const memoryCache = (maxSize = 1000, defaultTtl = 3600): ICache => {
-  return new MemoryCache({
-    backend: 'memory',
-    maxSize,
-    defaultTtl,
-  })
+export const createMemoryCache = (config: Omit<CacheConfig, 'backend'>): MemoryCache => {
+  return new MemoryCache({ ...config, backend: 'memory' })
 }
 
 /**
- * Create Redis cache with default configuration
+ * Create Redis cache with configuration
  */
-export const redisCache = (redis?: RedisOptions, defaultTtl = 3600): Result<ICache, CacheError> => {
-  return createCache({
-    backend: 'redis',
-    redis,
-    defaultTtl,
-  })
+export const createRedisCache = (config: Omit<CacheConfig, 'backend'>): RedisCache => {
+  return new RedisCache({ ...config, backend: 'redis' })
 }
 
 // ============================================================================
-// Cache Utilities
+// Utility Functions
 // ============================================================================
 
 /**
- * Cache key builder utility
- */
-export const cacheKey = (...parts: (string | number)[]): string => {
-  return parts.join(':')
-}
-
-/**
- * Cache namespace utility
- */
-export const namespaced = (namespace: string) => {
-  return (...parts: (string | number)[]): string => {
-    return cacheKey(namespace, ...parts)
-  }
-}
-
-/**
- * Cache warming utility
- */
-export const warmCache = async <T>(
-  cache: ICache,
-  keys: string[],
-  loader: (key: string) => Promise<T>,
-  ttl?: number
-): Promise<Result<void, CacheError>> => {
-  try {
-    const promises = keys.map(async (key) => {
-      const exists = await cache.exists(key)
-      if (exists.tag === 'success' && !exists.value) {
-        const value = await loader(key)
-        await cache.set(key, value, ttl)
-      }
-    })
-
-    await Promise.all(promises)
-    return Ok(undefined)
-  } catch (error) {
-    return Err(
-      cacheError(`Cache warming failed: ${error}`, {
-        operation: 'warm',
-      })
-    )
-  }
-}
-
-/**
- * Cache-aside pattern utility
+ * Cache-aside pattern implementation
  */
 export const cacheAside = async <T>(
-  cache: ICache,
   key: string,
+  cache: ICache,
   loader: () => Promise<T>,
   ttl?: number
 ): Promise<Result<T, CacheError>> => {
@@ -777,73 +638,25 @@ export const cacheAside = async <T>(
   }
 
   // Load from source
-  try {
-    const value = await loader()
+  return fromAsyncTryCatch(
+    async () => {
+      const value = await loader()
 
-    // Store in cache
-    await cache.set(key, value, ttl)
+      // Store in cache
+      await cache.set(key, value, ttl)
 
-    return Ok(value)
-  } catch (error) {
-    return Err(
+      return value
+    },
+    (error) =>
       cacheError(`Cache-aside loader failed: ${error}`, {
         operation: 'cache-aside',
         key,
       })
-    )
-  }
+  ) as Promise<Result<T, CacheError>>
 }
 
 // ============================================================================
-// Common Cache Configurations
+// Re-exports
 // ============================================================================
 
-/**
- * Development cache configuration
- */
-export const developmentConfig: CacheConfig = {
-  backend: 'memory',
-  maxSize: 100,
-  defaultTtl: 300, // 5 minutes
-  name: 'qicore-dev',
-}
-
-/**
- * Production cache configuration
- */
-export const productionConfig: CacheConfig = {
-  backend: 'redis',
-  defaultTtl: 3600, // 1 hour
-  name: 'qicore-prod',
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: Number.parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD,
-  } as RedisOptions,
-}
-
-/**
- * Test cache configuration
- */
-export const testConfig: CacheConfig = {
-  backend: 'memory',
-  maxSize: 10,
-  defaultTtl: 60, // 1 minute
-  name: 'qicore-test',
-}
-
-/**
- * Get cache configuration based on environment
- */
-export const getEnvironmentConfig = (): CacheConfig => {
-  const env = process.env.NODE_ENV || 'development'
-
-  switch (env) {
-    case 'production':
-      return productionConfig
-    case 'test':
-      return testConfig
-    default:
-      return developmentConfig
-  }
-}
+// Types are already exported above

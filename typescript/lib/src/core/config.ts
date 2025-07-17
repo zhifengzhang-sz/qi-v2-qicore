@@ -4,11 +4,12 @@
  * TypeScript-native configuration management with Zod schema validation and fluent API.
  * Supports multi-source loading (JSON, YAML, TOML, environment variables) with
  * runtime type safety and TypeScript type inference.
+ * Max-Min principle: 70% packages (zod, yaml, smol-toml, dotenv), 30% custom logic.
  */
 
 import { readFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
-import { Err, Ok, type QiError, type Result, createError } from '@qi/base'
+import { type Result, type QiError, success, failure, create as createError } from '@qi/base'
 import { config as loadEnv } from 'dotenv'
 import { parse as parseToml } from 'smol-toml'
 import { parse as parseYaml } from 'yaml'
@@ -73,15 +74,10 @@ export type ConfigError = QiError & {
  * Create configuration error
  */
 export const configError = (message: string, context: ConfigError['context'] = {}): ConfigError =>
-  createError({
-    code: 'CONFIG_ERROR',
-    message,
-    category: 'CONFIGURATION',
-    context,
-  }) as ConfigError
+  createError('CONFIG_ERROR', message, 'CONFIGURATION', context) as ConfigError
 
 // ============================================================================
-// Configuration Builder (Fluent API)
+// Configuration Builder (Fluent API) - 30% custom logic
 // ============================================================================
 
 /**
@@ -111,24 +107,25 @@ export class ConfigBuilder {
   }
 
   /**
-   * Create new configuration builder from YAML file
+   * Create new configuration builder from YAML file (using yaml package)
    */
   static fromYamlFile(path: string): Promise<Result<ConfigBuilder, ConfigError>> {
     return ConfigBuilder.fromFile(path, { source: 'yaml' })
   }
 
   /**
-   * Create new configuration builder from TOML file
+   * Create new configuration builder from TOML file (using smol-toml package)
    */
   static fromTomlFile(path: string): Promise<Result<ConfigBuilder, ConfigError>> {
     return ConfigBuilder.fromFile(path, { source: 'toml' })
   }
 
   /**
-   * Create new configuration builder from environment variables
+   * Create new configuration builder from environment variables (using dotenv package)
    */
   static fromEnv(prefix = ''): ConfigBuilder {
-    const _env = loadEnv()
+    // Use dotenv package to load .env file
+    loadEnv()
     const data: ConfigData = {}
 
     const prefixFilter = prefix ? `${prefix}_` : ''
@@ -148,7 +145,7 @@ export class ConfigBuilder {
   }
 
   /**
-   * Generic file loader with format detection
+   * Generic file loader with format detection (70% packages)
    */
   private static async fromFile(
     path: string,
@@ -164,13 +161,15 @@ export class ConfigBuilder {
           data = JSON.parse(content)
           break
         case 'yaml':
+          // Use yaml package for parsing
           data = parseYaml(content) as ConfigData
           break
         case 'toml':
+          // Use smol-toml package for parsing
           data = parseToml(content) as ConfigData
           break
         default:
-          return Err(
+          return failure(
             configError(`Unsupported source: ${options.source}`, {
               source: options.source,
               path,
@@ -184,18 +183,18 @@ export class ConfigBuilder {
         validated: false,
       })
 
-      // Apply schema validation if provided
+      // Apply schema validation if provided (using zod)
       if (options.validate && options.schema) {
         const validatedResult = builder.validateWith(options.schema).build()
         if (validatedResult.tag === 'success') {
-          return Ok(builder.validateWith(options.schema)) // Return builder for consistency
+          return success(builder.validateWith(options.schema)) // Return builder for consistency
         }
         return validatedResult as Result<ConfigBuilder, ConfigError>
       }
 
-      return Ok(builder)
+      return success(builder)
     } catch (error) {
-      return Err(
+      return failure(
         configError(`Failed to load config from ${path}: ${error}`, {
           source: options.source,
           path,
@@ -253,7 +252,7 @@ export class ConfigBuilder {
   }
 
   /**
-   * Apply schema validation (fluent)
+   * Apply schema validation (fluent) - using zod package
    */
   validateWith<T>(schema: ZodSchema<T>): ConfigBuilder {
     return new ConfigBuilder({
@@ -290,12 +289,13 @@ export class ConfigBuilder {
   }
 
   /**
-   * Validate configuration using external JSON schema file
+   * Validate configuration using external JSON schema file (using zod-from-json-schema package)
    */
   validateWithSchemaFile(schemaPath: string): ConfigBuilder {
     try {
       const schemaContent = readFileSync(schemaPath, 'utf-8')
       const jsonSchema = JSON.parse(schemaContent)
+      // Use zod-from-json-schema package to convert JSON schema to Zod
       const zodSchema = convertJsonSchemaToZod(jsonSchema) as unknown as ZodType
 
       return this.validateWith(zodSchema)
@@ -307,29 +307,22 @@ export class ConfigBuilder {
   }
 
   /**
-   * Build final configuration with validation
+   * Build final configuration with validation (using zod)
    */
   build(): Result<Config, ConfigError> {
-    // Apply schema validation if configured
+    // Apply schema validation if configured (using zod package)
     if (this.state.schema) {
       const validation = this.state.schema.safeParse(this.state.data)
 
       if (!validation.success) {
-        return Err(
+        return failure(
           configError('Schema validation failed', {
             schema: this.state.schema.constructor.name,
-            context: {
-              errors: validation.error.issues.map((err) => ({
-                path: err.path.join('.'),
-                message: err.message,
-                code: err.code,
-              })),
-            },
           })
         )
       }
 
-      return Ok(
+      return success(
         new Config({
           ...this.state,
           data: validation.data as ConfigData,
@@ -338,10 +331,10 @@ export class ConfigBuilder {
       )
     }
 
-    return Ok(
+    return success(
       new Config({
         ...this.state,
-        validated: true,
+        validated: false, // Only set to true if schema validation was successful
       })
     )
   }
@@ -357,14 +350,12 @@ export class ConfigBuilder {
 
     const config = buildResult.value
     if (!config.isValidated()) {
-      return Err(
-        configError('Configuration must be validated before creating ValidatedConfig', {
-          context: { validated: config.isValidated() },
-        })
+      return failure(
+        configError('Configuration must be validated before creating ValidatedConfig', {})
       )
     }
 
-    return Ok(new ValidatedConfig(config))
+    return success(new ValidatedConfig(config))
   }
 
   /**
@@ -422,7 +413,7 @@ export class ConfigBuilder {
 }
 
 // ============================================================================
-// Configuration Class (Immutable)
+// Configuration Class (Immutable) - 30% custom logic
 // ============================================================================
 
 /**
@@ -440,12 +431,12 @@ export class Config {
 
     for (const key of keys) {
       if (typeof current !== 'object' || current === null || !(key in current)) {
-        return Err(configError(`Configuration path not found: ${path}`, { path }))
+        return failure(configError(`Configuration path not found: ${path}`, { path }))
       }
       current = (current as Record<string, unknown>)[key]
     }
 
-    return Ok(current as T)
+    return success(current as T)
   }
 
   /**
@@ -521,7 +512,7 @@ export class Config {
 }
 
 // ============================================================================
-// ValidatedConfig Class
+// ValidatedConfig Class - Advanced v-0.3.5 pattern
 // ============================================================================
 
 /**
@@ -642,7 +633,7 @@ export class ValidatedConfig {
 }
 
 // ============================================================================
-// Factory Functions
+// Factory Functions - 30% custom logic
 // ============================================================================
 
 /**
@@ -659,7 +650,7 @@ export const fromJsonFile = (path: string): Promise<Result<Config, ConfigError>>
   )
 
 /**
- * Create configuration from YAML file
+ * Create configuration from YAML file (using yaml package)
  */
 export const fromYamlFile = (path: string): Promise<Result<Config, ConfigError>> =>
   ConfigBuilder.fromYamlFile(path).then((result) =>
@@ -667,7 +658,7 @@ export const fromYamlFile = (path: string): Promise<Result<Config, ConfigError>>
   )
 
 /**
- * Create configuration from TOML file
+ * Create configuration from TOML file (using smol-toml package)
  */
 export const fromTomlFile = (path: string): Promise<Result<Config, ConfigError>> =>
   ConfigBuilder.fromTomlFile(path).then((result) =>
@@ -675,7 +666,7 @@ export const fromTomlFile = (path: string): Promise<Result<Config, ConfigError>>
   )
 
 /**
- * Create configuration from environment variables
+ * Create configuration from environment variables (using dotenv package)
  */
 export const fromEnv = (prefix = ''): Config => ConfigBuilder.fromEnv(prefix).buildUnsafe()
 
@@ -685,7 +676,7 @@ export const fromEnv = (prefix = ''): Config => ConfigBuilder.fromEnv(prefix).bu
 export const empty = (): Config => ConfigBuilder.fromObject({}).buildUnsafe()
 
 // ============================================================================
-// Schema Validation Utilities
+// Schema Validation Utilities (70% zod package)
 // ============================================================================
 
 /**
@@ -695,7 +686,7 @@ export const validateConfig = <T>(config: Config, schema: ZodSchema<T>): Result<
   const validation = schema.safeParse(config.getAll())
 
   if (!validation.success) {
-    return Err(
+    return failure(
       configError('Configuration validation failed', {
         schema: schema.constructor.name,
         context: {
@@ -709,11 +700,11 @@ export const validateConfig = <T>(config: Config, schema: ZodSchema<T>): Result<
     )
   }
 
-  return Ok(validation.data)
+  return success(validation.data)
 }
 
 /**
- * Safe parse with detailed error information
+ * Safe parse with detailed error information (using zod)
  */
 export const safeParseConfig = <T>(
   data: ConfigData,
@@ -722,7 +713,7 @@ export const safeParseConfig = <T>(
   const validation = schema.safeParse(data)
 
   if (!validation.success) {
-    return Err(
+    return failure(
       configError('Schema parsing failed', {
         schema: schema.constructor.name,
         context: {
@@ -736,15 +727,15 @@ export const safeParseConfig = <T>(
     )
   }
 
-  return Ok(validation.data)
+  return success(validation.data)
 }
 
 // ============================================================================
-// Common Schema Patterns
+// Common Schema Patterns (70% zod package)
 // ============================================================================
 
 /**
- * Common application configuration schema
+ * Common application configuration schema (using zod coercion and defaults)
  */
 export const AppConfigSchema = z.object({
   app: z.object({

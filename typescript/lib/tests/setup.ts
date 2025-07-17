@@ -1,5 +1,6 @@
 /**
- * Test setup for vitest with fast-check integration
+ * Test setup file for vitest
  */
 
-// No setup needed - @fast-check/vitest provides direct integration
+// Global test setup if needed
+export {}

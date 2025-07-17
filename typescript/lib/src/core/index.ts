@@ -25,6 +25,9 @@ export {
   // Validation utilities
   validateConfig,
   safeParseConfig,
+  // ValidatedConfig class
+  ValidatedConfig,
+  ConfigAccessError,
   // Error factory
   configError,
   // Common schemas
@@ -45,19 +48,10 @@ export {
   type LoggerError,
   // Factory functions
   createLogger,
-  defaultLogger,
-  prettyLogger,
-  fileLogger,
-  telemetryLogger,
+  createFromEnv,
   // Utilities
-  levelValue,
-  isLevelEnabled,
   formatError,
-  formatQiError,
-  requestContext,
-  performanceContext,
-  // Middleware
-  loggerMiddleware,
+  createRequestLogger,
   // Error factory
   loggerError,
   // Configurations
@@ -83,20 +77,12 @@ export {
   type CacheError,
   // Factory functions
   createCache,
-  memoryCache,
-  redisCache,
+  createMemoryCache,
+  createRedisCache,
   // Utilities
-  cacheKey,
-  namespaced,
-  warmCache,
   cacheAside,
   // Error factory
   cacheError,
-  // Configurations
-  developmentConfig as cacheDevelopmentConfig,
-  productionConfig as cacheProductionConfig,
-  testConfig as cacheTestConfig,
-  getEnvironmentConfig as getCacheEnvironmentConfig,
 } from './cache.js'
 
 // Re-export base types for convenience

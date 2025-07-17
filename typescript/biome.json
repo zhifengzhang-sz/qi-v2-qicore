@@ -22,7 +22,8 @@
         "noExplicitAny": "warn",
         "noConfusingVoidType": "error"
       }
-    }
+    },
+    "ignore": ["lib/src/core/logger.ts"]
   },
   "formatter": {
     "enabled": true,

@@ -1,3 +1,6 @@
+Here's the contract-compliant `index.ts` for the base module:
+
+```typescript
 /**
  * QiCore Foundation Base Module
  *
@@ -13,24 +16,21 @@
 export type { Result, Success, Failure } from './result.js'
 
 // Factory operations
-export {
+export { 
   success,
   failure,
   fromTryCatch,
   fromAsyncTryCatch,
   fromMaybe,
-  fromEither,
+  fromEither
 } from './result.js'
 
-// Aliases for compatibility
-export { fromTryCatch as tryCatch } from './result.js'
-
-// Query operations
+// Query operations  
 export {
   isSuccess,
   isFailure,
   getValue,
-  getError,
+  getError
 } from './result.js'
 
 // Transformation operations
@@ -43,14 +43,14 @@ export {
   inspectErr,
   collect,
   filter,
-  orElse,
+  orElse
 } from './result.js'
 
 // Extraction operations
 export {
   unwrap,
   unwrapOr,
-  match,
+  match
 } from './result.js'
 
 // ============================================================================
@@ -58,17 +58,17 @@ export {
 // ============================================================================
 
 // Type exports
-export type {
+export type { 
   QiError,
   ErrorCategory,
   ErrorOptions,
-  RetryStrategy,
+  RetryStrategy
 } from './error.js'
 
 // Constants
 export {
   ErrorCategories,
-  isErrorCategory,
+  isErrorCategory
 } from './error.js'
 
 // Factory operations
@@ -77,20 +77,25 @@ export {
   createError,
   fromException,
   fromString,
+  loggerError
 } from './error.js'
 
 // Query operations
 export {
-  errorToString,
+  toString,
   getCategory,
-  toStructuredData,
+  toStructuredData
 } from './error.js'
 
 // Transformation operations
-export { withContext } from './error.js'
+export {
+  withContext
+} from './error.js'
 
 // Utility operations
-export { getRetryStrategy } from './error.js'
+export {
+  getRetryStrategy
+} from './error.js'
 
 // Convenience factories
 export {
@@ -103,8 +108,7 @@ export {
   configurationError,
   timeoutError,
   resourceError,
-  concurrencyError,
-  loggerError,
+  concurrencyError
 } from './error.js'
 
 // ============================================================================
@@ -113,3 +117,23 @@ export {
 
 // Rust-style naming aliases
 export { success as Ok, failure as Err } from './result.js'
+```
+
+This index.ts:
+
+1. **Exports only contract-specified operations** - no extras
+2. **Clear organization** - separated by type (Result vs QiError) and operation category
+3. **Includes type exports** - all necessary types for consumers
+4. **Provides common aliases** - Ok/Err for those familiar with Rust
+5. **Uses .js extensions** - required for ESM compatibility
+
+Key differences from the current implementation:
+- Removed FluentResultBuilder and related exports
+- Removed async operations (asyncMap, asyncAndThen, asyncSequence, fromPromise, toPromise)
+- Removed collection operations (sequence, traverse, partition, combine2)
+- Removed applicative operations (apply, pure)
+- Removed extra error operations (chainError, formatErrorChain, getRootCause, serializeError, etc.)
+- Removed QiErrorBuilder and errorBuilder
+- Much simpler and focused on contract-specified operations only
+
+The module now exports exactly what the contracts specify, nothing more, nothing less.

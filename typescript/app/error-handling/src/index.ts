@@ -17,19 +17,59 @@ import {
   Ok,
   type QiError,
   type Result,
+  type ErrorCategory,
   authorizationError,
   businessError,
-  chainError,
-  createAggregateError,
-  formatErrorChain,
   getRetryStrategy,
-  getRootCause,
   match,
   networkError,
   systemError,
   timeoutError,
   validationError,
+  withContext,
 } from '@qi/base'
+
+// Utility functions for error handling (implementation-specific, not in contracts)
+const createAggregateError = (
+  message: string,
+  errors: QiError[],
+  _category: ErrorCategory = 'SYSTEM'
+): QiError => {
+  return systemError(message, {
+    aggregatedErrors: errors.map((e) => ({ code: e.code, message: e.message })),
+    errorCount: errors.length,
+  })
+}
+
+const chainError = (parentError: QiError, childError: QiError): QiError => {
+  return withContext({ cause: childError }, parentError)
+}
+
+const formatErrorChain = (error: QiError): string => {
+  const chain: string[] = []
+  const current = error
+
+  chain.push(`${current.code}: ${current.message}`)
+
+  // Look for cause in context (this is implementation-specific)
+  if (current.context.cause && typeof current.context.cause === 'object') {
+    const cause = current.context.cause as QiError
+    chain.push(`  Caused by: ${cause.code}: ${cause.message}`)
+  }
+
+  return chain.join('\n')
+}
+
+const getRootCause = (error: QiError): QiError => {
+  let current = error
+
+  // Keep following the cause chain
+  while (current.context.cause && typeof current.context.cause === 'object') {
+    current = current.context.cause as QiError
+  }
+
+  return current
+}
 
 // Setup logger for demonstrations
 interface SimpleLogger {
@@ -322,9 +362,9 @@ function demonstrateRetryStrategies() {
         return result
       }
 
-      const strategy = getRetryStrategy(result.error)
+      const strategy = getRetryStrategy(result.error.category)
 
-      if (!strategy.shouldRetry) {
+      if (strategy.strategy === 'never') {
         console.log('❌ Error not retryable:', result.error.message)
         return result
       }
@@ -339,7 +379,8 @@ function demonstrateRetryStrategies() {
         )
       }
 
-      console.log(`⏳ Retrying in ${strategy.backoffMs}ms...`)
+      const backoffMs = strategy.strategy === 'exponential_backoff' ? attempt * 1000 : 500
+      console.log(`⏳ Retrying in ${backoffMs}ms... (${strategy.strategy})`)
       // In real implementation, you'd wait here
     }
 
