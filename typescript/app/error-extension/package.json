@@ -1,0 +1,16 @@
+{
+  "name": "qicore-error-extension-example",
+  "version": "1.0.0",
+  "description": "QiCore Foundation - Error Extension and Domain-Specific Error Handling",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@qi/qicore-foundation": "workspace:*"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}

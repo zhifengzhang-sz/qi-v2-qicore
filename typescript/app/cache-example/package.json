@@ -1,0 +1,16 @@
+{
+  "name": "qicore-cache-example",
+  "version": "1.0.0",
+  "description": "QiCore Foundation - Cache Usage Examples",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@qi/qicore-foundation": "workspace:*"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}
