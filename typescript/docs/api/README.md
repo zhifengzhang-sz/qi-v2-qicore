@@ -5,15 +5,14 @@ Complete API reference for QiCore Foundation TypeScript implementation.
 ## Table of Contents
 
 ### Base Module (`@qi/qicore-foundation/base`)
+- [Complete Base API](./base.md) - All Result<T> and QiError functions
 - [Result<T>](./base/result.md) - Functional error handling type
 - [QiError](./base/error.md) - Structured error management
-- [Utility Functions](./base/utils.md) - Helper functions and utilities
 
 ### Core Module (`@qi/qicore-foundation`)
-- [Configuration](./core/config.md) - Configuration management
-- [Logger](./core/logger.md) - Structured logging
-- [Cache](./core/cache.md) - Caching strategies
-- [Integration](./core/integration.md) - Service integration patterns
+- [Configuration](./core/config.md) - Multi-source configuration management
+- [Logger](./core/logger.md) - Structured logging with Result<T> integration
+- [Cache](./core/cache.md) - Memory and Redis caching strategies
 
 ## Quick Reference
 
@@ -22,13 +21,13 @@ Complete API reference for QiCore Foundation TypeScript implementation.
 ```typescript
 // Import base types
 import { 
-  Ok, Err, type Result, type QiError,
+  success, failure, Ok, Err, type Result, type QiError,
   map, flatMap, match, unwrapOr
 } from '@qi/qicore-foundation/base'
 
 // Basic usage
-const result: Result<number> = Ok(42)
-const mapped = map(result, x => x * 2)
+const result: Result<number> = success(42)
+const mapped = map(x => x * 2, result)
 ```
 
 ### Core Module
@@ -40,9 +39,9 @@ import {
 } from '@qi/qicore-foundation'
 
 // Basic usage
-const logger = createLogger({ name: 'app' })
-const cache = createCache({ backend: 'memory' })
-const config = ConfigBuilder.create().fromEnv().build()
+const loggerResult = createLogger({ level: 'info' })
+const cacheResult = createCache({ backend: 'memory' })
+const configResult = ConfigBuilder.fromEnv().build()
 ```
 
 ## API Design Principles
@@ -88,7 +87,7 @@ const config = ConfigBuilder.create().fromEnv().build()
 
 ## Version Information
 
-- **Current Version**: 0.3.4
+- **Current Version**: 0.3.6
 - **TypeScript Version**: 5.8+
 - **Node.js Version**: 18+
 - **ES Target**: ES2023
