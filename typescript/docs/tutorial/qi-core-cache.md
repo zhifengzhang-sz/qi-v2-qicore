@@ -150,7 +150,7 @@ match(
 )
 
 // Check if key exists
-const exists = await cache.exists('user:123')
+const exists = await cache.has('user:123')
 
 // Delete key
 await cache.delete('user:123')

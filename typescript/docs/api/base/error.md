@@ -1,6 +1,6 @@
 # QiError API Reference
 
-QiError provides structured error handling with categorization, context, and chaining capabilities.
+QiError provides structured error handling with categorization and context for consistent error management across the QiCore Foundation.
 
 ## Type Definition
 
@@ -9,9 +9,7 @@ interface QiError {
   readonly code: string
   readonly message: string
   readonly category: ErrorCategory
-  readonly context?: Record<string, unknown>
-  readonly timestamp: string
-  readonly cause?: QiError
+  readonly context: Record<string, unknown>
 }
 
 type ErrorCategory = 
@@ -25,12 +23,18 @@ type ErrorCategory =
   | 'TIMEOUT'
   | 'RESOURCE'
   | 'CONCURRENCY'
+  | 'LOGGER'
 
-type ErrorCode = string
-type RetryStrategy = {
-  shouldRetry: boolean
-  maxRetries: number
-  backoffMs: number
+interface RetryStrategy {
+  readonly strategy: 'never' | 'exponential_backoff' | 'linear_backoff'
+  readonly description: string
+}
+
+interface ErrorOptions {
+  readonly code: string
+  readonly message: string
+  readonly category: ErrorCategory
+  readonly context?: Record<string, unknown>
 }
 ```
 
@@ -38,21 +42,22 @@ type RetryStrategy = {
 
 ### ErrorCategories
 
-Object containing all available error categories.
+Array containing all available error categories.
 
 ```typescript
-const ErrorCategories = {
-  VALIDATION: 'VALIDATION',
-  NETWORK: 'NETWORK',
-  SYSTEM: 'SYSTEM',
-  BUSINESS: 'BUSINESS',
-  AUTHENTICATION: 'AUTHENTICATION',
-  AUTHORIZATION: 'AUTHORIZATION',
-  CONFIGURATION: 'CONFIGURATION',
-  TIMEOUT: 'TIMEOUT',
-  RESOURCE: 'RESOURCE',
-  CONCURRENCY: 'CONCURRENCY'
-} as const
+const ErrorCategories: ReadonlyArray<ErrorCategory> = [
+  'VALIDATION',
+  'NETWORK', 
+  'SYSTEM',
+  'BUSINESS',
+  'AUTHENTICATION',
+  'AUTHORIZATION',
+  'CONFIGURATION',
+  'TIMEOUT',
+  'RESOURCE',
+  'CONCURRENCY',
+  'LOGGER'
+] as const
 ```
 
 ### isErrorCategory(category: string): category is ErrorCategory
@@ -67,28 +72,23 @@ if (isErrorCategory('VALIDATION')) {
 
 ## Error Creation
 
-### createError(code: string, message: string, category?: ErrorCategory, context?: Record<string, unknown>): QiError
+### createError(options: ErrorOptions): QiError
 
-Creates a new QiError.
-
-```typescript
-const error = createError('USER_NOT_FOUND', 'User not found')
-const errorWithCategory = createError('INVALID_EMAIL', 'Invalid email', 'VALIDATION')
-const errorWithContext = createError(
-  'API_ERROR',
-  'API call failed',
-  'NETWORK',
-  { endpoint: '/api/users', statusCode: 500 }
-)
-```
-
-### createErrorCode(domain: string, operation: string, reason: string): ErrorCode
-
-Creates a structured error code.
+Creates a new QiError from options object.
 
 ```typescript
-const code = createErrorCode('USER', 'FETCH', 'NOT_FOUND')
-// Returns: 'USER_FETCH_NOT_FOUND'
+const error = createError({
+  code: 'USER_NOT_FOUND',
+  message: 'User not found',
+  category: 'BUSINESS'
+})
+
+const errorWithContext = createError({
+  code: 'API_ERROR',
+  message: 'API call failed',
+  category: 'NETWORK',
+  context: { endpoint: '/api/users', statusCode: 500 }
+})
 ```
 
 ## Factory Functions
@@ -106,22 +106,95 @@ const error = create(
 )
 ```
 
-### createError(options: ErrorOptions): QiError
+## Utility Functions
 
-Creates a QiError from an options object.
+### fromException(exception: unknown, category?: ErrorCategory): QiError
+
+Creates a QiError from a JavaScript exception.
 
 ```typescript
-const error = createError({
-  code: 'DATABASE_ERROR',
-  message: 'Database connection failed',
-  category: 'SYSTEM',
-  context: { host: 'localhost', port: 5432 }
-})
+try {
+  JSON.parse(invalidJson)
+} catch (error) {
+  const qiError = fromException(error, 'VALIDATION')
+}
+```
+
+### fromString(message: string, category?: ErrorCategory): QiError
+
+Creates a QiError from a simple string message.
+
+```typescript
+const error = fromString('Something went wrong', 'SYSTEM')
+```
+
+### errorToString(error: QiError): string
+
+Converts a QiError to a human-readable string.
+
+```typescript
+const errorStr = errorToString(error)
+// Returns: '[USER_NOT_FOUND] User not found'
+```
+
+### getCategory(error: QiError): ErrorCategory
+
+Gets the category of an error.
+
+```typescript
+const category = getCategory(error) // Returns: 'VALIDATION'
+```
+
+### toStructuredData(error: QiError): Record<string, unknown>
+
+Converts a QiError to a serializable structure.
+
+```typescript
+const data = toStructuredData(error)
+// Returns: { code: 'USER_NOT_FOUND', message: '...', category: 'BUSINESS', context: {...} }
+```
+
+## Error Utilities
+
+### getRetryStrategy(category: ErrorCategory): RetryStrategy
+
+Gets the retry strategy for an error category.
+
+```typescript
+const strategy = getRetryStrategy('NETWORK')
+console.log(`Strategy: ${strategy.strategy}, Description: ${strategy.description}`)
+```
+
+**Default Strategies:**
+- `NETWORK`: `{ strategy: 'exponential_backoff', description: 'Network communication failures' }`
+- `TIMEOUT`: `{ strategy: 'exponential_backoff', description: 'Timeout errors' }`
+- `SYSTEM`: `{ strategy: 'linear_backoff', description: 'System resource and infrastructure problems' }`
+- `RESOURCE`: `{ strategy: 'linear_backoff', description: 'Resource exhaustion/unavailable' }`
+- `CONCURRENCY`: `{ strategy: 'linear_backoff', description: 'Concurrency conflicts' }`
+- `VALIDATION`: `{ strategy: 'never', description: 'Input validation and constraint violations' }`
+- `BUSINESS`: `{ strategy: 'never', description: 'Business logic and domain rule violations' }`
+- `AUTHENTICATION`: `{ strategy: 'never', description: 'Authentication failures' }`
+- `AUTHORIZATION`: `{ strategy: 'never', description: 'Authorization/permission failures' }`
+- `CONFIGURATION`: `{ strategy: 'never', description: 'Configuration/setup errors' }`
+- `LOGGER`: `{ strategy: 'never', description: 'Logger-related errors' }`
+
+## Context Management
+
+### withContext(context: Record<string, unknown>, error: QiError): QiError
+
+Adds context to an existing error.
+
+```typescript
+const enhanced = withContext({
+  userId: 123,
+  timestamp: new Date().toISOString(),
+  requestId: 'req-abc123'
+}, error)
 ```
 
 ## Convenience Functions
 
-### validationError(message: string, context?: Record<string, unknown>): QiError
+### validationError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates a validation error.
 
@@ -129,7 +202,7 @@ Creates a validation error.
 const error = validationError('Email format is invalid', { field: 'email' })
 ```
 
-### networkError(message: string, context?: Record<string, unknown>): QiError
+### networkError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates a network error.
 
@@ -137,7 +210,7 @@ Creates a network error.
 const error = networkError('Network connection failed', { host: 'api.example.com' })
 ```
 
-### systemError(message: string, context?: Record<string, unknown>): QiError
+### systemError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates a system error.
 
@@ -145,7 +218,7 @@ Creates a system error.
 const error = systemError('Insufficient memory', { available: '1GB', required: '2GB' })
 ```
 
-### businessError(message: string, context?: Record<string, unknown>): QiError
+### businessError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates a business logic error.
 
@@ -153,180 +226,60 @@ Creates a business logic error.
 const error = businessError('Account balance too low', { balance: 100, required: 250 })
 ```
 
-### authenticationError(code: string, message: string, context?: Record<string, unknown>): QiError
+### authenticationError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates an authentication error.
 
 ```typescript
-const error = authenticationError('INVALID_TOKEN', 'Authentication token expired')
+const error = authenticationError('Authentication token expired')
 ```
 
-### authorizationError(code: string, message: string, context?: Record<string, unknown>): QiError
+### authorizationError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates an authorization error.
 
 ```typescript
-const error = authorizationError('ACCESS_DENIED', 'Insufficient permissions')
+const error = authorizationError('Insufficient permissions')
 ```
 
-### configurationError(code: string, message: string, context?: Record<string, unknown>): QiError
+### configurationError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates a configuration error.
 
 ```typescript
-const error = configurationError('MISSING_CONFIG', 'Required configuration missing')
+const error = configurationError('Required configuration missing')
 ```
 
-### timeoutError(code: string, message: string, context?: Record<string, unknown>): QiError
+### timeoutError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates a timeout error.
 
 ```typescript
-const error = timeoutError('REQUEST_TIMEOUT', 'Request exceeded timeout')
+const error = timeoutError('Request exceeded timeout')
 ```
 
-### resourceError(code: string, message: string, context?: Record<string, unknown>): QiError
+### resourceError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates a resource error.
 
 ```typescript
-const error = resourceError('QUOTA_EXCEEDED', 'Resource quota exceeded')
+const error = resourceError('Resource quota exceeded')
 ```
 
-### concurrencyError(code: string, message: string, context?: Record<string, unknown>): QiError
+### concurrencyError(message: string, context: Record<string, unknown> = {}): QiError
 
 Creates a concurrency error.
 
 ```typescript
-const error = concurrencyError('LOCK_FAILED', 'Failed to acquire lock')
+const error = concurrencyError('Concurrent modification detected')
 ```
 
-## Error Utilities
+### loggerError(message: string, context: Record<string, unknown> = {}): QiError
 
-### hasCategory(error: QiError, category: ErrorCategory): boolean
-
-Checks if an error has a specific category.
+Creates a logger error.
 
 ```typescript
-if (hasCategory(error, 'NETWORK')) {
-  // Handle network errors
-}
-```
-
-### getRetryStrategy(error: QiError): RetryStrategy
-
-Gets the retry strategy for an error based on its category.
-
-```typescript
-const strategy = getRetryStrategy(error)
-if (strategy.shouldRetry) {
-  console.log(`Retrying up to ${strategy.maxRetries} times`)
-}
-```
-
-**Default Strategies:**
-- `NETWORK`: `{ shouldRetry: true, maxRetries: 3, backoffMs: 1000 }`
-- `TIMEOUT`: `{ shouldRetry: true, maxRetries: 3, backoffMs: 1000 }`
-- `SYSTEM`: `{ shouldRetry: true, maxRetries: 2, backoffMs: 2000 }`
-- `VALIDATION`: `{ shouldRetry: false, maxRetries: 0, backoffMs: 0 }`
-- `BUSINESS`: `{ shouldRetry: false, maxRetries: 0, backoffMs: 0 }`
-
-## Error Chaining
-
-### chainError(error: QiError, cause: QiError): QiError
-
-Chains errors to show causality.
-
-```typescript
-const dbError = systemError('CONNECTION_FAILED', 'Database connection failed')
-const serviceError = chainError(
-  businessError('USER_FETCH_FAILED', 'Failed to fetch user'),
-  dbError
-)
-```
-
-### getRootCause(error: QiError): QiError
-
-Gets the root cause of an error chain.
-
-```typescript
-const root = getRootCause(chainedError)
-```
-
-### formatErrorChain(error: QiError): string
-
-Formats an error chain for display.
-
-```typescript
-const formatted = formatErrorChain(error)
-console.log(formatted)
-// "API_ERROR: API request failed
-//  └─ USER_FETCH_FAILED: Failed to fetch user
-//     └─ CONNECTION_FAILED: Database connection failed"
-```
-
-## Context Management
-
-### withContext(error: QiError, context: Record<string, unknown>): QiError
-
-Adds context to an existing error.
-
-```typescript
-const enhanced = withContext(error, {
-  userId: 123,
-  timestamp: new Date().toISOString(),
-  requestId: 'req-abc123'
-})
-```
-
-### getContext(error: QiError): Record<string, unknown> | undefined
-
-Gets the context from an error.
-
-```typescript
-const context = getContext(error)
-console.log(context?.userId)
-```
-
-## Aggregate Errors
-
-### createAggregateError(code: string, message: string, errors: QiError[]): QiError
-
-Creates an aggregate error containing multiple errors.
-
-```typescript
-const validationErrors = [
-  validationError('MISSING_NAME', 'Name is required'),
-  validationError('INVALID_EMAIL', 'Email format is invalid')
-]
-
-const aggregate = createAggregateError(
-  'VALIDATION_FAILED',
-  'Multiple validation errors',
-  validationErrors
-)
-
-// Access individual errors
-const individualErrors = aggregate.context?.errors as QiError[]
-```
-
-## Serialization
-
-### serializeError(error: QiError): Record<string, unknown>
-
-Serializes an error for storage or transmission.
-
-```typescript
-const serialized = serializeError(error)
-const json = JSON.stringify(serialized)
-```
-
-### deserializeError(data: Record<string, unknown>): QiError
-
-Deserializes an error from storage or transmission.
-
-```typescript
-const error = deserializeError(JSON.parse(json))
+const error = loggerError('Failed to write log file')
 ```
 
 ## Usage Examples
@@ -334,184 +287,92 @@ const error = deserializeError(JSON.parse(json))
 ### Basic Error Creation
 
 ```typescript
-import { createError, validationError, networkError } from '@qi/qicore-foundation/base'
+import { create, createError, validationError, networkError } from '@qi/qicore-foundation/base'
 
-// Simple error
-const error1 = createError('USER_NOT_FOUND', 'User not found')
+// Using create function
+const error1 = create('USER_NOT_FOUND', 'User not found', 'BUSINESS')
 
-// Categorized error
-const error2 = validationError('INVALID_EMAIL', 'Email format is invalid')
+// Using createError with options
+const error2 = createError({
+  code: 'INVALID_EMAIL',
+  message: 'Email format is invalid',
+  category: 'VALIDATION'
+})
 
-// Error with context
-const error3 = networkError('API_FAILED', 'API call failed', {
+// Using convenience functions
+const error3 = networkError('API call failed', {
   endpoint: '/api/users',
   statusCode: 500,
   responseTime: 1500
 })
 ```
 
-### Error Chaining
+### Working with Error Context
 
 ```typescript
-import { chainError, systemError, businessError } from '@qi/qicore-foundation/base'
+import { validationError, withContext, toStructuredData } from '@qi/qicore-foundation/base'
 
-// Chain related errors
-const dbError = systemError('CONNECTION_FAILED', 'Database connection failed')
-const serviceError = chainError(
-  businessError('USER_SAVE_FAILED', 'Failed to save user'),
-  dbError
-)
-const apiError = chainError(
-  networkError('API_ERROR', 'API request failed'),
-  serviceError
-)
+// Create error with initial context
+const error = validationError('Invalid input', { field: 'email' })
 
-// Access the chain
-console.log(apiError.cause?.code) // 'USER_SAVE_FAILED'
-console.log(apiError.cause?.cause?.code) // 'CONNECTION_FAILED'
+// Add more context
+const enhanced = withContext({
+  userId: 123,
+  requestId: 'req-abc123'
+}, error)
+
+// Convert to serializable format
+const data = toStructuredData(enhanced)
+console.log(JSON.stringify(data, null, 2))
 ```
 
-### Complex Error Creation
+### Retry Strategy Usage
 
 ```typescript
-import { create } from '@qi/qicore-foundation/base'
+import { getRetryStrategy, networkError } from '@qi/qicore-foundation/base'
 
-const error = create(
-  'COMPLEX_ERROR',
-  'A complex error occurred',
-  'SYSTEM',
-  {
-    operation: 'processData',
-    input: { type: 'user', id: 123 },
-    metadata: { timestamp: Date.now() },
-    cause: previousError
-  }
-)
-```
+const error = networkError('Connection failed')
+const strategy = getRetryStrategy(error.category)
 
-### Error Handling in Services
-
-```typescript
-import { 
-  Result, Ok, Err, 
-  hasCategory, getRetryStrategy, chainError 
-} from '@qi/qicore-foundation/base'
-
-class UserService {
-  async getUser(id: number): Promise<Result<User, QiError>> {
-    try {
-      const user = await this.database.findUser(id)
-      if (!user) {
-        return Err(businessError('USER_NOT_FOUND', 'User not found'))
-      }
-      return Ok(user)
-    } catch (error) {
-      const dbError = systemError('DATABASE_ERROR', 'Database operation failed')
-      return Err(chainError(
-        businessError('USER_FETCH_FAILED', 'Failed to fetch user'),
-        dbError
-      ))
-    }
-  }
-
-  async withRetry<T>(operation: () => Promise<Result<T, QiError>>): Promise<Result<T, QiError>> {
-    let lastError: QiError | undefined
-    
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const result = await operation()
-      
-      if (result.tag === 'success') {
-        return result
-      }
-      
-      lastError = result.error
-      const strategy = getRetryStrategy(result.error)
-      
-      if (!strategy.shouldRetry || attempt >= strategy.maxRetries - 1) {
-        break
-      }
-      
-      await new Promise(resolve => 
-        setTimeout(resolve, strategy.backoffMs * (attempt + 1))
-      )
-    }
-    
-    return Err(lastError!)
-  }
+if (strategy.strategy !== 'never') {
+  console.log(`Should retry with strategy: ${strategy.strategy}`)
+  console.log(`Description: ${strategy.description}`)
 }
 ```
 
-### Validation with Aggregate Errors
+### Integration with Result<T>
 
 ```typescript
-import { createAggregateError, validationError } from '@qi/qicore-foundation/base'
+import { Result, success, failure, match, validationError } from '@qi/qicore-foundation/base'
 
-function validateUser(data: any): Result<User, QiError> {
-  const errors: QiError[] = []
-  
-  if (!data.name) {
-    errors.push(validationError('MISSING_NAME', 'Name is required'))
+function validateEmail(email: string): Result<string, QiError> {
+  if (!email.includes('@')) {
+    return failure(validationError('Invalid email format', { email }))
   }
-  
-  if (!data.email) {
-    errors.push(validationError('MISSING_EMAIL', 'Email is required'))
-  } else if (!isValidEmail(data.email)) {
-    errors.push(validationError('INVALID_EMAIL', 'Email format is invalid'))
-  }
-  
-  if (!data.age || data.age < 0) {
-    errors.push(validationError('INVALID_AGE', 'Age must be positive'))
-  }
-  
-  if (errors.length > 0) {
-    return Err(createAggregateError(
-      'VALIDATION_FAILED',
-      'User validation failed',
-      errors
-    ))
-  }
-  
-  return Ok(data as User)
-}
-```
-
-## Integration with Result<T>
-
-QiError is designed to work seamlessly with Result<T>:
-
-```typescript
-import { Result, Ok, Err, map, flatMap } from '@qi/qicore-foundation/base'
-
-// Functions return Result<T, QiError>
-function fetchUser(id: number): Result<User, QiError> {
-  if (id <= 0) {
-    return Err(validationError('INVALID_ID', 'User ID must be positive'))
-  }
-  // ... fetch logic
+  return success(email)
 }
 
-// Chain operations with proper error handling
-const result = flatMap(fetchUser(123), user =>
-  map(validateUser(user), validatedUser => ({
-    ...validatedUser,
-    processed: true
-  }))
+const result = validateEmail('invalid-email')
+match(
+  (email) => console.log('Valid email:', email),
+  (error) => console.error('Validation failed:', errorToString(error)),
+  result
 )
 ```
 
 ## Best Practices
 
-1. **Use appropriate categories**: Choose the right category for proper error handling
-2. **Provide context**: Include relevant debugging information
-3. **Chain related errors**: Link errors to show causality
-4. **Use structured codes**: Create consistent error codes
-5. **Leverage retry strategies**: Use built-in retry guidance
-6. **Aggregate validation errors**: Collect all validation errors at once
-7. **Preserve error chains**: Don't lose important error information
+1. **Use appropriate categories**: Choose the most specific error category
+2. **Provide meaningful context**: Include relevant debugging information
+3. **Use convenience functions**: They set appropriate codes and categories
+4. **Preserve error information**: Use withContext to add without losing data
+5. **Follow retry strategies**: Use getRetryStrategy for consistent retry behavior
+6. **Structure error codes**: Use consistent naming conventions
+7. **Avoid sensitive data**: Don't include passwords or tokens in context
 
 ## Performance Considerations
 
-- QiError objects are lightweight and optimized for serialization
+- QiError objects are lightweight plain objects
 - Context objects should be kept reasonably small
-- Error chaining maintains references, not copies
-- Serialization/deserialization is optimized for common use cases
+- toStructuredData is optimized for serialization
+- Error creation is fast and allocation-efficient

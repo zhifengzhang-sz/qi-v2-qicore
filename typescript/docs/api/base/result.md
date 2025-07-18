@@ -9,59 +9,68 @@ type Result<T, E = QiError> =
   | { readonly tag: 'success'; readonly value: T }
   | { readonly tag: 'failure'; readonly error: E }
 
-type Success<T, E = QiError> = { readonly tag: 'success'; readonly value: T }
-type Failure<E, T = unknown> = { readonly tag: 'failure'; readonly error: E }
+type Success<T> = { readonly tag: 'success'; readonly value: T }
+type Failure<E> = { readonly tag: 'failure'; readonly error: E }
 ```
 
 ## Factory Operations
 
-### Ok<T>(value: T): Result<T, never>
+### success<T>(value: T): Result<T, never>
 
 Creates a successful Result.
 
 ```typescript
-const number = Ok(42)
-const user = Ok({ id: 1, name: 'Alice' })
-const array = Ok([1, 2, 3])
+const number = success(42)
+const user = success({ id: 1, name: 'Alice' })
+const array = success([1, 2, 3])
 ```
 
-### Err<E>(error: E): Result<never, E>
+### failure<E>(error: E): Result<never, E>
 
 Creates a failed Result.
 
 ```typescript
-const error = Err(new Error('Something went wrong'))
-const customError = Err({ code: 'CUSTOM_ERROR', message: 'Custom error' })
+const error = failure(new Error('Something went wrong'))
+const customError = failure({ code: 'CUSTOM_ERROR', message: 'Custom error' })
 ```
 
-### fromNullable<T>(value: T | null | undefined, error: QiError): Result<T>
+### fromMaybe<T>(value: T | null | undefined, errorIfNull: QiError): Result<T, QiError>
 
 Converts nullable values to Result.
 
 ```typescript
 const user = getUser() // Returns User | null
-const result = fromNullable(user, createError('USER_NOT_FOUND', 'User not found'))
+const result = fromMaybe(user, createError('USER_NOT_FOUND', 'User not found'))
 ```
 
-### tryCatch<T>(fn: () => T): Result<T>
+### fromTryCatch<T>(operation: () => T, errorHandler?: (error: unknown) => QiError): Result<T, QiError>
 
 Wraps a function that might throw into a Result.
 
 ```typescript
-const parseResult = tryCatch(() => JSON.parse(jsonString))
+const parseResult = fromTryCatch(() => JSON.parse(jsonString))
 ```
 
-### asyncTryCatch<T>(fn: () => Promise<T>): Promise<Result<T>>
+### fromAsyncTryCatch<T>(operation: () => Promise<T>, errorHandler?: (error: unknown) => QiError): Promise<Result<T, QiError>>
 
 Wraps an async function that might throw into a Result.
 
 ```typescript
-const fetchResult = await asyncTryCatch(() => fetch('/api/data'))
+const fetchResult = await fromAsyncTryCatch(() => fetch('/api/data'))
+```
+
+### fromEither<L, R>(either: { tag: 'left'; value: L } | { tag: 'right'; value: R }): Result<R, L>
+
+Converts from Either-like type.
+
+```typescript
+const either = { tag: 'right', value: 42 }
+const result = fromEither(either) // success(42)
 ```
 
 ## Query Operations
 
-### isSuccess<T, E>(result: Result<T, E>): result is Success<T, E>
+### isSuccess<T, E>(result: Result<T, E>): result is Success<T>
 
 Type guard for successful Results.
 
@@ -71,7 +80,7 @@ if (isSuccess(result)) {
 }
 ```
 
-### isFailure<T, E>(result: Result<T, E>): result is Failure<E, T>
+### isFailure<T, E>(result: Result<T, E>): result is Failure<E>
 
 Type guard for failed Results.
 
@@ -81,98 +90,98 @@ if (isFailure(result)) {
 }
 ```
 
-### getValue<T, E>(result: Result<T, E>): T | undefined
+### getValue<T, E>(result: Result<T, E>): T | null
 
 Safely extracts the value from a Result.
 
 ```typescript
-const value = getValue(result) // T | undefined
+const value = getValue(result) // T | null
 ```
 
-### getError<T, E>(result: Result<T, E>): E | undefined
+### getError<T, E>(result: Result<T, E>): E | null
 
 Safely extracts the error from a Result.
 
 ```typescript
-const error = getError(result) // E | undefined
+const error = getError(result) // E | null
 ```
 
 ## Transformation Operations
 
-### map<T, U, E>(result: Result<T, E>, fn: (value: T) => U): Result<U, E>
+### map<T, U, E>(fn: (value: T) => U, result: Result<T, E>): Result<U, E>
 
 Transforms the success value of a Result.
 
 ```typescript
-const doubled = map(Ok(21), x => x * 2) // Ok(42)
-const error = map(Err('failed'), x => x * 2) // Err('failed')
+const doubled = map(x => x * 2, success(21)) // success(42)
+const error = map(x => x * 2, failure('failed')) // failure('failed')
 ```
 
 **Laws:**
-- Identity: `map(result, x => x) === result`
-- Composition: `map(map(result, f), g) === map(result, x => g(f(x)))`
+- Identity: `map(x => x, result) === result`
+- Composition: `map(g, map(f, result)) === map(x => g(f(x)), result)`
 
-### mapError<T, E, F>(result: Result<T, E>, fn: (error: E) => F): Result<T, F>
+### mapError<T, E, F>(fn: (error: E) => F, result: Result<T, E>): Result<T, F>
 
 Transforms the error of a Result.
 
 ```typescript
-const enhanced = mapError(result, err => ({ ...err, timestamp: Date.now() }))
+const enhanced = mapError(err => ({ ...err, timestamp: Date.now() }), result)
 ```
 
-### flatMap<T, U, E>(result: Result<T, E>, fn: (value: T) => Result<U, E>): Result<U, E>
+### flatMap<T, U, E>(fn: (value: T) => Result<U, E>, result: Result<T, E>): Result<U, E>
 
 Monadic bind operation for chaining Results.
 
 ```typescript
-const result = flatMap(getUser(123), user => 
-  flatMap(getProfile(user.id), profile => 
-    Ok({ user, profile })
-  )
+const result = flatMap(user => 
+  flatMap(profile => 
+    success({ user, profile }), getProfile(user.id)
+  ), getUser(123)
 )
 ```
 
 **Laws:**
-- Left Identity: `flatMap(Ok(a), f) === f(a)`
-- Right Identity: `flatMap(m, Ok) === m`
-- Associativity: `flatMap(flatMap(m, f), g) === flatMap(m, x => flatMap(f(x), g))`
+- Left Identity: `flatMap(f, success(a)) === f(a)`
+- Right Identity: `flatMap(success, m) === m`
+- Associativity: `flatMap(g, flatMap(f, m)) === flatMap(x => flatMap(g, f(x)), m)`
 
-### andThen<T, U, E>(result: Result<T, E>, fn: (value: T) => Result<U, E>): Result<U, E>
+### andThen<T, U, E>(fn: (value: T) => Result<U, E>, result: Result<T, E>): Result<U, E>
 
 Alias for flatMap.
 
 ```typescript
-const result = andThen(step1(), step2)
+const result = andThen(step2, step1())
 ```
 
-### filter<T, E>(result: Result<T, E>, predicate: (value: T) => boolean, error: () => E): Result<T, E>
+### filter<T, E>(predicate: (value: T) => boolean, errorIfFalse: E, result: Result<T, E>): Result<T, E>
 
 Filters a Result based on a predicate.
 
 ```typescript
 const evenOnly = filter(
-  Ok(42),
   x => x % 2 === 0,
-  () => new Error('Not even')
+  new Error('Not even'),
+  success(42)
 )
 ```
 
-### orElse<T, E>(result: Result<T, E>, fallback: () => Result<T, E>): Result<T, E>
+### orElse<T, E, F>(alternative: (error: E) => Result<T, F>, result: Result<T, E>): Result<T, F>
 
 Provides a fallback Result if the original failed.
 
 ```typescript
-const result = orElse(primary, () => secondary)
+const result = orElse(() => secondary, primary)
 ```
 
 ## Extraction Operations
 
-### unwrapOr<T, E>(result: Result<T, E>, defaultValue: T): T
+### unwrapOr<T, E>(defaultValue: T, result: Result<T, E>): T
 
 Extracts the value or returns a default.
 
 ```typescript
-const value = unwrapOr(result, 'default') // Always returns T
+const value = unwrapOr('default', result) // Always returns T
 ```
 
 ### unwrap<T, E>(result: Result<T, E>): T
@@ -180,209 +189,78 @@ const value = unwrapOr(result, 'default') // Always returns T
 Extracts the value, throwing if the Result is an error.
 
 ```typescript
-const value = unwrap(Ok(42)) // 42
-const error = unwrap(Err('failed')) // Throws Error
+const value = unwrap(success(42)) // 42
+const error = unwrap(failure('failed')) // Throws Error
 ```
 
 **⚠️ Warning**: Only use when you're certain the Result is successful.
 
-### match<T, E, U>(result: Result<T, E>, handlers: { success: (value: T) => U; failure: (error: E) => U }): U
+### inspect<T, E>(fn: (value: T) => void, result: Result<T, E>): Result<T, E>
+
+Inspects the success value without changing the Result.
+
+```typescript
+const logged = inspect(value => console.log('Value:', value), result)
+```
+
+### inspectErr<T, E>(fn: (error: E) => void, result: Result<T, E>): Result<T, E>
+
+Inspects the error value without changing the Result.
+
+```typescript
+const logged = inspectErr(error => console.error('Error:', error), result)
+```
+
+### collect<T, E>(result: Result<Result<T, E>, E>): Result<T, E>
+
+Flattens nested Results.
+
+```typescript
+const nested = success(success(42))
+const flattened = collect(nested) // success(42)
+```
+
+### match<T, E, R>(onSuccess: (value: T) => R, onError: (error: E) => R, result: Result<T, E>): R
 
 Pattern matching for Results.
 
 ```typescript
-const message = match(result, {
-  success: value => `Success: ${value}`,
-  failure: error => `Error: ${error.message}`
-})
+const message = match(
+  value => `Success: ${value}`,
+  error => `Error: ${error.message}`,
+  result
+)
 ```
 
-## Collection Operations
-
-### sequence<T, E>(results: Result<T, E>[]): Result<T[], E>
-
-Converts an array of Results to a Result of an array.
-
-```typescript
-const results = [Ok(1), Ok(2), Ok(3)]
-const sequenced = sequence(results) // Ok([1, 2, 3])
-
-const mixed = [Ok(1), Err('failed'), Ok(3)]
-const failed = sequence(mixed) // Err('failed')
-```
-
-### traverse<T, U, E>(array: T[], fn: (item: T) => Result<U, E>): Result<U[], E>
-
-Maps a function over an array and sequences the results.
-
-```typescript
-const strings = ['1', '2', '3']
-const numbers = traverse(strings, str => {
-  const num = parseInt(str)
-  return isNaN(num) ? Err('Invalid number') : Ok(num)
-})
-```
-
-### partition<T, E>(results: Result<T, E>[]): { successes: T[]; failures: E[] }
-
-Separates an array of Results into successes and failures.
-
-```typescript
-const results = [Ok(1), Err('error1'), Ok(3), Err('error2')]
-const { successes, failures } = partition(results)
-// successes: [1, 3]
-// failures: ['error1', 'error2']
-```
-
-### combine2<T, U, E>(result1: Result<T, E>, result2: Result<U, E>): Result<[T, U], E>
-
-Combines two Results into a single Result with a tuple.
-
-```typescript
-const combined = combine2(Ok(42), Ok('hello'))
-// Ok([42, 'hello'])
-```
-
-## Applicative Operations
-
-### apply<T, U, E>(fn: Result<(value: T) => U, E>, value: Result<T, E>): Result<U, E>
-
-Applies a function in a Result to a value in a Result.
-
-```typescript
-const addFn = Ok((x: number) => x + 10)
-const value = Ok(5)
-const result = apply(addFn, value) // Ok(15)
-```
-
-### pure<T>(value: T): Result<T, never>
-
-Lifts a value into the Result context (alias for Ok).
-
-```typescript
-const result = pure(42) // Ok(42)
-```
-
-## Async Operations
-
-### asyncMap<T, U, E>(result: Result<T, E>, fn: (value: T) => Promise<U>): Promise<Result<U, E>>
-
-Async version of map.
-
-```typescript
-const result = await asyncMap(Ok(42), async x => {
-  const response = await fetch(`/api/data/${x}`)
-  return await response.json()
-})
-```
-
-### asyncAndThen<T, U, E>(result: Result<T, E>, fn: (value: T) => Promise<Result<U, E>>): Promise<Result<U, E>>
-
-Async version of andThen/flatMap.
-
-```typescript
-const result = await asyncAndThen(userResult, async user => {
-  const profile = await fetchProfile(user.id)
-  return Ok({ user, profile })
-})
-```
-
-### asyncSequence<T, E>(results: Promise<Result<T, E>>[]): Promise<Result<T[], E>>
-
-Async version of sequence.
-
-```typescript
-const promises = [
-  fetchUser(1),
-  fetchUser(2),
-  fetchUser(3)
-]
-const users = await asyncSequence(promises)
-```
-
-### fromPromise<T>(promise: Promise<T>): Promise<Result<T, Error>>
-
-Converts a Promise to a Result.
-
-```typescript
-const result = await fromPromise(fetch('/api/data'))
-```
-
-### toPromise<T, E>(result: Result<T, E>): Promise<T>
-
-Converts a Result to a Promise (rejects on error).
-
-```typescript
-const promise = toPromise(Ok(42)) // Promise<42>
-const rejected = toPromise(Err('failed')) // Promise.reject('failed')
-```
 
 ## Usage Examples
 
 ### Basic Usage
 
 ```typescript
-import { Ok, Err, map, flatMap, match } from '@qi/qicore-foundation/base'
+import { success, failure, map, flatMap, match } from '@qi/qicore-foundation/base'
 
 // Create Results
-const success = Ok(42)
-const failure = Err(new Error('Something went wrong'))
+const successResult = success(42)
+const failureResult = failure(new Error('Something went wrong'))
 
 // Transform
-const doubled = map(success, x => x * 2)
+const doubled = map(x => x * 2, successResult)
 
 // Chain operations
-const result = flatMap(success, x => 
-  x > 0 ? Ok(Math.sqrt(x)) : Err(new Error('Negative number'))
+const result = flatMap(x => 
+  x > 0 ? success(Math.sqrt(x)) : failure(new Error('Negative number')),
+  successResult
 )
 
 // Pattern match
-const message = match(result, {
-  success: value => `Result: ${value}`,
-  failure: error => `Error: ${error.message}`
-})
+const message = match(
+  value => `Result: ${value}`,
+  error => `Error: ${error.message}`,
+  result
+)
 ```
 
-### Async Operations
-
-```typescript
-import { asyncMap, asyncAndThen, fromPromise } from '@qi/qicore-foundation/base'
-
-// Convert Promise to Result
-const userResult = await fromPromise(fetch('/api/user/123'))
-
-// Transform async
-const enrichedUser = await asyncMap(userResult, async user => {
-  const profile = await fetchProfile(user.id)
-  return { ...user, profile }
-})
-
-// Chain async operations
-const fullUser = await asyncAndThen(userResult, async user => {
-  const profile = await fetchProfile(user.id)
-  return asyncAndThen(profile, async profileData => {
-    const settings = await fetchSettings(user.id)
-    return Ok({ user, profile: profileData, settings })
-  })
-})
-```
-
-### Collection Processing
-
-```typescript
-import { traverse, sequence, partition } from '@qi/qicore-foundation/base'
-
-// Process array of items
-const userIds = [1, 2, 3, 4, 5]
-const users = await traverse(userIds, id => fetchUser(id))
-
-// Combine multiple Results
-const results = [Ok(1), Ok(2), Err('failed'), Ok(4)]
-const combined = sequence(results) // Err('failed')
-
-// Separate successes and failures
-const { successes, failures } = partition(results)
-```
 
 ## Type Inference
 
@@ -390,13 +268,13 @@ Result<T> provides excellent TypeScript inference:
 
 ```typescript
 // TypeScript infers Result<number>
-const result = Ok(42)
+const result = success(42)
 
 // TypeScript infers Result<string>
-const mapped = map(result, x => x.toString())
+const mapped = map(x => x.toString(), result)
 
 // TypeScript infers Result<User>
-const user = flatMap(result, id => fetchUser(id))
+const user = flatMap(id => fetchUser(id), result)
 ```
 
 ## Error Handling Best Practices
@@ -419,16 +297,16 @@ const user = flatMap(result, id => fetchUser(id))
 Result<T> satisfies the mathematical laws for:
 
 ### Functor
-- `map(result, id) === result`
-- `map(map(result, f), g) === map(result, x => g(f(x)))`
+- `map(id, result) === result`
+- `map(g, map(f, result)) === map(x => g(f(x)), result)`
 
 ### Applicative
 - `apply(pure(id), result) === result`
 - `apply(pure(f), pure(x)) === pure(f(x))`
 
 ### Monad
-- `flatMap(pure(a), f) === f(a)`
-- `flatMap(m, pure) === m`
-- `flatMap(flatMap(m, f), g) === flatMap(m, x => flatMap(f(x), g))`
+- `flatMap(f, success(a)) === f(a)`
+- `flatMap(success, m) === m`
+- `flatMap(g, flatMap(f, m)) === flatMap(x => flatMap(g, f(x)), m)`
 
 These laws ensure predictable and composable behavior.

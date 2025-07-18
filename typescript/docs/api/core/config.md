@@ -1,23 +1,63 @@
 # Configuration API Reference
 
-The Configuration module provides robust configuration management with validation, multiple sources, and type safety.
+The Configuration module provides robust configuration management with validation, multiple sources, and type safety using Zod schemas and fluent API patterns.
+
+## Type Definitions
+
+```typescript
+type ConfigData = Record<string, unknown>
+
+type ConfigSource = 'object' | 'json' | 'yaml' | 'toml' | 'env'
+
+interface ConfigOptions {
+  source: ConfigSource
+  envPrefix?: string
+  validate?: boolean
+  schema?: ZodSchema<unknown>
+}
+
+interface ConfigError extends QiError {
+  readonly category: 'CONFIGURATION'
+  readonly context: {
+    readonly source?: ConfigSource
+    readonly path?: string
+    readonly schema?: string
+  }
+}
+```
 
 ## Core Classes
 
 ### ConfigBuilder
 
-Fluent API for building configuration from multiple sources.
+Fluent API for building configuration from multiple sources with static factory methods.
 
 ```typescript
 class ConfigBuilder {
-  static create(): ConfigBuilder
-  fromObject(data: Record<string, unknown>): ConfigBuilder
-  fromJsonFile(path: string): ConfigBuilder
-  fromYamlFile(path: string): ConfigBuilder
-  fromTomlFile(path: string): ConfigBuilder
-  fromEnv(prefix?: string): ConfigBuilder
-  validate<T>(schema: z.ZodSchema<T>): ConfigBuilder
+  // Static factory methods
+  static fromObject(data: ConfigData): ConfigBuilder
+  static fromJsonFile(path: string): Promise<Result<ConfigBuilder, ConfigError>>
+  static fromYamlFile(path: string): Promise<Result<ConfigBuilder, ConfigError>>
+  static fromTomlFile(path: string): Promise<Result<ConfigBuilder, ConfigError>>
+  static fromEnv(prefix?: string): ConfigBuilder
+  
+  // Instance methods for building
+  merge(other: ConfigBuilder): ConfigBuilder
+  mergeObject(data: ConfigData): ConfigBuilder
+  set(path: string, value: unknown): ConfigBuilder
+  validateWith<T>(schema: ZodSchema<T>): ConfigBuilder
+  transform<T>(fn: (data: ConfigData) => T): ConfigBuilder
+  filter(predicate: (key: string, value: unknown) => boolean): ConfigBuilder
+  validateWithSchemaFile(schemaPath: string): ConfigBuilder
+  
+  // Build methods
   build(): Result<Config, ConfigError>
+  buildValidated(): Result<ValidatedConfig, ConfigError>
+  buildUnsafe(): Config
+  
+  // Inspection methods
+  getData(): ConfigData
+  getSources(): ConfigSource[]
 }
 ```
 
@@ -27,42 +67,62 @@ Immutable configuration container with type-safe access.
 
 ```typescript
 class Config {
-  get<T>(key: string, defaultValue?: T): T
-  has(key: string): boolean
-  keys(): string[]
-  toObject(): Record<string, unknown>
+  get<T>(path: string): Result<T, ConfigError>
+  getOr<T>(path: string, defaultValue: T): T
+  has(path: string): boolean
+  getAll(): ConfigData
+  isValidated(): boolean
+  toObject(): ConfigData
+  toJson(): string
   merge(other: Config): Config
-  subset(prefix: string): Config
+  
+  // Additional methods
+  getSources(): ConfigSource[]
+  getSchema(): ZodSchema<unknown> | undefined
+  toBuilder(): ConfigBuilder
 }
 ```
 
-## Type Definitions
+### ValidatedConfig
+
+Type-safe configuration container that wraps Config with validated data access.
 
 ```typescript
-type ConfigData = Record<string, unknown>
-
-interface ConfigSource {
-  type: 'object' | 'file' | 'env'
-  data: ConfigData
-  metadata?: Record<string, unknown>
+class ValidatedConfig {
+  // Access methods with type safety
+  get<T>(path: string): T
+  getOptional<T>(path: string): T | undefined
+  getOr<T>(path: string, defaultValue: T): T
+  has(path: string): boolean
+  
+  // Data access
+  getAll(): ConfigData
+  getSources(): ConfigSource[]
+  getSchema(): ZodSchema<unknown> | undefined
+  
+  // Conversion methods
+  toConfig(): Config
+  merge(other: ValidatedConfig): ValidatedConfig
+  toJson(): string
+  toObject(): ConfigData
 }
+```
 
-interface ConfigOptions {
-  envPrefix?: string
-  fileEncoding?: string
-  strict?: boolean
-}
+### ConfigAccessError
 
-interface ConfigError extends QiError {
-  category: 'CONFIGURATION'
+Specialized error for configuration access failures.
+
+```typescript
+class ConfigAccessError extends Error {
+  readonly path: string
 }
 ```
 
 ## Factory Functions
 
-### fromObject(data: Record<string, unknown>): Result<Config, ConfigError>
+### fromObject(data: ConfigData): Config
 
-Creates configuration from an object.
+Creates configuration directly from an object.
 
 ```typescript
 const config = fromObject({
@@ -77,40 +137,39 @@ const config = fromObject({
 })
 ```
 
-### fromJsonFile(path: string): Result<Config, ConfigError>
+### fromJsonFile(path: string): Promise<Result<Config, ConfigError>>
 
 Creates configuration from a JSON file.
 
 ```typescript
-const config = fromJsonFile('./config.json')
+const configResult = await fromJsonFile('./config.json')
+if (configResult.tag === 'success') {
+  const config = configResult.value
+}
 ```
 
-### fromYamlFile(path: string): Result<Config, ConfigError>
+### fromYamlFile(path: string): Promise<Result<Config, ConfigError>>
 
 Creates configuration from a YAML file.
 
 ```typescript
-const config = fromYamlFile('./config.yaml')
+const configResult = await fromYamlFile('./config.yaml')
 ```
 
-### fromTomlFile(path: string): Result<Config, ConfigError>
+### fromTomlFile(path: string): Promise<Result<Config, ConfigError>>
 
 Creates configuration from a TOML file.
 
 ```typescript
-const config = fromTomlFile('./config.toml')
+const configResult = await fromTomlFile('./config.toml')
 ```
 
-### fromEnv(prefix?: string): Result<Config, ConfigError>
+### fromEnv(prefix?: string): Config
 
 Creates configuration from environment variables.
 
 ```typescript
-// Load all environment variables
-const config = fromEnv()
-
-// Load with prefix (e.g., APP_PORT becomes port)
-const config = fromEnv('APP_')
+const config = fromEnv('APP') // Uses APP_ prefixed env vars
 ```
 
 ### empty(): Config
@@ -121,410 +180,352 @@ Creates an empty configuration.
 const config = empty()
 ```
 
-## Validation
+### ConfigBuilder.getData(): ConfigData
 
-### validateConfig<T>(config: Config, schema: z.ZodSchema<T>): Result<T, ConfigError>
-
-Validates configuration against a Zod schema.
+Returns the current configuration data for inspection.
 
 ```typescript
-import { z } from 'zod'
-
-const AppConfigSchema = z.object({
-  app: z.object({
-    name: z.string(),
-    port: z.number().min(1).max(65535),
-    debug: z.boolean().default(false)
-  }),
-  database: z.object({
-    host: z.string(),
-    port: z.number(),
-    name: z.string()
-  })
-})
-
-const validated = validateConfig(config, AppConfigSchema)
+const builder = ConfigBuilder.fromObject({ app: { name: 'test' } })
+const currentData = builder.getData() // { app: { name: 'test' } }
 ```
 
-### safeParseConfig<T>(config: Config, schema: z.ZodSchema<T>): Result<T, ConfigError>
+### ConfigBuilder.getSources(): ConfigSource[]
 
-Safely parses configuration with detailed error messages.
+Returns the list of configuration sources used to build this configuration.
 
 ```typescript
-const result = safeParseConfig(config, AppConfigSchema)
-if (result.tag === 'failure') {
-  console.log('Validation errors:', result.error.context?.errors)
+const builder = ConfigBuilder
+  .fromObject({ default: true })
+  .merge(ConfigBuilder.fromEnv('APP'))
+const sources = builder.getSources() // ['object', 'env']
+```
+
+### Config.getSources(): ConfigSource[]
+
+Returns the configuration sources used to build this configuration.
+
+```typescript
+const config = fromObject({ app: { name: 'test' } })
+const sources = config.getSources() // ['object']
+```
+
+### Config.getSchema(): ZodSchema<unknown> | undefined
+
+Returns the validation schema if present.
+
+```typescript
+const config = ConfigBuilder
+  .fromObject({ app: { name: 'test' } })
+  .validateWith(AppConfigSchema)
+  .buildUnsafe()
+const schema = config.getSchema() // Returns the AppConfigSchema
+```
+
+### Config.toBuilder(): ConfigBuilder
+
+Converts the Config back to a ConfigBuilder for further modification.
+
+```typescript
+const config = fromObject({ app: { name: 'test' } })
+const builder = config.toBuilder()
+const modified = builder
+  .set('app.version', '1.0.0')
+  .build()
+```
+
+## Utility Functions
+
+### configError(message: string, context?: ConfigError['context']): ConfigError
+
+Creates a configuration-specific error.
+
+```typescript
+const error = configError('Invalid configuration', {
+  source: 'json',
+  path: './config.json'
+})
+```
+
+### validateConfig<T>(config: Config, schema: ZodSchema<T>): Result<T, ConfigError>
+
+Validates a configuration against a Zod schema.
+
+```typescript
+const UserConfigSchema = z.object({
+  name: z.string(),
+  email: z.string().email()
+})
+
+const result = validateConfig(config, UserConfigSchema)
+if (result.tag === 'success') {
+  const userData = result.value // Direct type-safe access
 }
 ```
 
-## Built-in Schemas
+### safeParseConfig<T>(data: ConfigData, schema: ZodSchema<T>): Result<T, ConfigError>
+
+Safely parses configuration data against a schema.
+
+```typescript
+const result = safeParseConfig(configData, UserConfigSchema)
+```
+
+## Predefined Schemas
 
 ### AppConfigSchema
 
-Common application configuration schema.
+Pre-defined schema for common application configuration.
 
 ```typescript
 const AppConfigSchema = z.object({
   app: z.object({
     name: z.string(),
-    port: z.number().default(3000),
-    debug: z.boolean().default(false),
-    environment: z.enum(['development', 'production', 'test']).default('development')
-  })
-})
-
-type AppConfig = z.infer<typeof AppConfigSchema>
-```
-
-## Error Handling
-
-### configError(message: string, context?: Record<string, unknown>): ConfigError
-
-Creates a configuration error.
-
-```typescript
-const error = configError('Configuration validation failed', {
-  schema: 'AppConfig',
-  errors: validationErrors
+    version: z.string(),
+    environment: z.enum(['development', 'production', 'test']).default('development'),
+    port: z.coerce.number().default(3000),
+    host: z.string().default('localhost'),
+  }),
+  database: z.object({
+    host: z.string(),
+    port: z.coerce.number().default(5432),
+    name: z.string(),
+    user: z.string(),
+    password: z.string(),
+  }).optional(),
+  redis: z.object({
+    host: z.string().default('localhost'),
+    port: z.coerce.number().default(6379),
+    password: z.string().optional(),
+  }).optional(),
+  logging: z.object({
+    level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+    pretty: z.coerce.boolean().default(false),
+  }).optional(),
 })
 ```
 
 ## Usage Examples
 
-### Basic Configuration
+### Basic Configuration Loading
 
 ```typescript
-import { ConfigBuilder } from '@qi/qicore-foundation'
+import { ConfigBuilder, fromObject, validateConfig } from '@qi/qicore-foundation/core'
+import { z } from 'zod'
 
-const configResult = ConfigBuilder.create()
-  .fromJsonFile('./config.json')
-  .fromEnv('APP_')
+// Static method approach
+const config = ConfigBuilder
+  .fromObject({ port: 3000, host: 'localhost' })
+  .merge(ConfigBuilder.fromEnv('APP'))
   .build()
 
-if (configResult.tag === 'success') {
-  const config = configResult.value
-  
-  const port = config.get('app.port', 3000)
-  const dbHost = config.get('database.host')
-  
-  console.log(`Starting app on port ${port}`)
+if (config.tag === 'success') {
+  const portResult = config.value.get<number>('port')
+  if (portResult.tag === 'success') {
+    console.log('Port:', portResult.value)
+  }
 }
 ```
 
-### Configuration with Validation
+### Multi-Source Configuration
 
 ```typescript
-import { ConfigBuilder, validateConfig } from '@qi/qicore-foundation'
-import { z } from 'zod'
+// Load from multiple sources
+const builder = ConfigBuilder
+  .fromObject({ 
+    defaults: { timeout: 5000 } 
+  })
+  .mergeObject({
+    app: { name: 'MyApp' }
+  })
 
+// Add environment variables
+const envBuilder = ConfigBuilder.fromEnv('APP')
+const combined = builder.merge(envBuilder)
+
+const config = combined.build()
+```
+
+### Schema Validation
+
+```typescript
 const ConfigSchema = z.object({
-  server: z.object({
-    port: z.number().min(1).max(65535),
-    host: z.string().default('localhost')
+  app: z.object({
+    name: z.string(),
+    port: z.number().min(1000).max(65535)
   }),
   database: z.object({
-    url: z.string().url(),
-    maxConnections: z.number().default(10)
+    host: z.string(),
+    port: z.number()
   })
 })
 
-const configResult = ConfigBuilder.create()
-  .fromYamlFile('./config.yaml')
-  .fromEnv()
-  .validate(ConfigSchema)
-  .build()
-
-if (configResult.tag === 'success') {
-  const config = configResult.value
-  // config is now typed according to ConfigSchema
-}
-```
-
-### Multiple Sources with Precedence
-
-```typescript
-// Later sources override earlier ones
-const config = ConfigBuilder.create()
-  .fromJsonFile('./config.json')        // Base configuration
-  .fromYamlFile('./config.local.yaml')  // Local overrides
-  .fromEnv('APP_')                      // Environment overrides
-  .build()
-```
-
-### Environment-Specific Configuration
-
-```typescript
-const environment = process.env.NODE_ENV || 'development'
-
-const config = ConfigBuilder.create()
+// Build with validation
+const configResult = ConfigBuilder
   .fromJsonFile('./config.json')
-  .fromJsonFile(`./config.${environment}.json`)
-  .fromEnv()
+  .then(result => {
+    if (result.tag === 'success') {
+      return result.value
+        .validateWith(ConfigSchema)
+        .buildValidated()
+    }
+    return result
+  })
+```
+
+### Configuration Merging and Transformation
+
+```typescript
+// Advanced builder operations
+const config = ConfigBuilder
+  .fromObject({ base: { value: 1 } })
+  .set('app.name', 'MyApp')
+  .filter((key, value) => !key.startsWith('temp'))
+  .transform(data => ({
+    ...data,
+    computed: { timestamp: Date.now() }
+  }))
   .build()
 ```
 
-### Configuration Subsets
+### File-Based Configuration
 
 ```typescript
-const config = configResult.value
-const dbConfig = config.subset('database')
+// JSON configuration
+const jsonConfig = await ConfigBuilder.fromJsonFile('./config.json')
 
-// Access nested values without prefix
-const host = dbConfig.get('host')
-const port = dbConfig.get('port')
-```
+// YAML configuration  
+const yamlConfig = await ConfigBuilder.fromYamlFile('./config.yaml')
 
-### Merging Configurations
+// TOML configuration
+const tomlConfig = await ConfigBuilder.fromTomlFile('./config.toml')
 
-```typescript
-const baseConfig = fromObject({ a: 1, b: 2 })
-const overrideConfig = fromObject({ b: 3, c: 4 })
-
-const merged = baseConfig.merge(overrideConfig)
-// Result: { a: 1, b: 3, c: 4 }
-```
-
-## Advanced Patterns
-
-### Service Configuration
-
-```typescript
-class DatabaseService {
-  private config: DatabaseConfig
-
-  constructor(config: Config) {
-    const dbConfigResult = validateConfig(config.subset('database'), DatabaseSchema)
-    
-    if (dbConfigResult.tag === 'failure') {
-      throw new Error('Invalid database configuration')
-    }
-    
-    this.config = dbConfigResult.value
-  }
-
-  async connect(): Promise<Connection> {
-    return createConnection({
-      host: this.config.host,
-      port: this.config.port,
-      database: this.config.name
-    })
-  }
-}
-```
-
-### Configuration Watching
-
-```typescript
-import { watch } from 'fs'
-
-class ConfigWatcher {
-  private config: Config
-  private callbacks: Array<(config: Config) => void> = []
-
-  constructor(private configPath: string) {
-    this.loadConfig()
-    this.watchFile()
-  }
-
-  private loadConfig() {
-    const result = ConfigBuilder.create()
-      .fromJsonFile(this.configPath)
-      .fromEnv()
-      .build()
-
-    if (result.tag === 'success') {
-      this.config = result.value
-      this.callbacks.forEach(callback => callback(this.config))
-    }
-  }
-
-  private watchFile() {
-    watch(this.configPath, () => {
-      this.loadConfig()
-    })
-  }
-
-  onChange(callback: (config: Config) => void) {
-    this.callbacks.push(callback)
-  }
-}
-```
-
-### Configuration Providers
-
-```typescript
-interface ConfigProvider {
-  load(): Promise<Result<ConfigData, ConfigError>>
-  watch?(callback: (data: ConfigData) => void): void
-}
-
-class RemoteConfigProvider implements ConfigProvider {
-  constructor(private endpoint: string) {}
-
-  async load(): Promise<Result<ConfigData, ConfigError>> {
-    try {
-      const response = await fetch(this.endpoint)
-      const data = await response.json()
-      return Ok(data)
-    } catch (error) {
-      return Err(configError('Failed to load remote config', { endpoint: this.endpoint }))
-    }
-  }
-}
-
-// Usage
-const provider = new RemoteConfigProvider('https://config.example.com/app')
-const remoteData = await provider.load()
-
-if (remoteData.tag === 'success') {
-  const config = ConfigBuilder.create()
-    .fromObject(remoteData.value)
-    .fromEnv()
+// Combine different formats
+if (jsonConfig.tag === 'success' && yamlConfig.tag === 'success') {
+  const combined = jsonConfig.value
+    .merge(yamlConfig.value)
     .build()
 }
-```
-
-## File Format Examples
-
-### JSON Configuration
-
-```json
-{
-  "app": {
-    "name": "MyApp",
-    "port": 3000,
-    "debug": false
-  },
-  "database": {
-    "host": "localhost",
-    "port": 5432,
-    "name": "myapp"
-  },
-  "redis": {
-    "host": "localhost",
-    "port": 6379
-  }
-}
-```
-
-### YAML Configuration
-
-```yaml
-app:
-  name: MyApp
-  port: 3000
-  debug: false
-
-database:
-  host: localhost
-  port: 5432
-  name: myapp
-
-redis:
-  host: localhost
-  port: 6379
-```
-
-### TOML Configuration
-
-```toml
-[app]
-name = "MyApp"
-port = 3000
-debug = false
-
-[database]
-host = "localhost"
-port = 5432
-name = "myapp"
-
-[redis]
-host = "localhost"
-port = 6379
-```
-
-### Environment Variables
-
-```bash
-# With APP_ prefix
-APP_APP_NAME=MyApp
-APP_APP_PORT=3000
-APP_APP_DEBUG=false
-APP_DATABASE_HOST=localhost
-APP_DATABASE_PORT=5432
-APP_DATABASE_NAME=myapp
-```
-
-## Type Safety
-
-### Schema Definition
-
-```typescript
-import { z } from 'zod'
-
-const ServerConfigSchema = z.object({
-  port: z.number().min(1).max(65535),
-  host: z.string().default('localhost'),
-  ssl: z.object({
-    enabled: z.boolean().default(false),
-    cert: z.string().optional(),
-    key: z.string().optional()
-  }).optional()
-})
-
-type ServerConfig = z.infer<typeof ServerConfigSchema>
 ```
 
 ### Type-Safe Configuration Access
 
 ```typescript
-const config = validateConfig(rawConfig, ServerConfigSchema)
+interface AppConfig {
+  server: {
+    port: number
+    host: string
+  }
+  database: {
+    url: string
+  }
+}
 
-if (config.tag === 'success') {
-  // TypeScript knows the exact type
-  const port: number = config.value.port
-  const host: string = config.value.host
-  const sslEnabled: boolean = config.value.ssl?.enabled ?? false
+const AppSchema: z.ZodSchema<AppConfig> = z.object({
+  server: z.object({
+    port: z.number(),
+    host: z.string()
+  }),
+  database: z.object({
+    url: z.string()
+  })
+})
+
+const configResult = await ConfigBuilder.fromJsonFile('./app.json')
+if (configResult.tag === 'success') {
+  const validatedConfigResult = configResult.value
+    .validateWith(AppSchema)
+    .buildValidated()
+  
+  if (validatedConfigResult.tag === 'success') {
+    const validatedConfig = validatedConfigResult.value
+    const serverPort = validatedConfig.get<number>('server.port')
+    const serverHost = validatedConfig.get<string>('server.host')
+    console.log(`Server: ${serverHost}:${serverPort}`)
+  }
+}
+```
+
+### Error Handling
+
+```typescript
+import { match } from '@qi/qicore-foundation/base'
+
+const configResult = await ConfigBuilder.fromJsonFile('./config.json')
+
+match(
+  (builder) => {
+    const config = builder.build()
+    match(
+      (cfg) => console.log('Config loaded successfully'),
+      (error) => console.error('Config build failed:', error.message),
+      config
+    )
+  },
+  (error) => console.error('Config file load failed:', error.message),
+  configResult
+)
+```
+
+### Environment-Specific Configuration
+
+```typescript
+// Load base config and override with environment-specific settings
+const baseConfig = ConfigBuilder.fromObject({
+  app: { name: 'MyApp', debug: false }
+})
+
+const envConfig = ConfigBuilder.fromEnv('APP')
+
+// Environment file overlay
+const envFile = process.env.NODE_ENV || 'development'
+const envFileConfig = await ConfigBuilder.fromJsonFile(`./config.${envFile}.json`)
+
+if (envFileConfig.tag === 'success') {
+  const config = baseConfig
+    .merge(envFileConfig.value)
+    .merge(envConfig)
+    .build()
 }
 ```
 
 ## Best Practices
 
-1. **Use multiple sources**: Combine files, environment variables, and defaults
-2. **Validate early**: Use schemas to catch configuration errors early
-3. **Provide defaults**: Use schema defaults for optional values
-4. **Use environment-specific configs**: Separate configs for different environments
-5. **Keep secrets separate**: Don't store secrets in configuration files
-6. **Document schemas**: Use Zod's describe() for self-documenting schemas
-7. **Use subsets**: Create focused configuration objects for services
+1. **Use static factory methods**: ConfigBuilder methods are static
+2. **Validate early**: Use schema validation for type safety
+3. **Merge strategically**: Later configurations override earlier ones
+4. **Handle errors properly**: Use Result<T> pattern for error handling
+5. **Environment separation**: Use different config files per environment
+6. **Type safety**: Use TypeScript interfaces with Zod schemas
+7. **Default values**: Use getOr() for safe access with defaults
+8. **Immutable operations**: All operations return new instances
 
 ## Performance Considerations
 
-- Configuration objects are immutable and can be safely shared
-- File loading is synchronous and should be done at startup
-- Environment variable parsing is cached
-- Validation is performed once during configuration building
-- Configuration merging creates new objects without mutating originals
+- Configuration loading is I/O bound for file operations
+- In-memory merging and transformation are fast
+- Schema validation adds minimal overhead
+- Use buildUnsafe() only when certain about data validity
+- Cache validated configurations to avoid re-validation
 
-## Error Handling
+## Integration with Result<T>
 
-Configuration errors include detailed context about what went wrong:
+All potentially failing operations return Result<T> for consistent error handling:
 
 ```typescript
-const result = ConfigBuilder.create()
-  .fromJsonFile('./missing-file.json')
-  .build()
+import { flatMap, map } from '@qi/base'
 
-if (result.tag === 'failure') {
-  console.log(result.error.code)     // 'CONFIG_FILE_NOT_FOUND'
-  console.log(result.error.message)  // 'Configuration file not found'
-  console.log(result.error.context)  // { path: './missing-file.json' }
+const processConfig = async (path: string) => {
+  const configResult = await ConfigBuilder.fromJsonFile(path)
+  
+  return flatMap(
+    (builder) => {
+      const config = builder.build()
+      return map(
+        (cfg) => cfg.get<string>('app.name'),
+        config
+      )
+    },
+    configResult
+  )
 }
 ```
-
-Common error categories:
-- File not found
-- Parse errors (invalid JSON/YAML/TOML)
-- Validation errors
-- Environment variable parsing errors
-- Schema validation failures
