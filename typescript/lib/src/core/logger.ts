@@ -16,8 +16,9 @@ import pino, { type Logger as PinoLogger, type LoggerOptions } from 'pino'
 
 /**
  * Log levels in order of severity
+ * Contract: DEBUG < INFO < WARN < ERROR < FATAL
  */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
 
 /**
  * Log entry structure
@@ -172,6 +173,14 @@ export class Logger {
   }
 
   /**
+   * Log fatal message (using pino.fatal)
+   * Contract: Log fatal-level message for critical system failures
+   */
+  fatal(message: string, error?: Error, context?: LoggerContext): void {
+    this.log('fatal', message, { ...context, error })
+  }
+
+  /**
    * Check if log level is enabled (using pino level checking)
    */
   isLevelEnabled(level: LogLevel): boolean {
@@ -288,7 +297,7 @@ export class Logger {
 export const createLogger = (config: LoggerConfig): Result<Logger, LoggerError> => {
   try {
     // Validate log level
-    const validLevels: LogLevel[] = ['debug', 'info', 'warn', 'error']
+    const validLevels: LogLevel[] = ['debug', 'info', 'warn', 'error', 'fatal']
     if (!validLevels.includes(config.level)) {
       return failure(
         loggerError(`Invalid log level: ${config.level}`, {
@@ -410,7 +419,7 @@ export const developmentConfig: LoggerConfig = {
  * Production logger configuration (optimized pino settings)
  */
 export const productionConfig: LoggerConfig = {
-  level: 'info',
+  level: 'warn',
   name: 'qicore-prod',
   pretty: false,
   redact: ['password', 'token', 'secret', 'key', 'authorization'],
@@ -421,7 +430,7 @@ export const productionConfig: LoggerConfig = {
  * Test logger configuration (minimal output)
  */
 export const testConfig: LoggerConfig = {
-  level: 'error',
+  level: 'fatal',
   name: 'qicore-test',
   pretty: false,
 }

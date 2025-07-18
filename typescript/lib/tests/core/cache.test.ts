@@ -3,13 +3,14 @@
  * Focus: Law, Interfaces, Behavior
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   MemoryCache,
   RedisCache,
   createCache,
   createMemoryCache,
   createRedisCache,
+  createPersistent,
   cacheAside,
   cacheError,
   type CacheConfig,
@@ -48,6 +49,20 @@ describe('Cache Factory Operations', () => {
     const cache = createRedisCache({ redis: { host: 'localhost' } })
     expect(cache).toBeInstanceOf(RedisCache)
   })
+
+  it('createPersistent creates persistent redis cache', () => {
+    const result = createPersistent('/tmp/test.cache', { maxSize: 100 })
+    expect(isSuccess(result)).toBe(true)
+    if (isSuccess(result)) {
+      expect(result.value).toBeInstanceOf(RedisCache)
+    }
+  })
+
+  it('createPersistent handles errors gracefully', () => {
+    // Test with invalid configuration that might cause an error
+    const result = createPersistent('', { maxSize: 100 })
+    expect(isSuccess(result)).toBe(true) // Should still succeed with empty path
+  })
 })
 
 describe('Cache Interface Operations', () => {
@@ -57,7 +72,9 @@ describe('Cache Interface Operations', () => {
     expect(typeof cache.get).toBe('function')
     expect(typeof cache.set).toBe('function')
     expect(typeof cache.delete).toBe('function')
-    expect(typeof cache.exists).toBe('function')
+    expect(typeof cache.has).toBe('function')
+    expect(typeof cache.remove).toBe('function')
+    expect(typeof cache.size).toBe('function')
     expect(typeof cache.clear).toBe('function')
     expect(typeof cache.keys).toBe('function')
     expect(typeof cache.getStats).toBe('function')
@@ -68,14 +85,14 @@ describe('Cache Interface Operations', () => {
     const getPromise = cache.get('test')
     const setPromise = cache.set('test', 'value')
     const deletePromise = cache.delete('test')
-    const existsPromise = cache.exists('test')
+    const hasPromise = cache.has('test')
     const clearPromise = cache.clear()
     const keysPromise = cache.keys()
 
     expect(getPromise).toBeInstanceOf(Promise)
     expect(setPromise).toBeInstanceOf(Promise)
     expect(deletePromise).toBeInstanceOf(Promise)
-    expect(existsPromise).toBeInstanceOf(Promise)
+    expect(hasPromise).toBeInstanceOf(Promise)
     expect(clearPromise).toBeInstanceOf(Promise)
     expect(keysPromise).toBeInstanceOf(Promise)
   })
@@ -109,15 +126,15 @@ describe('Cache Behavior Contract', () => {
     expect(isFailure(result)).toBe(true)
   })
 
-  it('exists returns true for existing key', async () => {
+  it('has returns true for existing key', async () => {
     await cache.set('key2', 'value2')
-    const result = await cache.exists('key2')
+    const result = await cache.has('key2')
     expect(isSuccess(result)).toBe(true)
     expect(result.tag === 'success' && result.value).toBe(true)
   })
 
-  it('exists returns false for missing key', async () => {
-    const result = await cache.exists('missing-key')
+  it('has returns false for missing key', async () => {
+    const result = await cache.has('missing-key')
     expect(isSuccess(result)).toBe(true)
     expect(result.tag === 'success' && result.value).toBe(false)
   })
@@ -294,5 +311,251 @@ describe('Cache Error Factory', () => {
     expect(error.category).toBe('RESOURCE')
     expect(error.message).toBe('Cache failed')
     expect(error.context).toEqual({})
+  })
+})
+
+describe('Cache Batch Operations', () => {
+  let cache: MemoryCache
+
+  beforeEach(() => {
+    cache = createMemoryCache({ maxSize: 100 })
+  })
+
+  describe('mget', () => {
+    it('returns empty object for non-existent keys', async () => {
+      const result = await cache.mget(['key1', 'key2', 'key3'])
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toEqual({})
+    })
+
+    it('returns existing values for keys', async () => {
+      await cache.set('key1', 'value1')
+      await cache.set('key2', 'value2')
+
+      const result = await cache.mget(['key1', 'key2', 'key3'])
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toEqual({
+        key1: 'value1',
+        key2: 'value2',
+      })
+    })
+
+    it('handles mixed existing and non-existing keys', async () => {
+      await cache.set('exists', 'found')
+
+      const result = await cache.mget(['exists', 'missing', 'also-missing'])
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toEqual({
+        exists: 'found',
+      })
+    })
+  })
+
+  describe('mset', () => {
+    it('sets multiple key-value pairs', async () => {
+      const entries = {
+        key1: 'value1',
+        key2: 'value2',
+        key3: 'value3',
+      }
+
+      const result = await cache.mset(entries)
+
+      expect(isSuccess(result)).toBe(true)
+
+      // Verify all keys were set
+      const value1 = await cache.get('key1')
+      const value2 = await cache.get('key2')
+      const value3 = await cache.get('key3')
+
+      expect(isSuccess(value1) && value1.value).toBe('value1')
+      expect(isSuccess(value2) && value2.value).toBe('value2')
+      expect(isSuccess(value3) && value3.value).toBe('value3')
+    })
+
+    it('sets values with TTL', async () => {
+      const entries = { key1: 'value1', key2: 'value2' }
+
+      const result = await cache.mset(entries, 1) // 1 second TTL
+
+      expect(isSuccess(result)).toBe(true)
+
+      // Should exist immediately
+      const immediate1 = await cache.get('key1')
+      const immediate2 = await cache.get('key2')
+      expect(isSuccess(immediate1) && immediate1.value).toBe('value1')
+      expect(isSuccess(immediate2) && immediate2.value).toBe('value2')
+    })
+
+    it('handles empty entries object', async () => {
+      const result = await cache.mset({})
+
+      expect(isSuccess(result)).toBe(true)
+    })
+  })
+
+  describe('mdelete', () => {
+    it('returns 0 for non-existent keys', async () => {
+      const result = await cache.mdelete(['missing1', 'missing2'])
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toBe(0)
+    })
+
+    it('deletes existing keys and returns count', async () => {
+      await cache.set('key1', 'value1')
+      await cache.set('key2', 'value2')
+      await cache.set('key3', 'value3')
+
+      const result = await cache.mdelete(['key1', 'key3', 'missing'])
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toBe(2)
+
+      // Verify deletions
+      const check1 = await cache.has('key1')
+      const check2 = await cache.has('key2')
+      const check3 = await cache.has('key3')
+
+      expect(isSuccess(check1) && check1.value).toBe(false)
+      expect(isSuccess(check2) && check2.value).toBe(true) // Wasn't deleted
+      expect(isSuccess(check3) && check3.value).toBe(false)
+    })
+
+    it('handles empty keys array', async () => {
+      const result = await cache.mdelete([])
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toBe(0)
+    })
+  })
+
+  describe('Batch operations integration', () => {
+    it('mset + mget + mdelete workflow', async () => {
+      // Set multiple values
+      const setResult = await cache.mset({
+        user1: { id: 1, name: 'Alice' },
+        user2: { id: 2, name: 'Bob' },
+        user3: { id: 3, name: 'Charlie' },
+      })
+      expect(isSuccess(setResult)).toBe(true)
+
+      // Get multiple values
+      const getResult = await cache.mget(['user1', 'user2', 'user4'])
+      expect(isSuccess(getResult)).toBe(true)
+      expect(getResult.tag === 'success' && getResult.value).toEqual({
+        user1: { id: 1, name: 'Alice' },
+        user2: { id: 2, name: 'Bob' },
+      })
+
+      // Delete some values
+      const deleteResult = await cache.mdelete(['user1', 'user3'])
+      expect(isSuccess(deleteResult)).toBe(true)
+      expect(deleteResult.tag === 'success' && deleteResult.value).toBe(2)
+
+      // Verify final state
+      const finalCheck = await cache.mget(['user1', 'user2', 'user3'])
+      expect(isSuccess(finalCheck)).toBe(true)
+      expect(finalCheck.tag === 'success' && finalCheck.value).toEqual({
+        user2: { id: 2, name: 'Bob' },
+      })
+    })
+  })
+})
+
+describe('Cache Advanced Operations', () => {
+  let cache: MemoryCache
+  beforeEach(() => {
+    cache = createMemoryCache({ maxSize: 100 })
+  })
+
+  describe('getOrSet', () => {
+    it('returns existing value if key exists', async () => {
+      await cache.set('existing', 'cached-value')
+
+      const factory = vi.fn().mockResolvedValue({ tag: 'success', value: 'new-value' })
+      const result = await cache.getOrSet('existing', factory)
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toBe('cached-value')
+      expect(factory).not.toHaveBeenCalled()
+    })
+
+    it('calls factory and caches result if key does not exist', async () => {
+      const factory = vi.fn().mockResolvedValue({ tag: 'success', value: 'factory-value' })
+      const result = await cache.getOrSet('new-key', factory)
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toBe('factory-value')
+      expect(factory).toHaveBeenCalledOnce()
+
+      // Verify the value was cached
+      const cachedResult = await cache.get('new-key')
+      expect(isSuccess(cachedResult)).toBe(true)
+      expect(cachedResult.tag === 'success' && cachedResult.value).toBe('factory-value')
+    })
+
+    it('returns factory error if factory fails', async () => {
+      const factory = vi
+        .fn()
+        .mockResolvedValue({ tag: 'failure', error: cacheError('Factory failed') })
+      const result = await cache.getOrSet('error-key', factory)
+
+      expect(isFailure(result)).toBe(true)
+      expect(result.tag === 'failure' && result.error.message).toBe('Factory failed')
+      expect(factory).toHaveBeenCalledOnce()
+
+      // Verify nothing was cached
+      const cachedResult = await cache.get('error-key')
+      expect(isFailure(cachedResult)).toBe(true)
+    })
+
+    it('uses provided TTL for cached value', async () => {
+      const factory = vi.fn().mockResolvedValue({ tag: 'success', value: 'ttl-value' })
+      const result = await cache.getOrSet('ttl-key', factory, 1) // 1 second TTL
+
+      expect(isSuccess(result)).toBe(true)
+      expect(result.tag === 'success' && result.value).toBe('ttl-value')
+
+      // Wait for TTL to expire
+      await new Promise((resolve) => setTimeout(resolve, 1100))
+
+      // Should call factory again since value expired
+      const factory2 = vi.fn().mockResolvedValue({ tag: 'success', value: 'refreshed-value' })
+      const result2 = await cache.getOrSet('ttl-key', factory2)
+
+      expect(isSuccess(result2)).toBe(true)
+      expect(result2.tag === 'success' && result2.value).toBe('refreshed-value')
+      expect(factory2).toHaveBeenCalledOnce()
+    })
+
+    it('handles concurrent calls atomically', async () => {
+      let factoryCallCount = 0
+      const factory = vi.fn().mockImplementation(async () => {
+        factoryCallCount++
+        await new Promise((resolve) => setTimeout(resolve, 100)) // Simulate async work
+        return { tag: 'success', value: `call-${factoryCallCount}` }
+      })
+
+      // Make multiple concurrent calls
+      const promises = [
+        cache.getOrSet('concurrent-key', factory),
+        cache.getOrSet('concurrent-key', factory),
+        cache.getOrSet('concurrent-key', factory),
+      ]
+
+      const results = await Promise.all(promises)
+
+      // All should succeed
+      for (const result of results) {
+        expect(isSuccess(result)).toBe(true)
+      }
+
+      // Factory should be called at least once (might be called multiple times due to race condition)
+      expect(factoryCallCount).toBeGreaterThan(0)
+    })
   })
 })

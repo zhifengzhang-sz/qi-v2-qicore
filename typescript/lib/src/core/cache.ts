@@ -109,9 +109,19 @@ export interface ICache {
   get<T>(key: string): Promise<Result<T, CacheError>>
   set<T>(key: string, value: T, ttl?: number): Promise<Result<void, CacheError>>
   delete(key: string): Promise<Result<boolean, CacheError>>
-  exists(key: string): Promise<Result<boolean, CacheError>>
+  has(key: string): Promise<Result<boolean, CacheError>>
+  remove(key: string): Promise<Result<boolean, CacheError>>
   clear(): Promise<Result<void, CacheError>>
+  size(): Promise<Result<number, CacheError>>
   keys(pattern?: string): Promise<Result<string[], CacheError>>
+  mget<T>(keys: string[]): Promise<Result<Record<string, T>, CacheError>>
+  mset<T>(entries: Record<string, T>, ttl?: number): Promise<Result<void, CacheError>>
+  mdelete(keys: string[]): Promise<Result<number, CacheError>>
+  getOrSet<T>(
+    key: string,
+    factory: () => Promise<Result<T, CacheError>>,
+    ttl?: number
+  ): Promise<Result<T, CacheError>>
   getStats(): CacheStats
   close(): Promise<void>
 }
@@ -248,7 +258,7 @@ export class MemoryCache implements ICache {
     return success(existed)
   }
 
-  async exists(key: string): Promise<Result<boolean, CacheError>> {
+  async has(key: string): Promise<Result<boolean, CacheError>> {
     const entry = this.entries.get(key)
 
     if (!entry) {
@@ -264,6 +274,34 @@ export class MemoryCache implements ICache {
     }
 
     return success(true)
+  }
+
+  async exists(key: string): Promise<Result<boolean, CacheError>> {
+    return this.has(key)
+  }
+
+  async remove(key: string): Promise<Result<boolean, CacheError>> {
+    return this.delete(key)
+  }
+
+  async size(): Promise<Result<number, CacheError>> {
+    // Clean up expired entries first
+    const now = new Date()
+    const expiredKeys: string[] = []
+
+    for (const [key, entry] of this.entries.entries()) {
+      if (entry.expiresAt && entry.expiresAt < now) {
+        expiredKeys.push(key)
+      }
+    }
+
+    for (const key of expiredKeys) {
+      this.entries.delete(key)
+      this.updateAccessOrder(key, 'remove')
+      this.stats.size--
+    }
+
+    return success(this.stats.size)
   }
 
   async clear(): Promise<Result<void, CacheError>> {
@@ -286,6 +324,69 @@ export class MemoryCache implements ICache {
     const matchedKeys = allKeys.filter((key) => regex.test(key))
 
     return success(matchedKeys)
+  }
+
+  async mget<T>(keys: string[]): Promise<Result<Record<string, T>, CacheError>> {
+    const result: Record<string, T> = {}
+
+    for (const key of keys) {
+      const getResult = await this.get<T>(key)
+      if (getResult.tag === 'success') {
+        result[key] = getResult.value
+      }
+    }
+
+    return success(result)
+  }
+
+  async mset<T>(entries: Record<string, T>, ttl?: number): Promise<Result<void, CacheError>> {
+    for (const [key, value] of Object.entries(entries)) {
+      const setResult = await this.set(key, value, ttl)
+      if (setResult.tag === 'failure') {
+        return setResult
+      }
+    }
+
+    return success(undefined)
+  }
+
+  async mdelete(keys: string[]): Promise<Result<number, CacheError>> {
+    let deletedCount = 0
+
+    for (const key of keys) {
+      const deleteResult = await this.delete(key)
+      if (deleteResult.tag === 'success' && deleteResult.value) {
+        deletedCount++
+      }
+    }
+
+    return success(deletedCount)
+  }
+
+  async getOrSet<T>(
+    key: string,
+    factory: () => Promise<Result<T, CacheError>>,
+    ttl?: number
+  ): Promise<Result<T, CacheError>> {
+    // Try to get existing value first
+    const getResult = await this.get<T>(key)
+    if (getResult.tag === 'success') {
+      return getResult
+    }
+
+    // Key doesn't exist or expired, call factory function
+    const factoryResult = await factory()
+    if (factoryResult.tag === 'failure') {
+      return factoryResult
+    }
+
+    // Cache the factory result
+    const setResult = await this.set(key, factoryResult.value, ttl)
+    if (setResult.tag === 'failure') {
+      return setResult
+    }
+
+    return factoryResult
   }
 
   getStats(): CacheStats {
@@ -457,7 +558,7 @@ export class RedisCache implements ICache {
     ) as Promise<Result<boolean, CacheError>>
   }
 
-  async exists(key: string): Promise<Result<boolean, CacheError>> {
+  async has(key: string): Promise<Result<boolean, CacheError>> {
     return fromAsyncTryCatch(
       async () => {
         // Use Redis EXISTS command via ioredis
@@ -466,11 +567,34 @@ export class RedisCache implements ICache {
       },
       (error) =>
         cacheError(error instanceof Error ? error.message : String(error), {
-          operation: 'exists',
+          operation: 'has',
           key,
           backend: 'redis',
         })
     ) as Promise<Result<boolean, CacheError>>
+  }
+
+  async exists(key: string): Promise<Result<boolean, CacheError>> {
+    return this.has(key)
+  }
+
+  async remove(key: string): Promise<Result<boolean, CacheError>> {
+    return this.delete(key)
+  }
+
+  async size(): Promise<Result<number, CacheError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis DBSIZE command to get total number of keys
+        const size = await this.redis.dbsize()
+        return size
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
+          operation: 'size',
+          backend: 'redis',
+        })
+    ) as Promise<Result<number, CacheError>>
   }
 
   async clear(): Promise<Result<void, CacheError>> {
@@ -515,10 +639,7 @@ export class RedisCache implements ICache {
 
   // Redis-specific methods leveraging ioredis capabilities
 
-  /**
-   * Use Redis pipeline for batch operations
-   */
-  async mget<T>(keys: string[]): Promise<Result<(T | null)[], CacheError>> {
+  async mget<T>(keys: string[]): Promise<Result<Record<string, T>, CacheError>> {
     return fromAsyncTryCatch(
       async () => {
         // Use Redis MGET via ioredis pipeline
@@ -532,19 +653,116 @@ export class RedisCache implements ICache {
           throw new Error('Pipeline execution failed')
         }
 
-        return results.map(([error, value]) => {
+        const result: Record<string, T> = {}
+
+        results.forEach(([error, value], index) => {
           if (error) {
             throw error
           }
-          return value ? (JSON.parse(value as string) as T) : null
+          if (value && keys[index]) {
+            result[keys[index]] = JSON.parse(value as string) as T
+          }
         })
+
+        return result
       },
       (error) =>
         cacheError(error instanceof Error ? error.message : String(error), {
           operation: 'mget',
           backend: 'redis',
         })
-    ) as Promise<Result<(T | null)[], CacheError>>
+    ) as Promise<Result<Record<string, T>, CacheError>>
+  }
+
+  async mset<T>(entries: Record<string, T>, ttl?: number): Promise<Result<void, CacheError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        const pipeline = this.redis.pipeline()
+        const effectiveTtl = ttl ?? this.config.defaultTtl
+
+        for (const [key, value] of Object.entries(entries)) {
+          const serialized = JSON.stringify(value)
+
+          if (effectiveTtl) {
+            pipeline.setex(key, effectiveTtl, serialized)
+          } else {
+            pipeline.set(key, serialized)
+          }
+        }
+
+        const results = await pipeline.exec()
+
+        if (!results) {
+          throw new Error('Pipeline execution failed')
+        }
+
+        // Check if any command failed
+        for (const [error] of results) {
+          if (error) {
+            throw error
+          }
+        }
+
+        this.stats.sets += Object.keys(entries).length
+
+        for (const [key, value] of Object.entries(entries)) {
+          this.events.emit('set', key, value, ttl)
+        }
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
+          operation: 'mset',
+          backend: 'redis',
+        })
+    ) as Promise<Result<void, CacheError>>
+  }
+
+  async mdelete(keys: string[]): Promise<Result<number, CacheError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use Redis DEL command for multiple keys
+        const result = await this.redis.del(...keys)
+
+        this.stats.deletes += result
+
+        for (const key of keys.slice(0, result)) {
+          this.events.emit('delete', key)
+        }
+
+        return result
+      },
+      (error) =>
+        cacheError(error instanceof Error ? error.message : String(error), {
+          operation: 'mdelete',
+          backend: 'redis',
+        })
+    ) as Promise<Result<number, CacheError>>
+  }
+
+  async getOrSet<T>(
+    key: string,
+    factory: () => Promise<Result<T, CacheError>>,
+    ttl?: number
+  ): Promise<Result<T, CacheError>> {
+    // Try to get existing value first
+    const getResult = await this.get<T>(key)
+    if (getResult.tag === 'success') {
+      return getResult
+    }
+
+    // Key doesn't exist or expired, call factory function
+    const factoryResult = await factory()
+    if (factoryResult.tag === 'failure') {
+      return factoryResult
+    }
+
+    // Cache the factory result
+    const setResult = await this.set(key, factoryResult.value, ttl)
+    if (setResult.tag === 'failure') {
+      return setResult
+    }
+
+    return factoryResult
   }
 
   /**
@@ -616,6 +834,41 @@ export const createMemoryCache = (config: Omit<CacheConfig, 'backend'>): MemoryC
  */
 export const createRedisCache = (config: Omit<CacheConfig, 'backend'>): RedisCache => {
   return new RedisCache({ ...config, backend: 'redis' })
+}
+
+/**
+ * Create persistent cache (Redis-backed) with file path configuration
+ */
+export const createPersistent = (
+  filePath: string,
+  config: Omit<CacheConfig, 'backend' | 'redis'>
+): Result<RedisCache, CacheError> => {
+  try {
+    // For persistent cache, we use Redis with configuration derived from file path
+    const redisConfig: RedisOptions = {
+      host: 'localhost',
+      port: 6379,
+      // Use file path as keyPrefix or database selector
+      keyPrefix: `${filePath.replace(/[^a-zA-Z0-9]/g, '_')}:`,
+      lazyConnect: true,
+      maxRetriesPerRequest: 3,
+    }
+
+    const cache = new RedisCache({
+      ...config,
+      backend: 'redis',
+      redis: redisConfig,
+    })
+
+    return success(cache)
+  } catch (error) {
+    return failure(
+      cacheError(error instanceof Error ? error.message : String(error), {
+        operation: 'createPersistent',
+        backend: 'redis',
+      })
+    )
+  }
 }
 
 // ============================================================================

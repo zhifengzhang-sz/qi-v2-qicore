@@ -67,12 +67,10 @@ Track cache effectiveness:
 ```typescript
 // Get performance statistics
 const stats = cache.getStats()
-console.log(`Hit rate: ${(stats.hitRate * 100).toFixed(2)}%`)
+const hitRate = stats.hits / (stats.hits + stats.misses) * 100
+console.log(`Hit rate: ${hitRate.toFixed(2)}%`)
 console.log(`Total operations: ${stats.hits + stats.misses}`)
 console.log(`Cache size: ${stats.size}`)
-
-// Reset statistics for new measurement period
-cache.resetStats()
 ```
 
 ```typescript
@@ -152,7 +150,7 @@ match(
 )
 
 // Check if key exists
-const exists = await cache.has('user:123')
+const exists = await cache.exists('user:123')
 
 // Delete key
 await cache.delete('user:123')
@@ -269,12 +267,10 @@ await cache.get('key3')  // miss
 
 // Get performance statistics
 const stats = cache.getStats()
-console.log(`Hit rate: ${(stats.hitRate * 100).toFixed(2)}%`)
+const hitRate = stats.hits / (stats.hits + stats.misses) * 100
+console.log(`Hit rate: ${hitRate.toFixed(2)}%`)
 console.log(`Total operations: ${stats.hits + stats.misses}`)
 console.log(`Cache size: ${stats.size}`)
-
-// Reset statistics
-cache.resetStats()
 ```
 
 ## Real Example
@@ -409,7 +405,7 @@ async function startApplication(cache: ICache, logger: Logger) {
   setInterval(() => {
     const stats = cache.getStats()
     logger.info('Cache performance', undefined, {
-      hitRate: stats.hitRate,
+      hitRate: stats.hits / (stats.hits + stats.misses),
       hits: stats.hits,
       misses: stats.misses,
       size: stats.size
@@ -460,7 +456,7 @@ Cache works seamlessly with Config and Logger:
 const cache = createCache({
   backend: config.get('cache.backend'),
   maxSize: config.get('cache.maxSize'),
-  redis: config.has('redis') ? {
+  redis: config.get('redis.host') ? {
     host: config.get('redis.host'),
     port: config.get('redis.port')
   } : undefined

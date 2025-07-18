@@ -91,68 +91,66 @@ const code = createErrorCode('USER', 'FETCH', 'NOT_FOUND')
 // Returns: 'USER_FETCH_NOT_FOUND'
 ```
 
-## Error Builder
+## Factory Functions
 
-### QiErrorBuilder
+### create(code: string, message: string, category: ErrorCategory, context?: Record<string, unknown>): QiError
 
-Fluent API for building complex errors.
+Creates a QiError with full control over all properties.
 
 ```typescript
-class QiErrorBuilder {
-  code(code: string): QiErrorBuilder
-  message(message: string): QiErrorBuilder
-  category(category: ErrorCategory): QiErrorBuilder
-  context(context: Record<string, unknown>): QiErrorBuilder
-  cause(cause: QiError): QiErrorBuilder
-  build(): QiError
-}
+const error = create(
+  'DATABASE_ERROR',
+  'Database connection failed', 
+  'SYSTEM',
+  { host: 'localhost', port: 5432 }
+)
 ```
 
-### errorBuilder(): QiErrorBuilder
+### createError(options: ErrorOptions): QiError
 
-Creates a new error builder instance.
+Creates a QiError from an options object.
 
 ```typescript
-const error = errorBuilder()
-  .code('DATABASE_ERROR')
-  .message('Database connection failed')
-  .category('SYSTEM')
-  .context({ host: 'localhost', port: 5432 })
-  .build()
+const error = createError({
+  code: 'DATABASE_ERROR',
+  message: 'Database connection failed',
+  category: 'SYSTEM',
+  context: { host: 'localhost', port: 5432 }
+})
 ```
 
 ## Convenience Functions
 
-### validationError(code: string, message: string, context?: Record<string, unknown>): QiError
+### validationError(message: string, context?: Record<string, unknown>): QiError
 
 Creates a validation error.
 
 ```typescript
-const error = validationError('INVALID_EMAIL', 'Email format is invalid')
+const error = validationError('Email format is invalid', { field: 'email' })
 ```
 
-### networkError(code: string, message: string, context?: Record<string, unknown>): QiError
+### networkError(message: string, context?: Record<string, unknown>): QiError
 
 Creates a network error.
 
 ```typescript
-const error = networkError('CONNECTION_FAILED', 'Network connection failed')
+const error = networkError('Network connection failed', { host: 'api.example.com' })
 ```
 
-### systemError(code: string, message: string, context?: Record<string, unknown>): QiError
+### systemError(message: string, context?: Record<string, unknown>): QiError
 
 Creates a system error.
 
 ```typescript
-const error = systemError('OUT_OF_MEMORY', 'Insufficient memory')
+const error = systemError('Insufficient memory', { available: '1GB', required: '2GB' })
 ```
 
-### businessError(code: string, message: string, context?: Record<string, unknown>): QiError
+### businessError(message: string, context?: Record<string, unknown>): QiError
 
 Creates a business logic error.
 
 ```typescript
-const error = businessError('INSUFFICIENT_FUNDS', 'Account balance too low')
+const error = businessError('Account balance too low', { balance: 100, required: 250 })
 ```
 
 ### authenticationError(code: string, message: string, context?: Record<string, unknown>): QiError
@@ -373,22 +371,22 @@ console.log(apiError.cause?.code) // 'USER_SAVE_FAILED'
 console.log(apiError.cause?.cause?.code) // 'CONNECTION_FAILED'
 ```
 
-### Builder Pattern
+### Complex Error Creation
 
 ```typescript
-import { errorBuilder } from '@qi/qicore-foundation/base'
+import { create } from '@qi/qicore-foundation/base'
 
-const error = errorBuilder()
-  .code('COMPLEX_ERROR')
-  .message('A complex error occurred')
-  .category('SYSTEM')
-  .context({
+const error = create(
+  'COMPLEX_ERROR',
+  'A complex error occurred',
+  'SYSTEM',
+  {
     operation: 'processData',
     input: { type: 'user', id: 123 },
-    metadata: { timestamp: Date.now() }
-  })
-  .cause(previousError)
-  .build()
+    metadata: { timestamp: Date.now() },
+    cause: previousError
+  }
+)
 ```
 
 ### Error Handling in Services

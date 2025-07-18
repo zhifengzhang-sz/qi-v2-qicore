@@ -275,8 +275,51 @@ const config = ConfigBuilder
 **Key Decisions**:
 - Cache operations return Result<T> for consistency
 - Manual expiration checks (no background timers)
-- Persistent cache uses simple JSON file storage
+- Redis-backed cache for production scalability  
 - LRU through access time tracking
+- Async-first interface for Redis compatibility
+
+**Contract Adaptations**:
+- **Method Names**: Implements contract-specified names (`has`, `remove`, `size`)
+- **Signature Adaptation**: All methods return `Promise<Result<T>>` vs contract's pure functions
+- **Async Necessity**: Redis operations require async interface
+- **Batch Operations**: Added `mget`, `mset`, `mdelete` for performance
+- **Result Wrapping**: Consistent error handling across all operations
+
+## TypeScript-Specific Implementation Patterns
+
+### Contract Compliance vs Platform Adaptation
+
+The TypeScript implementation balances **mathematical contract compliance** with **platform-specific requirements**:
+
+#### Pure Contract Specifications
+```yaml
+# Language-agnostic contracts specify:
+has: "Key → Cache → Boolean"           # Pure, synchronous
+remove: "Key → Cache → Boolean"        # Pure, synchronous  
+size: "Cache → Integer"                # Pure, synchronous
+```
+
+#### TypeScript Implementation
+```typescript
+// Platform-adapted signatures:
+has(key: string): Promise<Result<boolean, CacheError>>     // Async, wrapped
+remove(key: string): Promise<Result<boolean, CacheError>>  // Async, wrapped
+size(): Promise<Result<number, CacheError>>                // Async, wrapped
+```
+
+#### Rationale for Adaptations
+1. **Redis Requirement**: Production caching requires Redis, which is inherently async
+2. **Interface Consistency**: All cache methods use same `Promise<Result<T>>` pattern
+3. **Error Handling**: Consistent Result<T> wrapping across all operations
+4. **Type Safety**: TypeScript async/await patterns with compile-time error visibility
+
+### Cache Interface
+See [Cache Implementation Guide](guides/cache.md) for complete interface details including:
+- Core contract methods (get, set, has, remove, size, clear)
+- TypeScript extensions (delete, exists, keys, batch operations)
+- Redis-specific methods (ttl, expire)
+- Management functions (getStats, close)
 
 ## Type System Strategy
 
@@ -319,9 +362,8 @@ const config = ConfigBuilder
 - Use structural sharing for nested configs
 
 ### Cache Implementation
-- No background timers (check on access)
-- Bounded memory through maxSize
-- LRU eviction through simple timestamp
+- See [Cache Implementation Guide](guides/cache.md) for details
+- O(1) operations, bounded memory, LRU eviction
 
 ### Logger Performance
 - Level check before message formatting

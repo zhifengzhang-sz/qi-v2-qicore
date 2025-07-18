@@ -9,24 +9,22 @@ The Cache module provides high-performance caching with memory and Redis backend
 Common interface for all cache implementations.
 
 ```typescript
-interface ICache<T = unknown> {
-  get(key: string): Promise<Result<T, CacheError>>
-  set(key: string, value: T, ttl?: number): Promise<Result<void, CacheError>>
+interface ICache {
+  get<T>(key: string): Promise<Result<T, CacheError>>
+  set<T>(key: string, value: T, ttl?: number): Promise<Result<void, CacheError>>
   delete(key: string): Promise<Result<boolean, CacheError>>
-  has(key: string): Promise<Result<boolean, CacheError>>
+  exists(key: string): Promise<Result<boolean, CacheError>>
   clear(): Promise<Result<void, CacheError>>
-  size(): Promise<Result<number, CacheError>>
-  keys(): Promise<Result<string[], CacheError>>
+  keys(pattern?: string): Promise<Result<string[], CacheError>>
   
   // Batch operations
-  mget(keys: string[]): Promise<Result<Record<string, T>, CacheError>>
-  mset(entries: Record<string, T>, ttl?: number): Promise<Result<void, CacheError>>
+  mget<T>(keys: string[]): Promise<Result<Record<string, T>, CacheError>>
+  mset<T>(entries: Record<string, T>, ttl?: number): Promise<Result<void, CacheError>>
   mdelete(keys: string[]): Promise<Result<number, CacheError>>
   
   // Statistics and management
   getStats(): CacheStats
-  resetStats(): void
-  close?(): Promise<Result<void, CacheError>>
+  close(): Promise<void>
 }
 ```
 
@@ -94,13 +92,13 @@ interface CacheConfig {
 }
 
 interface CacheStats {
-  hits: number
-  misses: number
-  sets: number
-  deletes: number
-  size: number
-  hitRate: number
-  uptime: number
+  readonly hits: number
+  readonly misses: number
+  readonly sets: number
+  readonly deletes: number
+  readonly evictions: number
+  readonly size: number
+  readonly maxSize?: number
 }
 
 interface CacheEvents {
@@ -226,7 +224,7 @@ if (cacheResult.tag === 'success') {
   }
   
   // Check if key exists
-  const exists = await cache.has('user:123')
+  const exists = await cache.exists('user:123')
   
   // Delete key
   await cache.delete('user:123')
@@ -337,12 +335,13 @@ await cache.get('key3') // miss
 
 // Get performance statistics
 const stats = cache.getStats()
-console.log(`Hit rate: ${(stats.hitRate * 100).toFixed(2)}%`)
+const hitRate = stats.hits / (stats.hits + stats.misses) * 100
+console.log(`Hit rate: ${hitRate.toFixed(2)}%`)
 console.log(`Total operations: ${stats.hits + stats.misses}`)
 console.log(`Cache size: ${stats.size}`)
-
-// Reset statistics
-cache.resetStats()
+console.log(`Total sets: ${stats.sets}`)
+console.log(`Total deletes: ${stats.deletes}`)
+console.log(`Total evictions: ${stats.evictions}`)
 ```
 
 ### Advanced Redis Configuration

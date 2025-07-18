@@ -79,6 +79,7 @@ export {
   createCache,
   createMemoryCache,
   createRedisCache,
+  createPersistent,
   // Utilities
   cacheAside,
   // Error factory

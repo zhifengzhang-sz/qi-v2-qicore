@@ -86,7 +86,7 @@ describe('Redis Cache Integration', () => {
     const existsKey = `${testKey}-exists`
 
     // Should not exist initially
-    const notExistsResult = await cache.exists(existsKey)
+    const notExistsResult = await cache.has(existsKey)
     expect(isSuccess(notExistsResult)).toBe(true)
     if (notExistsResult.tag === 'success') {
       expect(notExistsResult.value).toBe(false)
@@ -96,7 +96,7 @@ describe('Redis Cache Integration', () => {
     await cache.set(existsKey, testValue)
 
     // Should exist now
-    const existsResult = await cache.exists(existsKey)
+    const existsResult = await cache.has(existsKey)
     expect(isSuccess(existsResult)).toBe(true)
     if (existsResult.tag === 'success') {
       expect(existsResult.value).toBe(true)
