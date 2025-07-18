@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Pre-commit hook for API documentation validation
+# Install with: git config core.hooksPath .githooks
+
+set -e
+
+echo "🔍 Running API documentation validation..."
+
+cd typescript
+
+# Run API validation
+if ! bun run validate-api; then
+    echo ""
+    echo "❌ API Documentation validation failed!"
+    echo "🔍 API documentation is not consistent with implementation."
+    echo "📋 Check the validation reports in typescript/docs/api/reports/"
+    echo "🛠️  Fix the issues or update API documentation to maintain 100% consistency."
+    echo "🚫 Breaking API changes require explicit version bump (api-ts-v-2.0)."
+    echo ""
+    echo "💡 To bypass this check (not recommended): git commit --no-verify"
+    exit 1
+fi
+
+echo "✅ API documentation validation passed!"
