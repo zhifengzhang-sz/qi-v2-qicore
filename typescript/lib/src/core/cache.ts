@@ -13,7 +13,7 @@ import {
   failure,
   create as createError,
   fromAsyncTryCatch,
-} from '@qi/base'
+} from '../base/index.js'
 import { EventEmitter } from 'eventemitter3'
 import { Redis, type RedisOptions } from 'ioredis'
 

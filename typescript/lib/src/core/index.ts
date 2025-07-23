@@ -87,4 +87,4 @@ export {
 } from './cache.js'
 
 // Re-export base types for convenience
-export type { Result, QiError } from '@qi/base'
+export type { Result, QiError } from '../base/index.js'

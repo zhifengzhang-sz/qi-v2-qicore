@@ -7,7 +7,9 @@ export default defineConfig({
     core: 'lib/src/core/index.ts',
   },
   format: ['cjs', 'esm'],
-  dts: true,
+  dts: {
+    resolve: true,
+  },
   sourcemap: true,
   clean: true,
   splitting: false,
@@ -15,4 +17,5 @@ export default defineConfig({
   target: 'es2023',
   outDir: 'dist',
   external: [],
+  tsconfig: './tsconfig.build.json',
 })

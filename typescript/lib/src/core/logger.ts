@@ -6,7 +6,13 @@
  * high-performance event system. Max-Min principle: 70% pino package, 30% custom wrapper.
  */
 
-import { type Result, type QiError, success, failure, create as createError } from '@qi/base'
+import {
+  type Result,
+  type QiError,
+  success,
+  failure,
+  create as createError,
+} from '../base/index.js'
 import { EventEmitter } from 'eventemitter3'
 import pino, { type Logger as PinoLogger, type LoggerOptions } from 'pino'
 
@@ -252,7 +258,7 @@ export class Logger {
         return
       }
 
-      // Merge child context with provided context
+      // Merge child context with provided context for event emission
       const mergedContext = { ...this.childContext, ...context }
 
       // Create log entry for events
@@ -266,13 +272,16 @@ export class Logger {
         spanId: mergedContext?.spanId as string,
       }
 
-      // Use pino's appropriate logging method
+      // Use pino's logging - pino.child() already has context merged, so only pass additional context
       if (context?.error) {
-        // Use pino's error object handling
+        // Use pino's error object handling with just the additional context
+        this.pino[level](context, message)
+      } else if (context) {
+        // Use pino's context logging with just the additional context
         this.pino[level](context, message)
       } else {
-        // Use pino's context logging
-        this.pino[level](mergedContext, message)
+        // Use pino's simple message logging (child context already applied)
+        this.pino[level](message)
       }
 
       // Emit custom event (30% custom logic)

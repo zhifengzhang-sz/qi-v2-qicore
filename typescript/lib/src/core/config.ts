@@ -9,7 +9,13 @@
 
 import { readFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
-import { type Result, type QiError, success, failure, create as createError } from '@qi/base'
+import {
+  type Result,
+  type QiError,
+  success,
+  failure,
+  create as createError,
+} from '../base/index.js'
 import { config as loadEnv } from 'dotenv'
 import { parse as parseToml } from 'smol-toml'
 import { parse as parseYaml } from 'yaml'
