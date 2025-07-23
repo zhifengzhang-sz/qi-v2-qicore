@@ -1,6 +1,6 @@
 {
   "name": "@qi",
-  "version": "ts-1.0.0",
+  "version": "ts-1.1.0",
   "description": "QiCore Foundation - TypeScript implementation of mathematical foundation types (qi/base) and infrastructure services (qi/core)",
   "type": "module",
   "main": "./dist/index.cjs",
