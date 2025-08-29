@@ -4,12 +4,13 @@ Complete API reference for QiCore Foundation TypeScript implementation.
 
 ## Table of Contents
 
-### Base Module (`@qi/qicore-foundation/base`)
+### Base Module (`@qi/base`)
 - [Complete Base API](./base.md) - All Result<T> and QiError functions
 - [Result<T>](./base/result.md) - Functional error handling type
 - [QiError](./base/error.md) - Structured error management
+- [Async Helpers](./base/async.md) - Promise<Result<T>> composition utilities
 
-### Core Module (`@qi/qicore-foundation`)
+### Core Module (`@qi/core`)
 - [Configuration](./core/config.md) - Multi-source configuration management
 - [Logger](./core/logger.md) - Structured logging with Result<T> integration
 - [Cache](./core/cache.md) - Memory and Redis caching strategies
@@ -22,12 +23,20 @@ Complete API reference for QiCore Foundation TypeScript implementation.
 // Import base types
 import { 
   success, failure, Ok, Err, type Result, type QiError,
-  map, flatMap, match, unwrapOr
-} from '@qi/qicore-foundation/base'
+  map, flatMap, match, unwrapOr,
+  // Async helpers for Promise<Result<T>> composition
+  flatMapAsync, mapAsync, matchAsync, sequenceAsync
+} from '@qi/base'
 
 // Basic usage
 const result: Result<number> = success(42)
 const mapped = map(x => x * 2, result)
+
+// Async usage
+const asyncResult = await flatMapAsync(
+  async data => success(await processData(data)),
+  dataResult
+)
 ```
 
 ### Core Module
@@ -36,7 +45,7 @@ const mapped = map(x => x * 2, result)
 // Import core services
 import { 
   createLogger, createCache, ConfigBuilder 
-} from '@qi/qicore-foundation'
+} from '@qi/core'
 
 // Basic usage
 const loggerResult = createLogger({ level: 'info' })
@@ -70,15 +79,16 @@ const configResult = ConfigBuilder.fromEnv().build()
 
 ### Base Module Structure
 ```
-@qi/qicore-foundation/base
+@qi/base
 ├── Result<T>           # Core Result type and operations
 ├── QiError             # Structured error handling
+├── Async Helpers       # Promise<Result<T>> composition utilities
 └── Utilities           # Helper functions and type guards
 ```
 
 ### Core Module Structure
 ```
-@qi/qicore-foundation
+@qi/core
 ├── Config              # Configuration management
 ├── Logger              # Structured logging
 ├── Cache               # Caching strategies

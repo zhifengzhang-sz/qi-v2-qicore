@@ -10,7 +10,7 @@
 // ============================================================================
 
 // Type exports
-export type { Result, Success, Failure } from './result.js'
+export type { Result, Success, Failure } from './result'
 
 // Factory operations
 export {
@@ -20,10 +20,10 @@ export {
   fromAsyncTryCatch,
   fromMaybe,
   fromEither,
-} from './result.js'
+} from './result'
 
 // Aliases for compatibility
-export { fromTryCatch as tryCatch } from './result.js'
+export { fromTryCatch as tryCatch } from './result'
 
 // Query operations
 export {
@@ -31,7 +31,7 @@ export {
   isFailure,
   getValue,
   getError,
-} from './result.js'
+} from './result'
 
 // Transformation operations
 export {
@@ -44,14 +44,14 @@ export {
   collect,
   filter,
   orElse,
-} from './result.js'
+} from './result'
 
 // Extraction operations
 export {
   unwrap,
   unwrapOr,
   match,
-} from './result.js'
+} from './result'
 
 // ============================================================================
 // QiError Exports
@@ -63,13 +63,13 @@ export type {
   ErrorCategory,
   ErrorOptions,
   RetryStrategy,
-} from './error.js'
+} from './error'
 
 // Constants
 export {
   ErrorCategories,
   isErrorCategory,
-} from './error.js'
+} from './error'
 
 // Factory operations
 export {
@@ -77,20 +77,20 @@ export {
   createError,
   fromException,
   fromString,
-} from './error.js'
+} from './error'
 
 // Query operations
 export {
   errorToString,
   getCategory,
   toStructuredData,
-} from './error.js'
+} from './error'
 
 // Transformation operations
-export { withContext } from './error.js'
+export { withContext } from './error'
 
 // Utility operations
-export { getRetryStrategy } from './error.js'
+export { getRetryStrategy } from './error'
 
 // Convenience factories
 export {
@@ -105,7 +105,7 @@ export {
   resourceError,
   concurrencyError,
   loggerError,
-} from './error.js'
+} from './error'
 
 // ============================================================================
 // Async Result Helpers
@@ -116,27 +116,27 @@ export {
   flatMapAsync,
   mapAsync,
   matchAsync,
-} from './async.js'
+} from './async'
 
 // Promise<Result<T>> composition operations
 export {
   flatMapPromise,
   mapPromise,
   matchPromise,
-} from './async.js'
+} from './async'
 
 // Async collection operations
 export {
   sequenceAsync,
   collectAsync,
-} from './async.js'
+} from './async'
 
 // Type guards and utilities
-export { isPromiseResult } from './async.js'
+export { isPromiseResult } from './async'
 
 // ============================================================================
 // Common Aliases for Ergonomics
 // ============================================================================
 
 // Rust-style naming aliases
-export { success as Ok, failure as Err } from './result.js'
+export { success as Ok, failure as Err } from './result'

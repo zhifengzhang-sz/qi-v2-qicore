@@ -1,9 +1,7 @@
 {
-  "name": "@qi/workspace",
+  "name": "@qi/core",
   "version": "2.0.0",
-  "private": true,
-  "workspaces": ["packages/*", "app/*"],
-  "description": "QiCore Foundation - TypeScript implementation of mathematical foundation types (qi/base) and infrastructure services (qi/core)",
+  "description": "QiCore Foundation Core - Infrastructure services (Config, Logger, Cache) with Result<T> integration",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -13,74 +11,43 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./base": {
-      "types": "./dist/base.d.ts",
-      "import": "./dist/base.js",
-      "require": "./dist/base.cjs"
-    },
-    "./core": {
-      "types": "./dist/core.d.ts",
-      "import": "./dist/core.js",
-      "require": "./dist/core.cjs"
-    }
-  },
-  "imports": {
-    "#qi/base": "./dist/base.js",
-    "#qi/core": "./dist/core.js"
-  },
-  "typesVersions": {
-    "*": {
-      "base": ["./dist/base.d.ts"],
-      "core": ["./dist/core.d.ts"]
     }
   },
   "scripts": {
     "dev": "bun tsup --watch",
     "build": "bun tsup",
-    "build:watch": "bun tsup --watch",
     "test": "bun vitest run",
     "test:watch": "bun vitest",
     "test:coverage": "bun vitest run --coverage",
-    "test:properties": "bun vitest run --config vitest.properties.config.ts",
-    "biome": "biome",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
     "typecheck": "tsc --noEmit --pretty",
-    "validate-api": "claude '/validate-api-docs'",
     "clean": "bun rimraf dist",
     "check": "bun run typecheck && bun run format:check && bun run lint && bun run test",
-    "prepublishOnly": "bun run clean && bun run check && bun run build",
-    "docs": "bun typedoc lib/src/index.ts --out docs/api"
+    "prepublishOnly": "bun run clean && bun run check && bun run build"
   },
   "keywords": [
     "qicore",
     "foundation",
-    "result",
-    "error-handling",
-    "monad",
-    "functor",
-    "functional-programming",
-    "typescript",
-    "mathematical-types",
     "configuration",
     "logger",
     "cache",
-    "infrastructure"
+    "infrastructure",
+    "typescript"
   ],
   "author": "Qi Platform",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/qi-platform/qi-v2-qicore.git",
-    "directory": "typescript"
+    "directory": "typescript/packages/core"
   },
   "bugs": {
     "url": "https://github.com/qi-platform/qi-v2-qicore/issues"
   },
-  "homepage": "https://github.com/qi-platform/qi-v2-qicore/tree/main/typescript",
-  "files": ["dist", "docs/typescript.impl.proposal.md"],
+  "homepage": "https://github.com/qi-platform/qi-v2-qicore/tree/main/typescript/packages/core",
+  "files": ["dist"],
   "engines": {
     "node": ">=18.0.0",
     "bun": ">=1.0.0"
@@ -93,6 +60,7 @@
     "url": "https://github.com/sponsors/qi-platform"
   },
   "dependencies": {
+    "@qi/base": "workspace:*",
     "dotenv": "^16.6.1",
     "eventemitter3": "^5.0.1",
     "ioredis": "^5.6.1",
@@ -103,21 +71,17 @@
     "yaml": "^2.8.0",
     "zod": "^4.0.0",
     "zod-config": "^1.2.0",
-    "zod-from-json-schema": "^0.4.2"
+    "zod-from-json-schema": "^0.5.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@fast-check/vitest": "^0.2.2",
     "@types/node": "^20.19.8",
     "@types/pino": "^7.0.5",
     "@vitest/coverage-v8": "^1.6.1",
     "bun-types": "^1.2.18",
-    "fast-check": "^3.23.2",
     "rimraf": "^5.0.10",
     "tsup": "^8.5.0",
-    "typedoc": "^0.25.13",
     "typescript": "^5.8.3",
-    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^1.6.1"
   }
 }

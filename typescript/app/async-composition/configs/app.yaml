@@ -1,0 +1,21 @@
+app:
+  name: "Async Composition Demo"
+  version: "1.0.0"
+  environment: "development"
+
+api:
+  baseUrl: "https://jsonplaceholder.typicode.com"
+  timeout: 5000
+  retries: 3
+
+database:
+  url: "postgresql://user:pass@localhost/demo"
+  poolSize: 10
+  
+processing:
+  batchSize: 5
+  maxConcurrency: 3
+  
+logging:
+  level: "info"
+  pretty: true

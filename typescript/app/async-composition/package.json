@@ -1,21 +1,17 @@
 {
-  "name": "config-example",
+  "name": "async-composition-example",
   "version": "1.0.0",
-  "description": "Comprehensive configuration management example using QiCore Foundation",
+  "description": "Async Result<T> composition patterns for QiCore Foundation",
   "type": "module",
   "scripts": {
-    "dev": "NODE_ENV=development tsx src/index.ts",
-    "start": "NODE_ENV=production tsx src/index.ts",
-    "watch": "tsx watch src/index.ts",
+    "dev": "tsx src/index.ts",
     "build": "tsc",
     "test": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@qi/base": "workspace:*",
-    "@qi/core": "workspace:*",
-    "zod-from-json-schema": "^0.5.0",
-    "zod": "^3.25.76"
+    "@qi/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.19.8",

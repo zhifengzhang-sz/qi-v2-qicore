@@ -8,7 +8,8 @@
     "start": "bun run src/index.ts"
   },
   "dependencies": {
-    "@qi/qicore-foundation": "workspace:*"
+    "@qi/base": "workspace:*",
+    "@qi/core": "workspace:*"
   },
   "devDependencies": {
     "bun-types": "latest"

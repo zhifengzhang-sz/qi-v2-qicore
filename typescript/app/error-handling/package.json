@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@qi/qicore-foundation": "workspace:*"
+    "@qi/base": "workspace:*",
+    "@qi/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.19.8",
