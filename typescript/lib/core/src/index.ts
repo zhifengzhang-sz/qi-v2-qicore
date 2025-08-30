@@ -86,5 +86,5 @@ export {
   cacheError,
 } from './cache.js'
 
-// Re-export base types for convenience
-export type { Result, QiError } from '@qi/base'
+// Note: Result and QiError are available from @qi/base
+// They are not re-exported here to avoid naming conflicts when both modules are imported

@@ -29,8 +29,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@qi/base': new URL('./lib/src/base/index.ts', import.meta.url).pathname,
-      '@qi/core': new URL('./lib/src/core/index.ts', import.meta.url).pathname,
+      '@qi/base': new URL('./lib/base/src/index.ts', import.meta.url).pathname,
+      '@qi/core': new URL('./lib/core/src/index.ts', import.meta.url).pathname,
     },
   },
 })

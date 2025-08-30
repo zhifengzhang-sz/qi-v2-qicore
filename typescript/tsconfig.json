@@ -22,12 +22,12 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@qi/base": ["./lib/src/base/index.ts"],
-      "@qi/base/*": ["./lib/src/base/*"],
-      "@qi/core": ["./lib/src/core/index.ts"],
-      "@qi/core/*": ["./lib/src/core/*"]
+      "@qi/base": ["./lib/base/src/index.ts"],
+      "@qi/base/*": ["./lib/base/src/*"],
+      "@qi/core": ["./lib/core/src/index.ts"],
+      "@qi/core/*": ["./lib/core/src/*"]
     }
   },
-  "include": ["lib/src/**/*", "lib/tests/**/*", "app/**/*"],
+  "include": ["lib/base/src/**/*", "lib/core/src/**/*", "lib/tests/**/*", "app/**/*"],
   "exclude": ["node_modules", "dist"]
 }

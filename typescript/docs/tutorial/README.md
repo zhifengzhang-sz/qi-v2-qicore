@@ -23,6 +23,11 @@ QiCore provides these as a unified system where each tool uses the same Result<T
 
 ## Tutorial Structure
 
+### 0. [Project Setup](./setup.md) 
+**Start here:** How to configure package.json, tsconfig.json, and build system to make `@qi/base` imports work.
+
+**Why you need this:** Without proper setup, `import { success } from '@qi/base'` won't work.
+
 ### 1. [Framework: qi/base](./qi-base.md)
 The foundation - learn Result<T> and QiError patterns that everything else builds on.
 
@@ -45,10 +50,42 @@ Performance optimization with memory and Redis caching.
 
 ## Learning Path
 
-1. **Start with qi/base** - The framework everything else uses
-2. **Add Config** - Essential for any production application  
-3. **Add Logger** - Required for observability and debugging
-4. **Add Cache** - When performance optimization is needed
+1. **Start with Project Setup** - Configure your build system and imports
+2. **Learn qi/base** - The framework everything else uses
+3. **Add Config** - Essential for any production application  
+4. **Add Logger** - Required for observability and debugging
+5. **Add Cache** - When performance optimization is needed
+
+## Import and Export Patterns
+
+QiCore Foundation uses modern package.json exports with clean import paths:
+
+```typescript
+// Base foundation types and error handling
+import { success, failure, Result, QiError, match, flatMap } from '@qi/base'
+
+// Core infrastructure services  
+import { ConfigBuilder } from '@qi/core/config'
+import { createLogger } from '@qi/core/logger'
+import { createCache } from '@qi/core/cache'
+
+// Convenient aliasing (alternative import names)
+import { Ok, Err } from '@qi/base'  // success/failure aliases
+```
+
+**Available Import Paths:**
+- `@qi/base` - Result<T>, QiError, and all combinators
+- `@qi/core/config` - Configuration management
+- `@qi/core/logger` - Structured logging
+- `@qi/core/cache` - Memory and Redis caching
+
+**Type Imports:**
+```typescript
+import type { Result, QiError, ErrorCategory } from '@qi/base'
+import type { Config, ValidatedConfig } from '@qi/core/config'  
+import type { Logger } from '@qi/core/logger'
+import type { Cache } from '@qi/core/cache'
+```
 
 ## Working Examples
 

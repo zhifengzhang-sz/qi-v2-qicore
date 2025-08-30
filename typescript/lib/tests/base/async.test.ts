@@ -25,7 +25,7 @@ import {
   sequenceAsync,
   collectAsync,
   isPromiseResult,
-} from '../../../lib/src/base/async.js'
+} from '@qi/base'
 
 // Test utilities
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))

@@ -1,5 +1,7 @@
 # Framework: qi/base
 
+> **Prerequisites:** Make sure you've completed [Project Setup](./setup.md) first to configure your package.json and tsconfig.json. Without proper setup, the imports shown below won't work.
+
 ## What It Does
 
 qi/base provides a complete error handling framework with three main concepts:
@@ -80,12 +82,103 @@ function divide(a: number, b: number): Result<number, QiError> {
 
 ### Import What You Need
 
+QiCore Foundation provides flexible import patterns to match your coding style:
+
+**Standard Imports:**
 ```typescript
 import { 
   success, failure, match, map, flatMap,
   type Result, type QiError,
   validationError, networkError 
 } from '@qi/base'
+```
+
+**With Convenient Aliases:**
+```typescript
+import { 
+  Ok, Err,           // Aliases for success/failure
+  match, map, flatMap,
+  type Result, type QiError,
+  validationError, networkError 
+} from '@qi/base'
+```
+
+**All Available Imports:**
+```typescript
+// Core Result types
+import { 
+  success, failure,     // Create Results
+  Ok, Err,             // Aliases for success/failure
+  type Result,         // Result<T, E> type
+  type Success,        // Success variant type  
+  type Failure         // Failure variant type
+} from '@qi/base'
+
+// Error handling
+import {
+  type QiError,        // Error interface
+  type ErrorCategory,  // Error category enum
+  type ErrorOptions,   // Error creation options
+  ErrorCategories,     // All available categories
+  isErrorCategory      // Type guard
+} from '@qi/base'
+
+// Error factory functions
+import {
+  create, createError, fromException, fromString,
+  validationError, networkError, systemError,
+  businessError, authenticationError, authorizationError,
+  configurationError, timeoutError, resourceError,
+  concurrencyError, loggerError
+} from '@qi/base'
+
+// Result combinators
+import {
+  map, flatMap, andThen, collect,
+  filter, orElse, match,
+  inspect, inspectErr,
+  getValue, getError,
+  unwrap, unwrapOr,
+  isSuccess, isFailure
+} from '@qi/base'
+
+// Async helpers (Promise<Result<T>> composition)
+import {
+  flatMapAsync, mapAsync, matchAsync,
+  flatMapPromise, mapPromise, matchPromise,
+  sequenceAsync, collectAsync,
+  isPromiseResult
+} from '@qi/base'
+
+// Result creation utilities
+import {
+  fromTryCatch, tryCatch,     // Aliases for same function
+  fromAsyncTryCatch,
+  fromMaybe, fromEither
+} from '@qi/base'
+
+// Error utilities  
+import {
+  errorToString, getCategory, toStructuredData,
+  withContext, getRetryStrategy
+} from '@qi/base'
+```
+
+**Import Style Recommendations:**
+
+1. **For beginners**: Use full names for clarity
+```typescript
+import { success, failure, match, flatMap } from '@qi/base'
+```
+
+2. **For Rust/functional style**: Use short aliases
+```typescript
+import { Ok, Err, match, flatMap } from '@qi/base'
+```
+
+3. **For async code**: Include Promise helpers
+```typescript
+import { Ok, Err, matchAsync, flatMapAsync } from '@qi/base'
 ```
 
 ### Create Results

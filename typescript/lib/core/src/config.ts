@@ -13,7 +13,7 @@ import { type Result, type QiError, success, failure, create as createError } fr
 import { config as loadEnv } from 'dotenv'
 import { parse as parseToml } from 'smol-toml'
 import { parse as parseYaml } from 'yaml'
-import { type ZodSchema, type ZodType, z } from 'zod'
+import { z } from 'zod'
 import { convertJsonSchemaToZod } from 'zod-from-json-schema'
 
 // ============================================================================
@@ -41,7 +41,7 @@ export interface ConfigOptions {
   /** Whether to validate against schema */
   validate?: boolean
   /** Schema for validation */
-  schema?: ZodSchema<unknown>
+  schema?: z.ZodType
 }
 
 /**
@@ -50,7 +50,7 @@ export interface ConfigOptions {
 interface ConfigBuilderState {
   readonly data: ConfigData
   readonly sources: ConfigSource[]
-  readonly schema?: ZodSchema<unknown>
+  readonly schema?: z.ZodType
   readonly validated: boolean
 }
 
@@ -254,7 +254,7 @@ export class ConfigBuilder {
   /**
    * Apply schema validation (fluent) - using zod package
    */
-  validateWith<T>(schema: ZodSchema<T>): ConfigBuilder {
+  validateWith(schema: z.ZodType): ConfigBuilder {
     return new ConfigBuilder({
       ...this.state,
       schema,
@@ -289,14 +289,13 @@ export class ConfigBuilder {
   }
 
   /**
-   * Validate configuration using external JSON schema file (using zod-from-json-schema package)
+   * Validate configuration using external JSON schema file
    */
   validateWithSchemaFile(schemaPath: string): ConfigBuilder {
     try {
       const schemaContent = readFileSync(schemaPath, 'utf-8')
       const jsonSchema = JSON.parse(schemaContent)
-      // Use zod-from-json-schema package to convert JSON schema to Zod
-      const zodSchema = convertJsonSchemaToZod(jsonSchema) as unknown as ZodType
+      const zodSchema = convertJsonSchemaToZod(jsonSchema) as z.ZodType
 
       return this.validateWith(zodSchema)
     } catch (error) {
@@ -478,7 +477,7 @@ export class Config {
   /**
    * Get schema if present
    */
-  getSchema(): ZodSchema<unknown> | undefined {
+  getSchema(): z.ZodType | undefined {
     return this.state.schema
   }
 
@@ -598,7 +597,7 @@ export class ValidatedConfig {
   /**
    * Get the schema used for validation
    */
-  getSchema(): ZodSchema<unknown> | undefined {
+  getSchema(): z.ZodType | undefined {
     return this.config.getSchema()
   }
 
@@ -682,7 +681,7 @@ export const empty = (): Config => ConfigBuilder.fromObject({}).buildUnsafe()
 /**
  * Validate configuration against Zod schema
  */
-export const validateConfig = <T>(config: Config, schema: ZodSchema<T>): Result<T, ConfigError> => {
+export const validateConfig = <T>(config: Config, schema: z.ZodType<T>): Result<T, ConfigError> => {
   const validation = schema.safeParse(config.getAll())
 
   if (!validation.success) {
@@ -700,7 +699,7 @@ export const validateConfig = <T>(config: Config, schema: ZodSchema<T>): Result<
     )
   }
 
-  return success(validation.data)
+  return success(validation.data as T)
 }
 
 /**
@@ -708,7 +707,7 @@ export const validateConfig = <T>(config: Config, schema: ZodSchema<T>): Result<
  */
 export const safeParseConfig = <T>(
   data: ConfigData,
-  schema: ZodSchema<T>
+  schema: z.ZodType<T>
 ): Result<T, ConfigError> => {
   const validation = schema.safeParse(data)
 
@@ -727,7 +726,7 @@ export const safeParseConfig = <T>(
     )
   }
 
-  return success(validation.data)
+  return success(validation.data as T)
 }
 
 // ============================================================================

@@ -1,44 +1,11 @@
 {
   "name": "@qi/workspace",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
-  "workspaces": ["packages/*", "app/*"],
-  "description": "QiCore Foundation - TypeScript implementation of mathematical foundation types (qi/base) and infrastructure services (qi/core)",
+  "workspaces": ["lib/base", "lib/core", "app/*"],
+  "description": "QiCore Foundation - Workspace root for @qi/base and @qi/core packages",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    },
-    "./base": {
-      "types": "./dist/base.d.ts",
-      "import": "./dist/base.js",
-      "require": "./dist/base.cjs"
-    },
-    "./core": {
-      "types": "./dist/core.d.ts",
-      "import": "./dist/core.js",
-      "require": "./dist/core.cjs"
-    }
-  },
-  "imports": {
-    "#qi/base": "./dist/base.js",
-    "#qi/core": "./dist/core.js"
-  },
-  "typesVersions": {
-    "*": {
-      "base": ["./dist/base.d.ts"],
-      "core": ["./dist/core.d.ts"]
-    }
-  },
   "scripts": {
-    "dev": "bun tsup --watch",
-    "build": "bun tsup",
-    "build:watch": "bun tsup --watch",
     "test": "bun vitest run",
     "test:watch": "bun vitest",
     "test:coverage": "bun vitest run --coverage",
@@ -48,11 +15,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "typecheck": "tsc --noEmit --pretty",
-    "validate-api": "claude '/validate-api-docs'",
-    "clean": "bun rimraf dist",
-    "check": "bun run typecheck && bun run format:check && bun run lint && bun run test",
-    "prepublishOnly": "bun run clean && bun run check && bun run build",
-    "docs": "bun typedoc lib/src/index.ts --out docs/api"
+    "check": "bun run typecheck && bun run format:check && bun run lint && bun run test"
   },
   "keywords": [
     "qicore",
@@ -101,9 +64,9 @@
     "pino-pretty": "^13.0.0",
     "smol-toml": "^1.4.1",
     "yaml": "^2.8.0",
-    "zod": "^4.0.0",
+    "zod": "^4.1.5",
     "zod-config": "^1.2.0",
-    "zod-from-json-schema": "^0.4.2"
+    "zod-from-json-schema": "^0.5.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -112,6 +75,7 @@
     "@types/pino": "^7.0.5",
     "@vitest/coverage-v8": "^1.6.1",
     "bun-types": "^1.2.18",
+    "dts-bundle-generator": "^9.5.1",
     "fast-check": "^3.23.2",
     "rimraf": "^5.0.10",
     "tsup": "^8.5.0",
