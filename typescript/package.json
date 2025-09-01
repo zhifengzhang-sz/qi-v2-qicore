@@ -1,11 +1,13 @@
 {
   "name": "@qi/workspace",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "workspaces": ["lib/base", "lib/core", "app/*"],
   "description": "QiCore Foundation - Workspace root for @qi/base and @qi/core packages",
   "type": "module",
   "scripts": {
+    "build": "bun --filter='@qi/*' run build",
+    "clean": "bun --filter='@qi/*' run clean",
     "test": "bun vitest run",
     "test:watch": "bun vitest",
     "test:coverage": "bun vitest run --coverage",
@@ -15,7 +17,8 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "typecheck": "tsc --noEmit --pretty",
-    "check": "bun run typecheck && bun run format:check && bun run lint && bun run test"
+    "check": "bun run typecheck && bun run format:check && bun run lint && bun run test",
+    "build:check": "bun run clean && bun run build && bun run check"
   },
   "keywords": [
     "qicore",

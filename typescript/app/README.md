@@ -34,7 +34,15 @@ This directory contains comprehensive example applications demonstrating how to 
 - ValidatedConfig API for type-safe access
 - Error handling for configuration failures
 
-### 5. Cache Example (`cache-example/`)
+### 5. Async Composition (`async-composition/`)
+**Advanced async patterns**
+- Async Result composition with functional helpers
+- Collection operations (sequential, parallel processing)
+- Pipeline patterns for batch processing
+- Error handling strategies in async contexts
+- Performance monitoring and graceful degradation
+
+### 6. Cache Example (`cache-example/`)
 **Caching strategies (project-specific)**
 - Memory cache with TTL and LRU eviction
 - Redis cache integration with real connectivity
@@ -51,40 +59,70 @@ This directory contains comprehensive example applications demonstrating how to 
 
 ## Running the Examples
 
-Each example directory contains:
-- `README.md` - Detailed explanation and usage
-- `package.json` - Dependencies and scripts
-- `src/index.ts` - Runnable demonstration
-
 ### Prerequisites
 
-- Node.js 18+ or Bun 1.0+
-- TypeScript 5.8+
-- Docker (for Redis examples)
+1. **Install Bun or Node.js**:
+   - Bun 1.0+ (recommended) or Node.js 18+
+   - TypeScript 5.8+
 
-### Setup
+2. **Start Redis** (required for cache and some integration tests):
+   ```bash
+   # Option 1: Use QiCore services
+   cd ~/path/to/qi-v2-services/services
+   docker compose up -d redis
+   
+   # Option 2: Start Redis directly
+   docker run -p 6379:6379 redis:alpine
+   
+   # Verify Redis is running
+   docker ps | grep redis
+   ```
+
+3. **Build QiCore packages**:
+   ```bash
+   # From the typescript directory
+   cd /path/to/qi-v2-qicore/typescript
+   bun run build
+   ```
+
+### Running Examples
+
+All examples can be run from the **typescript directory**:
 
 ```bash
-# Navigate to any example directory
-cd basic-result
+# From /path/to/qi-v2-qicore/typescript
 
-# Run the example
-bun run dev
+# Basic Result patterns
+bun app/basic-result/src/index.ts
 
-# Or with specific scenarios
-bun run dev -- map
-bun run dev -- flatmap
-bun run dev -- pattern
+# Configuration management  
+bun app/config-example/src/index.ts
+
+# Caching strategies
+bun app/cache-example/src/index.ts
+
+# Async composition patterns
+bun app/async-composition/src/index.ts
+
+# Error handling strategies
+bun app/error-handling/src/index.ts
+
+# Domain-specific errors
+bun app/error-extension/src/index.ts
 ```
 
-### Cache Example with Redis
+### Individual Example Usage
+
+Each example can also be run from its own directory:
 
 ```bash
-# Start Redis first
-docker run -p 6379:6379 redis:alpine
+# Navigate to any example
+cd app/basic-result
 
-# Run cache example
-cd cache-example
+# Run with bun
+bun run src/index.ts
+
+# Or use package.json scripts if available
 bun run dev
 ```
 
@@ -157,21 +195,31 @@ async function getUserWithCache(id: string) {
 }
 ```
 
-## Testing Examples
+## Validation
 
-Each example includes:
-- Working demonstrations that you can run
-- Error scenario testing
-- Real integration patterns
-- No fake or stub implementations
+Test that everything works:
+
+```bash
+# From typescript directory
+bun run check  # Runs typecheck + format + lint + tests
+
+# Test all examples work
+bun app/basic-result/src/index.ts
+bun app/config-example/src/index.ts  
+bun app/cache-example/src/index.ts
+bun app/async-composition/src/index.ts
+bun app/error-handling/src/index.ts
+bun app/error-extension/src/index.ts
+```
 
 ## Learning Path
 
 1. **Start with `basic-result/`** - Learn fundamental Result<T> patterns
-2. **Explore `error-extension/`** - Understand domain-specific error handling
-3. **Check `config-example/`** - See configuration + logging integration
-4. **Try `cache-example/`** - Learn caching strategies
-5. **Review `error-handling/`** - Advanced error management patterns
+2. **Explore `error-handling/`** - Comprehensive error management strategies  
+3. **Try `error-extension/`** - Domain-specific error handling patterns
+4. **Study `async-composition/`** - Advanced async Result patterns
+5. **Check `config-example/`** - Configuration + logging integration
+6. **Try `cache-example/`** - Caching strategies and Redis integration
 
 ## Why These Examples Work
 

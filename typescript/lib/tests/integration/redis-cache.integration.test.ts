@@ -7,7 +7,31 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createRedisCache, type ICache } from '@qi/core'
 import { isSuccess, isFailure } from '@qi/base'
 
-describe('Redis Cache Integration', () => {
+// Check if Redis is available
+async function isRedisAvailable(): Promise<boolean> {
+  const testCache = createRedisCache({
+    redis: {
+      host: 'localhost',
+      port: 6379,
+      lazyConnect: true,
+      connectTimeout: 1000,
+      commandTimeout: 1000,
+      maxRetriesPerRequest: 1,
+    },
+  })
+
+  try {
+    const result = await testCache.set('redis-availability-test', 'test')
+    await testCache.delete('redis-availability-test')
+    await testCache.close()
+    return isSuccess(result)
+  } catch {
+    await testCache.close()
+    return false
+  }
+}
+
+describe.skipIf(!(await isRedisAvailable()))('Redis Cache Integration', () => {
   let cache: ICache
   const testKey = 'integration-test-key'
   const testValue = 'integration-test-value'
@@ -19,6 +43,9 @@ describe('Redis Cache Integration', () => {
         host: 'localhost',
         port: 6379,
         lazyConnect: true,
+        connectTimeout: 2000,
+        commandTimeout: 2000,
+        maxRetriesPerRequest: 2,
       },
     })
 

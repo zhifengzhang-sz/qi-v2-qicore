@@ -1,6 +1,6 @@
 {
   "name": "@qi/core",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "QiCore Foundation Core - Infrastructure services (Config, Logger, Cache) using Result<T> patterns",
   "type": "module",
   "main": "./dist/index.cjs",

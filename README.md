@@ -141,7 +141,8 @@ configuration_monoid_laws:
 
 ### TypeScript
 - **TypeScript 5.8+**: Latest type system features
-- **Node.js 22+**: Modern JavaScript runtime
+- **Node.js 22+** or **Bun 1.0+**: Modern JavaScript runtime
+- **Redis**: Required for integration tests (start from `~/dev/qi/github/qi-v2-services`)
 - **Testing**: Vitest, Node.js built-in test runner
 
 ### Python
@@ -160,6 +161,7 @@ configuration_monoid_laws:
 
 ## Testing
 
+### Haskell
 ```bash
 # Unit tests for mathematical laws
 cabal test qi-base:test
@@ -169,6 +171,23 @@ cabal test qi-core:test
 
 # Property-based testing with QuickCheck
 cabal test --test-options="--quickcheck-tests=1000"
+```
+
+### TypeScript
+```bash
+cd typescript
+
+# Start Redis service first (required for integration tests)
+# From project root: cd ~/dev/qi/github/qi-v2-services && [start Redis]
+
+# Run all tests
+bun run test
+
+# Run with coverage
+bun run test:coverage
+
+# Complete validation (format + lint + test + typecheck)
+bun run check
 ```
 
 ## Performance Guarantees
@@ -182,6 +201,37 @@ cabal test --test-options="--quickcheck-tests=1000"
 - **Config get operations**: O(1) for direct keys, O(depth) for nested
 - **Logger level checking**: O(1) with early exit optimization
 - **Cache operations**: O(1) average case with STM concurrency
+
+## Examples and Learning
+
+### TypeScript Examples
+Comprehensive working examples are available in the TypeScript implementation:
+
+- **[typescript/app/](typescript/app/README.md)**: Complete example applications
+  - `basic-result/` - Fundamental Result<T> patterns
+  - `error-handling/` - Error management strategies  
+  - `error-extension/` - Domain-specific error types
+  - `async-composition/` - Advanced async Result patterns
+  - `config-example/` - Configuration + logging integration
+  - `cache-example/` - Caching strategies with Redis
+
+### Quick Start
+```bash
+cd typescript
+
+# Build the packages
+bun run build
+
+# Start Redis (required for some examples)
+cd ~/path/to/qi-v2-services/services && docker compose up -d redis
+
+# Run examples
+bun app/basic-result/src/index.ts      # Start here!
+bun app/config-example/src/index.ts    # Config + logging
+bun app/cache-example/src/index.ts     # Caching patterns
+```
+
+See [typescript/app/README.md](typescript/app/README.md) for complete usage instructions.
 
 ## Related Projects
 

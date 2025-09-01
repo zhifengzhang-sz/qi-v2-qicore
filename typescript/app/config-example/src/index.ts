@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const configDir = join(__dirname, '..', 'configs')
 import { ConfigBuilder, type ValidatedConfig } from '@qi/core/config'
 import { createLogger, type Logger } from '@qi/core/logger'
 import { flatMapPromise, matchAsync, match } from '@qi/base'
@@ -18,9 +23,9 @@ async function main() {
         (builder) =>
           builder
             .merge(ConfigBuilder.fromEnv('APP'))
-            .validateWithSchemaFile(join('configs', 'config.schema.json'))
+            .validateWithSchemaFile(join(configDir, 'config.schema.json'))
             .buildValidated(),
-        ConfigBuilder.fromYamlFile(join('configs', `${environment}.yaml`))
+        ConfigBuilder.fromYamlFile(join(configDir, `${environment}.yaml`))
       )
 
       // ✅ CLEAN: Use matchAsync for clean config handling

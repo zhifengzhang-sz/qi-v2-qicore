@@ -4,7 +4,7 @@
 
 ## Important Note
 
-`@qi/base` and `@qi/core` are **workspace packages** in this repository, not published npm packages. There are two ways to use them:
+`@qi/base` and `@qi/core` are **workspace packages** in this repository, **not published to npm**. They must be used locally via file dependencies or workspace setup.
 
 ### Option 1: Use as Workspace Dependencies (Recommended for Development)
 
@@ -19,41 +19,70 @@ If your project is inside this workspace, use workspace dependencies:
 }
 ```
 
-### Option 2: External Projects (Use Pre-built Packages)
+### Option 2: External Projects (Use Built Packages)
 
-For projects outside this workspace, reference the pre-built packages:
+For projects outside this workspace, you need to build the packages first, then reference them:
 
+#### Step 1: Build QiCore packages
 ```bash
-# In your external project (replace with actual path)
-bun add file:/home/user/projects/qi-v2-qicore/typescript/lib/base
-bun add file:/home/user/projects/qi-v2-qicore/typescript/lib/core
+# In the QiCore typescript directory
+cd /path/to/qi-v2-qicore/typescript
+bun run build
 ```
 
-Or in package.json (use your actual absolute paths):
+This creates distributable packages in:
+- `lib/base/dist/` - Contains `.js`, `.cjs`, and `.d.ts` files
+- `lib/core/dist/` - Contains `.js`, `.cjs`, and `.d.ts` files
+
+#### Step 2: Add file dependencies to your project
+```bash
+# In your external project (replace with actual absolute paths)
+bun add file:/absolute/path/to/qi-v2-qicore/typescript/lib/base
+bun add file:/absolute/path/to/qi-v2-qicore/typescript/lib/core
+```
+
+Or in your project's package.json:
 
 ```json
 {
   "dependencies": {
-    "@qi/base": "file:/home/user/projects/qi-v2-qicore/typescript/lib/base",
-    "@qi/core": "file:/home/user/projects/qi-v2-qicore/typescript/lib/core"
+    "@qi/base": "file:/absolute/path/to/qi-v2-qicore/typescript/lib/base",
+    "@qi/core": "file:/absolute/path/to/qi-v2-qicore/typescript/lib/core"
   }
 }
 ```
 
-Then install `@qi/base` and `@qi/core`:
-
+#### Step 3: Install dependencies
 ```bash
 bun install
 ```
 
+**Important Notes:**
+- You must run `bun run build` in QiCore **before** adding file dependencies
+- Use **absolute paths** (not relative paths like `../qi-v2-qicore/...`)
+- Rebuild QiCore packages when you pull updates from git
+
 ## Quick Start
 
-### 1. Create Your Project in the Workspace
+### Prerequisites
+
+Before using QiCore, ensure you have the required services running:
+
+```bash
+# Start Redis (required for @qi/core cache integration tests)
+cd /path/to/qi-v2-services/services
+docker compose up -d redis
+
+# Verify Redis is running on localhost:6379
+docker ps | grep redis
+```
+
+### 1. Create Your Project in the Workspace (Recommended)
 
 The easiest way is to create your project inside the `app/` directory:
 
 ```bash
-# Create new project directory
+# From the QiCore typescript directory
 mkdir app/my-project
 cd app/my-project
 
@@ -70,7 +99,8 @@ cat > package.json << 'EOF'
 }
 EOF
 
-# Install dependencies
+# Install dependencies (from the typescript root)
+cd ../..
 bun install
 ```
 
@@ -162,7 +192,7 @@ const { createLogger } = require('@qi/core')
 
 Here's a complete example of using QiCore in a real project:
 
-### package.json
+### package.json (Workspace Project)
 ```json
 {
   "name": "my-app",
@@ -174,8 +204,30 @@ Here's a complete example of using QiCore in a real project:
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@qi/base": "latest",
-    "@qi/core": "latest"
+    "@qi/base": "workspace:*",
+    "@qi/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "tsx": "^4.19.2"
+  }
+}
+```
+
+### package.json (External Project)
+```json
+{
+  "name": "my-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@qi/base": "file:/absolute/path/to/qi-v2-qicore/typescript/lib/base",
+    "@qi/core": "file:/absolute/path/to/qi-v2-qicore/typescript/lib/core"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
@@ -288,13 +340,49 @@ If you want to create packages with similar architecture:
 
 See the QiCore source code structure as a reference implementation.
 
+## Validation
+
+### Test Your QiCore Setup
+
+After setup, validate everything works:
+
+```bash
+# In workspace projects
+cd qi-v2-qicore/typescript
+bun run check  # Runs typecheck + format + lint + tests
+
+# In external projects  
+cd your-project
+bun run build  # Should compile without errors
+```
+
+### Running QiCore Tests
+
+To run the full QiCore test suite:
+
+```bash
+cd qi-v2-qicore/typescript
+
+# Make sure Redis is running first
+cd /path/to/qi-v2-services/services
+docker compose up -d redis
+
+# Run tests
+cd qi-v2-qicore/typescript
+bun run test           # Basic tests
+bun run test:coverage  # With coverage report
+bun run check          # Full validation
+```
+
 ## Troubleshooting
 
 ### "Cannot find module '@qi/base'"
 
-1. Verify installation: `npm ls @qi/base @qi/core`
-2. Check Node.js version: `node --version` (requires >=18)
-3. Clear cache: `npm cache clean --force` or `bun pm cache rm`
+1. **Workspace projects**: Run `bun install` from the typescript root
+2. **External projects**: Verify file paths are absolute and correct
+3. **File dependencies**: Make sure you ran `bun run build` in QiCore first
+4. Check Node.js version: `node --version` (requires >=18)
+5. Clear cache: `bun pm cache rm`
 
 ### "Type errors with Result<T>"
 
