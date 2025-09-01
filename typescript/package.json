@@ -1,9 +1,9 @@
 {
-  "name": "@qi/workspace",
+  "name": "qicore-workspace",
   "version": "2.1.1",
   "private": true,
-  "workspaces": ["lib/base", "lib/core", "app/*"],
-  "description": "QiCore Foundation - Workspace root for @qi/base and @qi/core packages",
+  "workspaces": ["lib/base", "lib/core", "lib/cli", "lib/amsg", "app/*"],
+  "description": "QiCore Foundation - Workspace root for @qi/base, @qi/core, @qi/cli, and @qi/amsg packages",
   "type": "module",
   "scripts": {
     "build": "bun --filter='@qi/*' run build",
@@ -17,7 +17,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "typecheck": "tsc --noEmit --pretty",
-    "check": "bun run typecheck && bun run format:check && bun run lint && bun run test",
+    "check": "bun run typecheck && bun --filter='@qi/*' run typecheck && bun run format:check && bun run lint && bun run test",
     "build:check": "bun run clean && bun run build && bun run check"
   },
   "keywords": [
@@ -33,7 +33,10 @@
     "configuration",
     "logger",
     "cache",
-    "infrastructure"
+    "infrastructure",
+    "cli",
+    "messaging",
+    "async-queue"
   ],
   "author": "Qi Platform",
   "license": "MIT",

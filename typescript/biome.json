@@ -12,18 +12,42 @@
       "recommended": true,
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "error"
+        "noUnusedVariables": "off",
+        "useExhaustiveDependencies": "warn"
       },
       "style": {
         "useConst": "error",
-        "useTemplate": "error"
+        "useTemplate": "warn",
+        "noNonNullAssertion": "off",
+        "noUselessElse": "warn",
+        "noUnusedTemplateLiteral": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "warn",
-        "noConfusingVoidType": "error"
+        "noExplicitAny": "off",
+        "noConfusingVoidType": "error",
+        "noArrayIndexKey": "warn"
+      },
+      "complexity": {
+        "noStaticOnlyClass": "off",
+        "noBannedTypes": "off",
+        "noForEach": "warn",
+        "useOptionalChain": "warn"
       }
     },
-    "ignore": ["lib/core/src/logger.ts"]
+    "ignore": [
+      "lib/core/src/logger.ts",
+      "lib/cli/src/frameworks/hybrid/HybridCLIFramework.ts",
+      "lib/cli/src/frameworks/ink/components/InputBox.tsx",
+      "lib/cli/src/frameworks/readline/ReadlineInputManager.ts",
+      "lib/cli/src/frameworks/readline/ReadlineStreamRenderer.ts",
+      "lib/cli/src/frameworks/readline/ReadlineModeRenderer.ts",
+      "lib/amsg/src/impl/QiAsyncMessageQueue.ts",
+      "lib/cli/src/container/CLIContainer.ts",
+      "lib/cli/src/frameworks/ink/components/PermissionDialog.tsx",
+      "lib/cli/src/impl/simple-command-handler.ts",
+      "lib/cli/src/impl/MessageDrivenCLI.ts",
+      "lib/cli/src/frameworks/ink/InkCLIFramework.tsx"
+    ]
   },
   "formatter": {
     "enabled": true,

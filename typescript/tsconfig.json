@@ -16,6 +16,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -25,9 +26,13 @@
       "@qi/base": ["./lib/base/src/index.ts"],
       "@qi/base/*": ["./lib/base/src/*"],
       "@qi/core": ["./lib/core/src/index.ts"],
-      "@qi/core/*": ["./lib/core/src/*"]
+      "@qi/core/*": ["./lib/core/src/*"],
+      "@qi/cli": ["./lib/cli/src/index.ts"],
+      "@qi/cli/*": ["./lib/cli/src/*"],
+      "@qi/amsg": ["./lib/amsg/src/index.ts"],
+      "@qi/amsg/*": ["./lib/amsg/src/*"]
     }
   },
-  "include": ["lib/base/src/**/*", "lib/core/src/**/*", "lib/tests/**/*", "app/**/*"],
+  "include": ["lib/*/src/**/*", "lib/tests/**/*", "app/**/*"],
   "exclude": ["node_modules", "dist"]
 }
