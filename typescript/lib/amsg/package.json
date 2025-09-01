@@ -1,0 +1,54 @@
+{
+  "name": "@qi/amsg",
+  "version": "1.0.0",
+  "description": "QiCore Async Messaging - h2A-inspired async message queue with Result<T> patterns",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "bun tsup && bun run build:types",
+    "build:types": "tsc --project tsconfig.json && dts-bundle-generator -o dist/index.d.ts temp/index.d.ts && dts-bundle-generator -o dist/index.d.cts temp/index.d.ts && bun rimraf temp",
+    "clean": "bun rimraf dist temp",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "bun run clean && bun run build"
+  },
+  "keywords": [
+    "qicore",
+    "async",
+    "messaging",
+    "message-queue",
+    "h2a-pattern",
+    "result-type",
+    "functional-programming",
+    "typescript"
+  ],
+  "author": "Qi Platform",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@qi/base": "file:../base"
+  },
+  "devDependencies": {
+    "dts-bundle-generator": "^9.5.1",
+    "rimraf": "^5.0.10",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "vitest": "^1.6.1"
+  }
+}
