@@ -5,7 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
   },
   format: ['cjs', 'esm'],
-  dts: false, // Using dts-bundle-generator instead
+  dts: true, // Generate TypeScript declarations directly
   sourcemap: true,
   clean: true,
   splitting: false,

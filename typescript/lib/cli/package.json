@@ -1,6 +1,6 @@
 {
   "name": "@qi/cli",
-  "version": "0.3.4",
+  "version": "2.2.0",
   "description": "QiCore CLI Framework - Message-driven CLI with hybrid terminal support",
   "type": "module",
   "main": "dist/index.cjs",
@@ -15,10 +15,9 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsup && bun run build:types",
-    "build:types": "tsc --project tsconfig.build.json && dts-bundle-generator -o dist/index.d.ts temp/index.d.ts && dts-bundle-generator -o dist/index.d.cts temp/index.d.ts && bun rimraf temp",
+    "build": "tsup",
     "dev": "tsup --watch",
-    "clean": "rimraf dist temp",
+    "clean": "rimraf dist",
     "typecheck": "tsc --noEmit --pretty",
     "test": "echo 'No tests yet'",
     "format": "biome format --write .",
@@ -41,7 +40,6 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
-    "dts-bundle-generator": "^9.0.0",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"

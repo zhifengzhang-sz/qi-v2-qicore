@@ -74,6 +74,7 @@ jspm_packages/
 # TypeScript build output
 typescript/dist/
 typescript/build/
+typescript/lib/*/temp/
 
 # Optional npm cache directory
 .npm

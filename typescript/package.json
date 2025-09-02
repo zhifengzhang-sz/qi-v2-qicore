@@ -1,6 +1,6 @@
 {
   "name": "qicore-workspace",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "private": true,
   "workspaces": ["lib/base", "lib/core", "lib/cli", "lib/amsg", "app/*"],
   "description": "QiCore Foundation - Workspace root for @qi/base, @qi/core, @qi/cli, and @qi/amsg packages",

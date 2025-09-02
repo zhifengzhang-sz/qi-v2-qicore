@@ -1,6 +1,6 @@
 {
   "name": "@qi/amsg",
-  "version": "1.0.0",
+  "version": "2.2.0",
   "description": "QiCore Async Messaging - h2A-inspired async message queue with Result<T> patterns",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -15,9 +15,8 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "bun tsup && bun run build:types",
-    "build:types": "tsc --project tsconfig.json && dts-bundle-generator -o dist/index.d.ts temp/index.d.ts && dts-bundle-generator -o dist/index.d.cts temp/index.d.ts && bun rimraf temp",
-    "clean": "bun rimraf dist temp",
+    "build": "bun tsup",
+    "clean": "bun rimraf dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "prepublishOnly": "bun run clean && bun run build"
@@ -45,7 +44,6 @@
     "@qi/base": "file:../base"
   },
   "devDependencies": {
-    "dts-bundle-generator": "^9.5.1",
     "rimraf": "^5.0.10",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3",

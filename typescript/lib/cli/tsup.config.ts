@@ -5,7 +5,9 @@ export default defineConfig({
     index: 'src/index.ts',
   },
   format: ['cjs', 'esm'],
-  dts: false, // Using dts-bundle-generator instead
+  dts: {
+    resolve: true, // Bundle external types into single .d.ts file
+  },
   sourcemap: true,
   clean: true,
   splitting: false,
