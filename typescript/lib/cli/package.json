@@ -16,7 +16,7 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup && bun run build:types",
-    "build:types": "tsc --project tsconfig.json && dts-bundle-generator -o dist/index.d.ts temp/index.d.ts && dts-bundle-generator -o dist/index.d.cts temp/index.d.ts && bun rimraf temp",
+    "build:types": "tsc --project tsconfig.build.json && dts-bundle-generator -o dist/index.d.ts temp/index.d.ts && dts-bundle-generator -o dist/index.d.cts temp/index.d.ts && bun rimraf temp",
     "dev": "tsup --watch",
     "clean": "rimraf dist temp",
     "typecheck": "tsc --noEmit --pretty",

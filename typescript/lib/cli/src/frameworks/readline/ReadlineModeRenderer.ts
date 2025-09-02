@@ -215,8 +215,13 @@ export class ReadlineModeRenderer implements IModeRenderer {
     const nextIndex = (currentIndex + 1) % modes.length
     const nextMode = modes[nextIndex]
 
-    this.setMode(nextMode, silent)
-    return nextMode
+    if (nextMode) {
+      this.setMode(nextMode, silent)
+      return nextMode
+    }
+
+    // Fallback to current mode if array access fails
+    return this.currentMode
   }
 
   /**

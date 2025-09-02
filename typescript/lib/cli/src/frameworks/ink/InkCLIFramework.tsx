@@ -749,7 +749,10 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     const modes: CLIMode[] = ['interactive', 'command', 'streaming']
     const currentIndex = modes.indexOf(currentMode)
     const nextIndex = (currentIndex + 1) % modes.length
-    framework.setMode(modes[nextIndex])
+    const nextMode = modes[nextIndex]
+    if (nextMode) {
+      framework.setMode(nextMode)
+    }
   }, [framework])
 
   const handleCommand = useCallback(

@@ -6,14 +6,12 @@
 
 import React, { memo } from 'react'
 import { Box, Text } from 'ink'
-import Gradient from 'ink-gradient'
-import BigText from 'ink-big-text'
 import { InputBox } from './InputBox'
 import { OutputDisplay, type OutputMessage } from './OutputDisplay'
 import { LoadingIndicator } from './LoadingIndicator'
 import { PermissionDialog, type PermissionRequest } from './PermissionDialog'
 import type { AppState, AppSubState } from '../../../abstractions/index'
-import { styles, defaultTheme, getInputBorderColor, textStyles } from '../styles/theme'
+import { styles, getInputBorderColor } from '../styles/theme'
 
 interface MainLayoutProps {
   state: AppState

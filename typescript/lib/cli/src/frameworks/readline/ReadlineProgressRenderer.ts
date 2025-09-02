@@ -271,7 +271,7 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
 
   private getCurrentSpinner(): string {
     const frames = this.config.spinnerFrames
-    return frames[this.animationFrame % frames.length]
+    return frames[this.animationFrame % frames.length] || '⠋'
   }
 
   private startAnimation(): void {
@@ -342,12 +342,7 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
   /**
    * Create a simple progress bar utility
    */
-  static createSimpleBar(
-    progress: number,
-    length: number = 20,
-    filled: string = '█',
-    empty: string = '░'
-  ): string {
+  static createSimpleBar(progress: number, length = 20, filled = '█', empty = '░'): string {
     const filledLength = Math.round(length * Math.min(1, Math.max(0, progress)))
     const emptyLength = length - filledLength
 

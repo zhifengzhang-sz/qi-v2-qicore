@@ -229,7 +229,8 @@ export class ProgressDisplay {
    * Get current spinner frame
    */
   private getCurrentSpinner(): string {
-    return this.spinnerFrames[this.animationIndex % this.spinnerFrames.length]
+    const frame = this.spinnerFrames[this.animationIndex % this.spinnerFrames.length]
+    return frame || '⠋'
   }
 
   /**
@@ -307,9 +308,9 @@ export class ProgressDisplay {
  */
 export function createProgressBar(
   progress: number,
-  length: number = 20,
-  filled: string = '█',
-  empty: string = '░'
+  length = 20,
+  filled = '█',
+  empty = '░'
 ): string {
   const filledLength = Math.round(length * Math.min(1, Math.max(0, progress)))
   const emptyLength = length - filledLength
@@ -327,7 +328,8 @@ export function formatPercentage(progress: number): string {
 /**
  * Create a simple spinner
  */
-export function createSpinner(frameIndex: number = 0): string {
+export function createSpinner(frameIndex = 0): string {
   const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-  return frames[frameIndex % frames.length]
+  const frame = frames[frameIndex % frames.length]
+  return frame || '⠋'
 }

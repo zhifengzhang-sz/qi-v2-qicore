@@ -5,7 +5,7 @@
  * and dynamic processing messages.
  */
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Text } from 'ink'
 import { createAnimatedLoader, defaultTheme, textStyles } from '../styles/theme'
 

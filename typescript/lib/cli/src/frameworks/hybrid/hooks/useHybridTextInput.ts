@@ -233,8 +233,10 @@ export function useHybridTextInput({
             const modes = ['interactive', 'command', 'streaming'] as const
             const currentIndex = modes.indexOf(currentMode)
             const nextMode = modes[(currentIndex + 1) % modes.length]
-            logger.trace(`Mode cycling: ${currentMode} → ${nextMode}`)
-            framework.setMode(nextMode)
+            if (nextMode) {
+              logger.trace(`Mode cycling: ${currentMode} → ${nextMode}`)
+              framework.setMode(nextMode)
+            }
           }
           logger.trace(`Returning unchanged cursor: offset=${cursor.offset}, text="${cursor.text}"`)
           return cursor // Don't change cursor for mode cycling

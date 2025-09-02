@@ -152,7 +152,7 @@ export class ReadlineTerminal implements ITerminal {
   /**
    * Move cursor up N lines
    */
-  cursorUp(lines: number = 1): void {
+  cursorUp(lines = 1): void {
     if (this.isDestroyed || lines <= 0) {
       return
     }
@@ -163,7 +163,7 @@ export class ReadlineTerminal implements ITerminal {
   /**
    * Move cursor down N lines
    */
-  cursorDown(lines: number = 1): void {
+  cursorDown(lines = 1): void {
     if (this.isDestroyed || lines <= 0) {
       return
     }
@@ -322,7 +322,7 @@ export class ReadlineTerminal implements ITerminal {
   /**
    * Write a line with automatic newline
    */
-  writeLine(text: string = ''): void {
+  writeLine(text = ''): void {
     this.write(`${text}\n`)
   }
 

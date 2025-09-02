@@ -4,7 +4,7 @@
  * Shows current application state with visual indicators
  */
 
-import React, { memo } from 'react'
+import { memo } from 'react'
 import { Box, Text } from 'ink'
 import type { AppState, AppSubState } from '../../../abstractions/index'
 

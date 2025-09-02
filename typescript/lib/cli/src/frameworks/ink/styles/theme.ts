@@ -181,15 +181,15 @@ export const createProgressBar = (
  * Animation utilities inspired by Claude Code's loading patterns
  */
 export const getLoadingFrame = (frameIndex: number): string => {
-  return defaultTheme.animation.loadingFrames[
-    frameIndex % defaultTheme.animation.loadingFrames.length
-  ]
+  const frames = defaultTheme.animation.loadingFrames
+  const frame = frames[frameIndex % frames.length]
+  return frame || '⠋'
 }
 
 export const getProcessingMessage = (messageIndex: number): string => {
-  return defaultTheme.animation.processingMessages[
-    messageIndex % defaultTheme.animation.processingMessages.length
-  ]
+  const messages = defaultTheme.animation.processingMessages
+  const message = messages[messageIndex % messages.length]
+  return message || 'Processing...'
 }
 
 export const createAnimatedLoader = (frameIndex: number, messageIndex: number): string => {

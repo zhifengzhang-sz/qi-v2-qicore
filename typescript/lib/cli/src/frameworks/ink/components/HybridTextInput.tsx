@@ -1,18 +1,4 @@
-/**
- * Hybrid Text Input Component - Following Claude Code's Architecture
- *
- * This component follows Claude Code's exact design pattern:
- * 1. Presentation component with minimal logic
- * 2. Delegates all logic to useHybridTextInput hook
- * 3. Uses cursor.render() for proper display
- * 4. Clean props interface
- *
- * Based on analysis of Claude Code's TextInput.tsx
- */
-
-import React from 'react'
 import { Text, useInput } from 'ink'
-import type { Key } from 'ink'
 import { createDebugLogger } from '../../../utils'
 import { useHybridTextInput } from '../../hybrid/hooks/useHybridTextInput'
 import type { HybridCLIFramework } from '../../hybrid/HybridCLIFramework'

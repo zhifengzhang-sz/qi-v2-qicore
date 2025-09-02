@@ -116,8 +116,10 @@ export class HybridCLIFramework extends InkCLIFramework {
     const currentIndex = modes.indexOf(currentMode)
     const nextMode = modes[(currentIndex + 1) % modes.length]
 
-    this.logger.debug(`Hybrid: Mode change ${currentMode} → ${nextMode}`)
-    this.setMode(nextMode)
+    if (nextMode) {
+      this.logger.debug(`Hybrid: Mode change ${currentMode} → ${nextMode}`)
+      this.setMode(nextMode)
+    }
   }
 
   /**

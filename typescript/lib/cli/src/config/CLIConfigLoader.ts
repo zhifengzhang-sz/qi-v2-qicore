@@ -206,7 +206,7 @@ function parseEnvValue(value: string, key: string): any {
     case 'historySize':
     case 'streamingThrottle':
     case 'maxBufferSize': {
-      const num = parseInt(value, 10)
+      const num = Number.parseInt(value, 10)
       return Number.isNaN(num) ? undefined : num
     }
 
@@ -229,7 +229,7 @@ function parseArgValue(value: string, key: string): any {
     case 'historySize':
     case 'streamingThrottle':
     case 'maxBufferSize': {
-      const num = parseInt(value, 10)
+      const num = Number.parseInt(value, 10)
       return Number.isNaN(num) ? undefined : num
     }
 

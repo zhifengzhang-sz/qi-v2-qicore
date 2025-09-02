@@ -1,11 +1,4 @@
-/**
- * Output Display Component for Ink CLI
- *
- * Shows command results and system messages
- */
-
-import React from 'react'
-import { Box, Text, Newline } from 'ink'
+import { Box, Text } from 'ink'
 import Spinner from 'ink-spinner'
 
 interface OutputMessage {
@@ -164,7 +157,7 @@ let messageCounter = 0
 export function createOutputMessage(
   content: string,
   type: OutputMessage['type'] = 'info',
-  isProcessing: boolean = false
+  isProcessing = false
 ): OutputMessage {
   messageCounter++
   return {
@@ -189,10 +182,7 @@ export function createUserMessage(content: string): OutputMessage {
   }
 }
 
-export function createAssistantMessage(
-  content: string,
-  isProcessing: boolean = false
-): OutputMessage {
+export function createAssistantMessage(content: string, isProcessing = false): OutputMessage {
   messageCounter++
   return {
     id: `msg-${Date.now()}-${messageCounter}-${Math.random().toString(36).substr(2, 9)}`,

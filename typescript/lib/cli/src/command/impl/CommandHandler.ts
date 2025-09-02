@@ -258,7 +258,7 @@ export class CommandHandler implements ICommandHandler {
       async (request: CommandRequest) => {
         const args = Array.from(request.parameters.values()) as string[]
 
-        if (args.length > 0) {
+        if (args.length > 0 && args[0]) {
           const help = this.getCommandHelp(args[0])
           return {
             status: 'success',

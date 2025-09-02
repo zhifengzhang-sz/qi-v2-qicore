@@ -364,7 +364,9 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
       }
 
       const char = chunk[position]
-      this.writeContent(char)
+      if (char !== undefined) {
+        this.writeContent(char)
+      }
       position++
     }, this.config.throttleMs)
   }

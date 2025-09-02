@@ -215,7 +215,7 @@ export class MeasuredText {
     const line = lines.length - 1
     return {
       line,
-      column: this.wrappedLines[line]?.text.length,
+      column: this.wrappedLines[line]?.text.length || 0,
     }
   }
 

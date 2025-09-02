@@ -59,7 +59,7 @@ interface CommandInfo {
 export class QiCoreCommandRouter implements ICommandRouter {
   private commands: Map<string, CommandInfo> = new Map()
   private aliases: Map<string, string> = new Map()
-  private commandPrefix: string = '/'
+  private commandPrefix = '/'
 
   constructor(options: { commandPrefix?: string } = {}) {
     this.commandPrefix = options.commandPrefix || '/'
@@ -154,7 +154,7 @@ export class QiCoreCommandRouter implements ICommandRouter {
           usage: info.usage || `${this.commandPrefix}${command} [args...]`,
           examples: info.examples || [],
           minArgs: info.minArgs || 0,
-          maxArgs: info.maxArgs || Infinity,
+          maxArgs: info.maxArgs || Number.POSITIVE_INFINITY,
         }
 
         this.commands.set(command, fullInfo)
@@ -401,7 +401,7 @@ export class QiCoreCommandRouter implements ICommandRouter {
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i]
-      
+
       if (!arg) {
         continue // Skip undefined/empty args
       }

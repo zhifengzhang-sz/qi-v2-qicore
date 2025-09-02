@@ -155,7 +155,7 @@ export function identifyKey(chunk: Buffer): string {
   // Single byte keys
   if (chunk.length === 1) {
     const byte = chunk[0]
-    
+
     if (byte === undefined) {
       return 'UNKNOWN'
     }
@@ -206,7 +206,7 @@ export const Terminal = {
   /**
    * Move cursor up N lines
    */
-  cursorUp(lines: number = 1): void {
+  cursorUp(lines = 1): void {
     if (lines > 0) {
       process.stdout.write(`\x1b[${lines}A`)
     }
@@ -215,7 +215,7 @@ export const Terminal = {
   /**
    * Move cursor down N lines
    */
-  cursorDown(lines: number = 1): void {
+  cursorDown(lines = 1): void {
     if (lines > 0) {
       process.stdout.write(`\x1b[${lines}B`)
     }

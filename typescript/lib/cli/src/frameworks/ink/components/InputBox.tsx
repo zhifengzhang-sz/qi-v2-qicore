@@ -142,7 +142,9 @@ export function InputBox({
           const parts = trimmedValue.slice(1).split(' ')
           const command = parts[0]
           const args = parts.slice(1)
-          onCommand(command, args)
+          if (command) {
+            onCommand(command, args)
+          }
         } else {
           onSubmit(trimmedValue)
         }

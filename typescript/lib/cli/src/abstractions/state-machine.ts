@@ -255,7 +255,8 @@ export function canCycleStates(context: CLIStateContext): boolean {
 export function getNextSubState(current: AppSubState): AppSubState {
   const cycle: AppSubState[] = ['generic', 'planning', 'editing']
   const currentIndex = cycle.indexOf(current)
-  return cycle[(currentIndex + 1) % cycle.length]
+  const nextState = cycle[(currentIndex + 1) % cycle.length]
+  return nextState || 'generic' // Fallback to generic if undefined
 }
 
 /**

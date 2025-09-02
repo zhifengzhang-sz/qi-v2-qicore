@@ -115,7 +115,7 @@ export class ModeIndicator {
   /**
    * Set the current mode
    */
-  setMode(mode: CLIMode, silent: boolean = false): void {
+  setMode(mode: CLIMode, silent = false): void {
     const previousMode = this.currentMode
     this.currentMode = mode
 
@@ -139,14 +139,19 @@ export class ModeIndicator {
   /**
    * Cycle to the next mode
    */
-  cycleMode(silent: boolean = false): CLIMode {
+  cycleMode(silent = false): CLIMode {
     const modes: CLIMode[] = ['interactive', 'command', 'streaming']
     const currentIndex = modes.indexOf(this.currentMode)
     const nextIndex = (currentIndex + 1) % modes.length
     const nextMode = modes[nextIndex]
 
-    this.setMode(nextMode, silent)
-    return nextMode
+    if (nextMode) {
+      this.setMode(nextMode, silent)
+      return nextMode
+    }
+
+    // Fallback to current mode if array access fails
+    return this.currentMode
   }
 
   /**

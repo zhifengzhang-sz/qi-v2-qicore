@@ -605,7 +605,8 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     // Find insertion point based on priority
     let insertIndex = this.queue.length
     for (let i = 0; i < this.queue.length; i++) {
-      if (this.queue[i].message.priority > priority) {
+      const queueItem = this.queue[i]
+      if (queueItem && queueItem.message.priority > priority) {
         insertIndex = i
         break
       }

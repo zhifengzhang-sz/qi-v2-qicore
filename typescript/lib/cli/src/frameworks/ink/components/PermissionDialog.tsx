@@ -54,10 +54,16 @@ export function PermissionDialog({ request, onApprove, onDeny, onDismiss }: Perm
 
       if (key.leftArrow) {
         const newIndex = currentIndex > 0 ? currentIndex - 1 : options.length - 1
-        setSelectedOption(options[newIndex])
+        const newOption = options[newIndex]
+        if (newOption) {
+          setSelectedOption(newOption)
+        }
       } else if (key.rightArrow) {
         const newIndex = currentIndex < options.length - 1 ? currentIndex + 1 : 0
-        setSelectedOption(options[newIndex])
+        const newOption = options[newIndex]
+        if (newOption) {
+          setSelectedOption(newOption)
+        }
       }
     }
 
