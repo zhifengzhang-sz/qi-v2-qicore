@@ -4,8 +4,8 @@
  * React-based CLI implementation using Ink framework
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { render, Text, useInput, useApp } from 'ink'
+import { useState, useEffect, useCallback } from 'react'
+import { render, useInput, useApp } from 'ink'
 import { randomBytes } from 'crypto'
 import type {
   ICLIFramework,
@@ -13,7 +13,6 @@ import type {
   CLIConfig,
   CLIState,
   CLIMode,
-  CLIEvents,
   MessageType as ICLIFrameworkMessageType,
 } from '../../abstractions/ICLIFramework'
 import type { QiAsyncMessageQueue } from '@qi/amsg'
@@ -22,7 +21,6 @@ import { MessageType } from '@qi/amsg'
 import { HotkeyManager } from '../../keyboard/HotkeyManager'
 import { MainLayout } from './components/MainLayout'
 import {
-  createOutputMessage,
   createUserMessage,
   createAssistantMessage,
   createSystemMessage,
@@ -74,7 +72,7 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
   private stateManager: any = null
   private stateUnsubscribe: (() => void) | null = null
   private setMessages: ((updater: (prev: OutputMessage[]) => OutputMessage[]) => void) | null = null
-  private debugMode: boolean = false
+  private debugMode = false
   protected logger: SimpleLogger
   private hotkeyManager?: HotkeyManager
 

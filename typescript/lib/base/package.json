@@ -1,6 +1,6 @@
 {
   "name": "@qi/base",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "QiCore Foundation Base - Mathematical foundation types (Result<T>, QiError) with pure functional patterns",
   "type": "module",
   "main": "./dist/index.cjs",

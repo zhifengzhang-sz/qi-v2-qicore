@@ -5,9 +5,8 @@
  * Provides interactive prompts for confirming potentially sensitive operations.
  */
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Box, Text, useInput } from 'ink'
-import { defaultTheme, textStyles } from '../styles/theme'
 
 interface PermissionRequest {
   id: string
@@ -131,8 +130,8 @@ export function PermissionDialog({ request, onApprove, onDeny, onDismiss }: Perm
           <Text color="red" bold>
             ⚠️ Potential risks:
           </Text>
-          {request.risks.map((risk, index) => (
-            <Box key={index} paddingLeft={2}>
+          {request.risks.map((risk) => (
+            <Box key={risk} paddingLeft={2}>
               <Text color="red">• {risk}</Text>
             </Box>
           ))}

@@ -4,15 +4,14 @@
  * Handles user input with proper parsing and command detection
  */
 
-import React, { useState, useTransition, useRef, useEffect, useMemo } from 'react'
+import { useState, useTransition, useRef, useEffect, useMemo } from 'react'
 import { Box, Text, useInput, useApp } from 'ink'
-import TextInput, { UncontrolledTextInput } from 'ink-text-input'
+import TextInput from 'ink-text-input'
 import { LoadingSpinner } from './LoadingIndicator'
 import { HybridTextInput } from './HybridTextInput'
 import { useHybridHistory } from '../../hybrid/hooks/useHybridHistory'
 import type { AppState, AppSubState } from '../../../abstractions/index'
 import { createDebugLogger } from '../../../utils'
-import { appendFileSync } from 'fs'
 
 // QiCore debug logging
 const logger = createDebugLogger('InputBox')

@@ -8,6 +8,7 @@
 import type { IAsyncMessageQueue, QueueOptions, QueueState } from '../interfaces/IAsyncMessageQueue'
 // v-0.6.1: QueueEventCallback and QueueEventType removed - pure message-driven
 import type { MessageStats, QiMessage } from '../types/MessageTypes'
+import { MessagePriority } from '../types/MessageTypes'
 import { MessageStatus } from '../types/MessageTypes'
 import {
   create,
@@ -19,6 +20,38 @@ import {
   type Result,
   success,
 } from '@qi/base'
+/**
+ * Queue event types for subscription system
+ */
+type QueueEventType =
+  | 'message_enqueued'
+  | 'message_dequeued'
+  | 'message_processed'
+  | 'message_failed'
+  | 'message_expired'
+  | 'message_dropped'
+  | 'queue_paused'
+  | 'queue_resumed'
+  | 'queue_cleared'
+  | 'queue_error'
+
+/**
+ * Queue event data structure
+ */
+interface QueueEvent<T extends QiMessage = QiMessage> {
+  type: QueueEventType
+  message?: T
+  error?: QiError
+  reason?: string
+  clearedCount?: number
+  timestamp?: Date
+}
+
+/**
+ * Queue subscriber callback type
+ */
+type QueueSubscriber<T extends QiMessage = QiMessage> = (event: QueueEvent<T>) => void
+
 // Simple debug logger for messaging
 const createDebugLogger = (name: string) => ({
   debug: (...args: any[]) => console.debug(`[${name}]`, ...args),
@@ -92,6 +125,19 @@ const queueError = {
       timestamp: new Date().toISOString(),
     }) as QueueError,
 
+  // Processing backpressure error
+  processingBackpressure: (
+    messageId: string,
+    currentProcessing: number,
+    maxConcurrent: number
+  ): QueueError =>
+    create('PROCESSING_BACKPRESSURE', 'Queue processing at maximum capacity', 'RESOURCE', {
+      messageId,
+      currentProcessing,
+      maxConcurrent,
+      timestamp: new Date().toISOString(),
+    }) as QueueError,
+
   // Legacy system error for backward compatibility
   systemError: (code: string, message: string, context: QueueError['context'] = {}): QueueError =>
     create(code, message, 'SYSTEM', {
@@ -115,10 +161,11 @@ interface QueuedMessage<T extends QiMessage = QiMessage> {
 }
 
 /**
- * QiAsyncMessageQueue implementation following h2A pattern
+ * QiAsyncMessageQueue implementation following h2A pattern with priority queuing
  */
 export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAsyncMessageQueue<T> {
-  private queue: QueuedMessage<T>[] = []
+  // Priority-based queues for efficient message ordering
+  private priorityQueues: Map<MessagePriority, QueuedMessage<T>[]> = new Map()
   private readResolve?: (value: IteratorResult<T, any>) => void
   private readReject?: (error: any) => void
   private state: QueueState
@@ -128,8 +175,19 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
   private cleanupTimer?: NodeJS.Timeout
   private isPausedState = false
   private debug = createDebugLogger('QiAsyncMessageQueue')
+  // New: Subscription system for monitoring
+  private subscribers: Set<QueueSubscriber<T>> = new Set()
+  // New: Backpressure management
+  private processingCount = 0
+  private droppedMessageCount = 0
 
   constructor(options: QueueOptions = {}) {
+    // Initialize priority queues for each priority level
+    this.priorityQueues.set(MessagePriority.CRITICAL, [])
+    this.priorityQueues.set(MessagePriority.HIGH, [])
+    this.priorityQueues.set(MessagePriority.NORMAL, [])
+    this.priorityQueues.set(MessagePriority.LOW, [])
+
     // Initialize state
     this.state = {
       started: false,
@@ -307,10 +365,13 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
   }
 
   /**
-   * Enqueue message - supports real-time injection (h2A pattern)
+   * Enqueue message - supports real-time injection (h2A pattern) with backpressure management
    */
   enqueue(message: T): Result<void, QueueError> {
-    this.debug.log(`Enqueuing message ID: ${message.id}, type: ${message.type}`)
+    this.debug.log(
+      `Enqueuing message ID: ${message.id}, type: ${message.type}, priority: ${message.priority}`
+    )
+
     // Validate queue state
     if (this.state.isDone) {
       return failure(queueError.queueDone(message.id))
@@ -320,11 +381,37 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       return failure(queueError.queueInError(message.id))
     }
 
-    // Check size limits
-    if (this.options.maxSize > 0 && this.queue.length >= this.options.maxSize) {
-      // v-0.6.1: Event emission removed - pure message-driven
+    // Backpressure management: Check size limits with priority handling
+    const totalQueueSize = this.getTotalQueueSize()
+    if (this.options.maxSize > 0 && totalQueueSize >= this.options.maxSize) {
+      // Critical messages always accepted - drop lowest priority if needed
+      if (message.priority === MessagePriority.CRITICAL) {
+        this.makeRoomForCriticalMessage()
+      } else {
+        this.droppedMessageCount++
+        this.notifySubscribers({ type: 'message_dropped', message, reason: 'queue_full' })
+        return failure(queueError.queueFull(message.id, this.options.maxSize, totalQueueSize))
+      }
+    }
 
-      return failure(queueError.queueFull(message.id, this.options.maxSize, this.queue.length))
+    // Check processing backpressure
+    if (
+      this.processingCount >= this.options.maxConcurrent &&
+      message.priority > MessagePriority.HIGH
+    ) {
+      this.droppedMessageCount++
+      this.notifySubscribers({
+        type: 'message_dropped',
+        message,
+        reason: 'processing_backpressure',
+      })
+      return failure(
+        queueError.processingBackpressure(
+          message.id,
+          this.processingCount,
+          this.options.maxConcurrent
+        )
+      )
     }
 
     // Create queued message (not inserted yet to avoid duplication when a reader is waiting)
@@ -361,12 +448,14 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       return success(undefined)
     }
 
-    // No waiting reader - insert into queue for normal consumption
-    if (this.options.priorityQueuing) {
-      this.insertByPriority(queuedMessage)
-    } else {
-      this.queue.push(queuedMessage)
+    // No waiting reader - insert into appropriate priority queue
+    const priorityQueue = this.priorityQueues.get(message.priority)
+    if (!priorityQueue) {
+      return failure(queueError.invalidMessage(message.id, `Invalid priority: ${message.priority}`))
     }
+
+    priorityQueue.push(queuedMessage)
+    this.notifySubscribers({ type: 'message_enqueued', message })
 
     return success(undefined)
   }
@@ -382,7 +471,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     this.state = { ...this.state, isDone: true }
 
     // Resolve waiting reader if queue is empty
-    if (this.readResolve && this.queue.length === 0) {
+    if (this.readResolve && this.getTotalQueueSize() === 0) {
       const resolve = this.readResolve
       this.readResolve = undefined
       this.readReject = undefined
@@ -425,7 +514,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
   getState(): Result<QueueState, QueueError> {
     return success({
       ...this.state,
-      messageCount: this.queue.length,
+      messageCount: this.getTotalQueueSize(),
     })
   }
 
@@ -439,7 +528,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
 
     return success({
       ...this.stats,
-      queueLength: this.queue.length,
+      queueLength: this.getTotalQueueSize(),
     })
   }
 
@@ -447,7 +536,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
    * Peek at next message without removing it
    */
   peek(): Result<T | null, QueueError> {
-    if (this.queue.length === 0) {
+    if (this.getTotalQueueSize() === 0) {
       return success(null)
     }
 
@@ -459,14 +548,14 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
    * Get queue size
    */
   size(): Result<number, QueueError> {
-    return success(this.queue.length)
+    return success(this.getTotalQueueSize())
   }
 
   /**
    * Check if queue is empty
    */
   isEmpty(): Result<boolean, QueueError> {
-    return success(this.queue.length === 0)
+    return success(this.getTotalQueueSize() === 0)
   }
 
   /**
@@ -476,21 +565,26 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     if (this.options.maxSize === 0) {
       return success(false)
     }
-    return success(this.queue.length >= this.options.maxSize)
+    return success(this.getTotalQueueSize() >= this.options.maxSize)
   }
 
   /**
    * Clear all messages from queue
    */
   clear(): Result<number, QueueError> {
-    const clearedCount = this.queue.length
-    this.queue = []
+    const clearedCount = this.getTotalQueueSize()
+
+    // Clear all priority queues
+    for (const queue of this.priorityQueues.values()) {
+      queue.length = 0
+    }
+
     this.state = {
       ...this.state,
       messageCount: 0,
     }
 
-    // v-0.6.1: Event emission removed - pure message-driven
+    this.notifySubscribers({ type: 'queue_cleared', clearedCount })
     return success(clearedCount)
   }
 
@@ -536,8 +630,10 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       this.readReject = undefined
     }
 
-    // Clear queue
-    this.queue = []
+    // Clear all priority queues
+    for (const queue of this.priorityQueues.values()) {
+      queue.length = 0
+    }
 
     // Call cleanup function if provided - use QiCore pattern
     if (this.options.cleanupFn) {
@@ -568,51 +664,83 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
   // Private helper methods
 
   private dequeueNextMessage(): Result<QueuedMessage<T> | null, QueueError> {
-    if (this.queue.length === 0) {
-      return success(null)
+    // Dequeue from highest priority queue first (CRITICAL=0 to LOW=3)
+    for (const priority of [
+      MessagePriority.CRITICAL,
+      MessagePriority.HIGH,
+      MessagePriority.NORMAL,
+      MessagePriority.LOW,
+    ]) {
+      const queue = this.priorityQueues.get(priority)
+      if (!queue || queue.length === 0) continue
+
+      const message = queue.shift()!
+
+      // Check if message has expired
+      if (message.expiresAt && new Date() > message.expiresAt) {
+        this.updateStats(message.message, 'expired')
+        this.notifySubscribers({ type: 'message_expired', message: message.message })
+        // Use functional composition for recursive call
+        return this.dequeueNextMessage()
+      }
+
+      this.notifySubscribers({ type: 'message_dequeued', message: message.message })
+      return success(message)
     }
 
-    const message = this.queue.shift()!
-
-    // Check if message has expired
-    if (message.expiresAt && new Date() > message.expiresAt) {
-      this.updateStats(message.message, 'expired')
-      // Use functional composition for recursive call
-      return this.dequeueNextMessage()
-    }
-
-    return success(message)
+    return success(null)
   }
 
   private findNextMessage(): QueuedMessage<T> | null {
-    if (this.queue.length === 0) {
-      return null
-    }
+    // Check highest priority queues first
+    for (const priority of [
+      MessagePriority.CRITICAL,
+      MessagePriority.HIGH,
+      MessagePriority.NORMAL,
+      MessagePriority.LOW,
+    ]) {
+      const queue = this.priorityQueues.get(priority)
+      if (!queue || queue.length === 0) continue
 
-    // Find first non-expired message
-    for (const message of this.queue) {
-      if (!message.expiresAt || new Date() <= message.expiresAt) {
-        return message
+      // Find first non-expired message in this priority queue
+      for (const message of queue) {
+        if (!message.expiresAt || new Date() <= message.expiresAt) {
+          return message
+        }
       }
     }
 
     return null
   }
 
-  private insertByPriority(queuedMessage: QueuedMessage<T>): void {
-    const priority = queuedMessage.message.priority
+  /**
+   * Get total size across all priority queues
+   */
+  private getTotalQueueSize(): number {
+    return Array.from(this.priorityQueues.values()).reduce(
+      (total, queue) => total + queue.length,
+      0
+    )
+  }
 
-    // Find insertion point based on priority
-    let insertIndex = this.queue.length
-    for (let i = 0; i < this.queue.length; i++) {
-      const queueItem = this.queue[i]
-      if (queueItem && queueItem.message.priority > priority) {
-        insertIndex = i
+  /**
+   * Make room for critical messages by dropping lowest priority messages
+   */
+  private makeRoomForCriticalMessage(): void {
+    // Drop from lowest priority first
+    for (const priority of [MessagePriority.LOW, MessagePriority.NORMAL, MessagePriority.HIGH]) {
+      const queue = this.priorityQueues.get(priority)
+      if (queue && queue.length > 0) {
+        const dropped = queue.pop()! // Remove last (oldest) message
+        this.droppedMessageCount++
+        this.notifySubscribers({
+          type: 'message_dropped',
+          message: dropped.message,
+          reason: 'critical_priority_override',
+        })
         break
       }
     }
-
-    this.queue.splice(insertIndex, 0, queuedMessage)
   }
 
   private updateMessageStatus(queuedMessage: QueuedMessage<T>, status: MessageStatus): void {
@@ -620,16 +748,22 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
 
     if (status === MessageStatus.PROCESSING) {
       queuedMessage.processingStarted = new Date()
+      this.processingCount++
       this.state = {
         ...this.state,
         processingCount: this.state.processingCount + 1,
       }
     } else if (status === MessageStatus.COMPLETED || status === MessageStatus.FAILED) {
       queuedMessage.processingCompleted = new Date()
+      this.processingCount = Math.max(0, this.processingCount - 1)
       this.state = {
         ...this.state,
         processingCount: Math.max(0, this.state.processingCount - 1),
       }
+      this.notifySubscribers({
+        type: status === MessageStatus.COMPLETED ? 'message_processed' : 'message_failed',
+        message: queuedMessage.message,
+      })
     }
 
     this.updateStats(queuedMessage.message, status)
@@ -666,21 +800,93 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
 
   private cleanupExpiredMessages(): void {
     const now = new Date()
-    const originalLength = this.queue.length
+    let totalRemovedCount = 0
 
-    this.queue = this.queue.filter((queuedMessage) => {
-      if (queuedMessage.expiresAt && now > queuedMessage.expiresAt) {
-        this.updateStats(queuedMessage.message, 'expired')
-        return false
-      }
-      return true
-    })
+    // Clean up expired messages from all priority queues
+    for (const [priority, queue] of this.priorityQueues.entries()) {
+      const originalLength = queue.length
 
-    const removedCount = originalLength - this.queue.length
-    if (removedCount > 0) {
+      this.priorityQueues.set(
+        priority,
+        queue.filter((queuedMessage) => {
+          if (queuedMessage.expiresAt && now > queuedMessage.expiresAt) {
+            this.updateStats(queuedMessage.message, 'expired')
+            this.notifySubscribers({ type: 'message_expired', message: queuedMessage.message })
+            return false
+          }
+          return true
+        })
+      )
+
+      totalRemovedCount += originalLength - this.priorityQueues.get(priority)!.length
+    }
+
+    if (totalRemovedCount > 0) {
       this.state = {
         ...this.state,
-        messageCount: this.queue.length,
+        messageCount: this.getTotalQueueSize(),
+      }
+    }
+  }
+
+  /**
+   * Subscribe to queue events for monitoring
+   */
+  subscribe(callback: QueueSubscriber<T>): () => void {
+    this.subscribers.add(callback)
+
+    // Return unsubscribe function
+    return () => {
+      this.subscribers.delete(callback)
+    }
+  }
+
+  /**
+   * Get queue statistics with priority breakdown
+   */
+  getDetailedStats(): Result<
+    | (MessageStats & {
+        droppedMessages: number
+        queuesByPriority: Record<MessagePriority, number>
+        processingCount: number
+      })
+    | null,
+    QueueError
+  > {
+    if (!this.options.enableStats) {
+      return success(null)
+    }
+
+    const queuesByPriority = {
+      [MessagePriority.CRITICAL]: this.priorityQueues.get(MessagePriority.CRITICAL)?.length || 0,
+      [MessagePriority.HIGH]: this.priorityQueues.get(MessagePriority.HIGH)?.length || 0,
+      [MessagePriority.NORMAL]: this.priorityQueues.get(MessagePriority.NORMAL)?.length || 0,
+      [MessagePriority.LOW]: this.priorityQueues.get(MessagePriority.LOW)?.length || 0,
+    }
+
+    return success({
+      ...this.stats,
+      queueLength: this.getTotalQueueSize(),
+      droppedMessages: this.droppedMessageCount,
+      queuesByPriority,
+      processingCount: this.processingCount,
+    })
+  }
+
+  /**
+   * Notify all subscribers of queue events
+   */
+  private notifySubscribers(event: QueueEvent<T>): void {
+    const eventWithTimestamp = {
+      ...event,
+      timestamp: event.timestamp || new Date(),
+    }
+
+    for (const subscriber of this.subscribers) {
+      try {
+        subscriber(eventWithTimestamp)
+      } catch (error) {
+        this.debug.error('Subscriber error:', error)
       }
     }
   }

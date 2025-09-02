@@ -181,7 +181,7 @@ export class ReadlineModeRenderer implements IModeRenderer {
   /**
    * Set the current mode
    */
-  setMode(mode: CLIMode, silent: boolean = false): void {
+  setMode(mode: CLIMode, silent = false): void {
     if (this.isDestroyed) {
       return
     }
@@ -209,7 +209,7 @@ export class ReadlineModeRenderer implements IModeRenderer {
   /**
    * Cycle to the next mode
    */
-  cycleMode(silent: boolean = false): CLIMode {
+  cycleMode(silent = false): CLIMode {
     const modes: CLIMode[] = ['interactive', 'command', 'streaming']
     const currentIndex = modes.indexOf(this.currentMode)
     const nextIndex = (currentIndex + 1) % modes.length

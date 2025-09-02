@@ -340,7 +340,7 @@ export class HybridCLIFramework extends InkCLIFramework {
   public createCursor(
     text: string,
     columns: number,
-    offset: number = 0
+    offset = 0
   ): Result<Cursor, HybridFrameworkError> {
     // Validation using QiCore patterns
     if (columns <= 0) {
