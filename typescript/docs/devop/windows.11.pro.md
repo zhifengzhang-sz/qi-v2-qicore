@@ -1,402 +1,117 @@
-## 1. Setting up WSL2/Ubuntu
+# Windows 11 Pro Development Environment Prerequisites
 
-**Quick Install Method (2025 - Recommended):**
+## System Requirements
+
+- **Windows 11 Pro** (Version 21H2 or later)
+- **Administrator privileges** 
+- **Minimum 8GB RAM** (16GB recommended for ML workloads)
+- **NVIDIA GPU with CUDA support** (optional, for ML acceleration)
+- **Virtualization enabled in BIOS/UEFI**
+
+## 1. WSL2 Installation and Configuration
+
+**Modern Single-Command Installation (2025 Method):**
+The current method uses a single command that enables all necessary features and installs Ubuntu automatically:
+
 ```powershell
 # Run PowerShell as Administrator
-# This single command enables WSL features and installs Ubuntu automatically
 wsl --install
-
-# Optional: Install without distribution for more control
-wsl --install --no-distribution
 
 # Optional: Install specific distribution
 wsl --install -d Ubuntu
-```
 
-**Alternative Manual Method (if quick install fails):**
-```powershell
-# Enable WSL and Virtual Machine Platform
-dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-
-# Restart computer, then set WSL2 as default
-wsl --set-default-version 2
-```
-
-**Update Ubuntu after first setup:**
-```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-## 2. Setting up VSCode for WSL2 Development
-
-**Install VSCode Extensions:**
-- Install VSCode on Windows (version 1.35 or later)
-- Install the "Remote - WSL" extension (ms-vscode-remote.remote-wsl)
-- Or install "Remote Development" extension pack (includes WSL, SSH, and Dev Containers)
-
-**Connect VSCode to WSL2:**
-```bash
-# From within WSL2 Ubuntu terminal
-code .
-```
-
-This automatically installs VSCode Server in WSL2 and opens VSCode connected to the Ubuntu environment.
-
-**Recommended WSL2 Extensions:**
-- Python (ms-python.python)
-- Pylance (ms-python.vscode-pylance)
-- TypeScript and JavaScript Language Features
-- Git Extension Pack
-
-## 3. Python Development Environment (Hybrid Setup)
-
-**In WSL2 Ubuntu (for editing/tools):**
-```bash
-# Install Python build dependencies (2025 updated list)
-sudo apt install -y gcc make build-essential libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev
-
-# Install pyenv for Python version management
-curl https://pyenv.run | bash
-
-# Add to ~/.bashrc (or ~/.zshrc if using zsh)
-echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
-
-# Also create ~/.profile with the same commands
-echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.profile
-echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.profile
-echo 'eval "$(pyenv init -)"' >> ~/.profile
-
-# Reload configuration
-exec "$SHELL"
-
-# Install Python versions we need
-pyenv install 3.11.5
-pyenv install 3.10.12
-pyenv global 3.11.5
-```
-
-**On Windows (for execution with GPU):**
-- Install Python from python.org or Microsoft Store
-- Install CUDA Toolkit if using NVIDIA GPUs
-- Install PyTorch/TensorFlow with CUDA support
-
-**Shared Project Setup:**
-```bash
-# In WSL2, create a shared workspace
-mkdir -p /mnt/c/dev/ai-projects
-cd /mnt/c/dev/ai-projects
-
-# Create virtual environment that both can access
-python3 -m venv venv
-
-# WSL2 activation
-source venv/bin/activate
-
-# Windows activation (from CMD/PowerShell in C:\dev\ai-projects)
-# venv\Scripts\activate
-```
-
-**VSCode Configuration for Hybrid Python:**
-Create `.vscode/settings.json` in your project:
-```json
-{
-    "python.pythonPath": "/mnt/c/dev/ai-projects/venv/bin/python",
-    "python.terminal.activateEnvironment": true,
-    "python.defaultInterpreterPath": "/mnt/c/dev/ai-projects/venv/bin/python"
-}
-```
-
-**Execution Workflow:**
-- Edit in VSCode connected to WSL2
-- Run development/testing in WSL2 terminal
-- Execute GPU-intensive training on Windows PowerShell/CMD
-
-## 4. TypeScript Development Environment
-
-**In WSL2 Ubuntu:**
-```bash
-# Remove any existing Node.js installations first (recommended)
-sudo apt remove nodejs npm
-
-# Install curl if not installed
-sudo apt-get install curl
-
-# Install Node.js using nvm (2025 method)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
-
-# Restart shell or source configuration
-exec "$SHELL"
-# Or: source ~/.bashrc
-
-# Verify nvm installation
-command -v nvm
-
-# Install latest LTS Node.js
-nvm install --lts
-nvm use --lts
+# Optional: Install without distribution for manual selection
+wsl --install --no-distribution
 
 # Verify installation
-node --version
-npm --version
-
-# Install global TypeScript tools
-npm install -g typescript ts-node @types/node
-
-# For AI/ML TypeScript projects
-npm install -g @tensorflow/tfjs-node
+wsl --list --verbose
 ```
 
-**On Windows (for GPU execution if needed):**
-- Install Node.js from nodejs.org
-- Install the same global packages
+**Post-Installation Setup:**
+After installation, set WSL2 as default and update the system:
 
-**Project Setup:**
-```bash
-# In the shared project directory
-cd /mnt/c/dev/ai-projects/my-ts-project
-
-# Initialize TypeScript project
-npm init -y
-npm install -D typescript @types/node ts-node
-npx tsc --init
-
-# Install AI/ML libraries
-npm install @tensorflow/tfjs @tensorflow/tfjs-node
-```
-
-**VSCode TypeScript Configuration:**
-Add to `.vscode/settings.json`:
-```json
-{
-    "typescript.preferences.includePackageJsonAutoImports": "on",
-    "typescript.suggest.autoImports": true,
-    "typescript.updateImportsOnFileMove.enabled": "always"
-}
-```
-
-## 5. Additional Tips for AI Development
-
-**Jupyter Setup:**
-```bash
-# In WSL2
-pip install jupyter jupyterlab notebook
-
-# Access from Windows browser
-jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
-```
-
-**GPU Monitoring:**
 ```powershell
-# Windows PowerShell
-nvidia-smi
+# Ensure WSL2 is default version
+wsl --set-default-version 2
+
+# Launch Ubuntu and create user account during first boot
+wsl -d Ubuntu
 ```
 
-**File System Notes:**
-- Windows files: `/mnt/c/` in WSL2
-- WSL2 files: `\\wsl$\Ubuntu\home\username\` in Windows Explorer
-- Use `/mnt/c/dev/` for shared projects to ensure both environments can access files efficiently
-
-**Performance Tips:**
-- Keep frequently accessed files on the WSL2 filesystem for better performance
-- Use shared directories (`/mnt/c/`) for projects you need to access from both environments
-- Install packages in the environment where you'll primarily use them
-
----
-
-## 6. Docker in WSL2
-
-**Option A: Docker Desktop (Recommended for most users)**
-- Download and install Docker Desktop for Windows
-- During installation, ensure "Use WSL 2 instead of Hyper-V" is enabled
-- In Docker Desktop settings, enable WSL 2 integration for your Ubuntu distribution
-- **Note**: Requires paid license for enterprise use (free for personal use)
-- Provides built-in Kubernetes, cross-platform integration, and easier setup
-
-**Option B: Docker CE directly in WSL2 (Enterprise/cost-conscious choice)**
+**Initial Ubuntu Configuration:**
 ```bash
-# Update package index
-sudo apt update
+# Update system packages
+sudo apt update && sudo apt upgrade -y
 
-# Install prerequisites
-sudo apt install apt-transport-https ca-certificates curl gnupg lsb-release
-
-# Add Docker's official GPG key
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-
-# Add Docker repository
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Install Docker CE
-sudo apt update
-sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Add the user to docker group
-sudo usermod -aG docker $USER
-
-# Start Docker service (WSL2 doesn't use systemd by default)
-sudo service docker start
-
-# Auto-start Docker (add to shell config)
-echo 'if ! service docker status > /dev/null 2>&1; then' >> ~/.bashrc
-echo '    sudo service docker start > /dev/null 2>&1' >> ~/.bashrc
-echo 'fi' >> ~/.bashrc
+# Install essential build tools
+sudo apt install -y build-essential curl wget git unzip
 ```
 
-**Docker CE Benefits**: No licensing costs, more control, native Linux experience  
-**Docker CE Challenges**: Requires more Linux knowledge, manual daemon management
-
-**Test Docker:**
+## 2. Essential Tools Installation in WSL2
+### zsh
+**Zsh and Oh My Zsh Setup:**
 ```bash
-# Restart WSL2 session or run:
-newgrp docker
-
-# Test Docker
-docker run hello-world
-```
-
-## 7. Git Setup
-
-**Install Git:**
-```bash
-# Install Git (usually pre-installed, but ensure latest version)
-sudo apt update
-sudo apt install git
-```
-
-**Configure Git:**
-```bash
-# Set our identity
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-
-# Set default branch name
-git config --global init.defaultBranch main
-
-# Improve Git experience
-git config --global pull.rebase false
-git config --global core.autocrlf input
-git config --global core.editor "code --wait"
-```
-
-**SSH Key Setup (recommended):**
-```bash
-# Generate SSH key
-ssh-keygen -t ed25519 -C "your.email@example.com"
-
-# Start SSH agent
-eval "$(ssh-agent -s)"
-
-# Add SSH key
-ssh-add ~/.ssh/id_ed25519
-
-# Display public key (add this to GitHub/GitLab)
-cat ~/.ssh/id_ed25519.pub
-```
-
-**Git Credential Helper:**
-```bash
-# Use Git Credential Manager from Windows
-git config --global credential.helper "/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe"
-```
-
-## 8. Claude Code CLI
-
-**Installation:**
-```bash
-# Install Claude Code CLI
-# Note: Check the official documentation for the latest installation method
-curl -fsSL https://raw.githubusercontent.com/anthropics/claude-code/main/install.sh | bash
-
-# Or using npm if available:
-npm install -g @anthropic/claude-code
-
-# Or using pip if available:
-pip install claude-code
-```
-
-**Setup and Configuration:**
-```bash
-# Initialize Claude Code (follow prompts for API key setup)
-claude-code init
-
-# Set up the API key (we'll need an Anthropic API key)
-claude-code config set api-key YOUR_API_KEY
-
-# Test the installation
-claude-code --help
-```
-
-**Note:** Check the official documentation at https://docs.anthropic.com/en/docs/claude-code for the most up-to-date installation instructions and setup process. As of 2025, Claude Code CLI is actively maintained and regularly updated.
-
-## 9. Terminal Enhancement with Zsh and Oh My Zsh (2025 Updated)
-
-**Install Zsh and Oh My Zsh:**
-```bash
-# Update package list and install essential tools
-sudo apt update
-sudo apt install build-essential curl wget unzip zsh tmux htop tree
+# Install Zsh
+sudo apt install zsh
 
 # Install Oh My Zsh
 sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
-# Set zsh as default shell if not set automatically
+# Set Zsh as default shell
 chsh -s $(which zsh)
-```
 
-**Install Powerlevel10k Theme (2025 Method):**
-```bash
-# Clone Powerlevel10k repository
+# Install Powerlevel10k theme
 git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
 
-# Install recommended fonts (MesloLGS NF)
-sudo apt install fonts-powerline
-
-# For Windows Terminal, also install MesloLGS NF fonts manually
-# Download from: https://github.com/romkatv/powerlevel10k#fonts
-```
-
-**Install Essential Plugins:**
-```bash
-# Auto-suggestions plugin
+# Install essential plugins
 git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-
-# Syntax highlighting plugin
 git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
 ```
 
-**Configure Zsh (~/.zshrc):**
+**Configure Zsh (.zshrc):**
 ```bash
-# Edit zsh configuration
-code ~/.zshrc
-
-# Set Powerlevel10k theme
+# Edit ~/.zshrc
 ZSH_THEME="powerlevel10k/powerlevel10k"
-
-# Enable plugins (2025 recommended set)
 plugins=(git docker docker-compose node npm python pip vscode zsh-autosuggestions zsh-syntax-highlighting)
 
-# Reload configuration
+# Apply configuration
 source ~/.zshrc
-
-# Run configuration wizard (will auto-start on first load)
-p10k configure
+p10k configure  # Run configuration wizard
 ```
 
-**Windows Terminal Font Setup:**
-- Set font to "MesloLGS NF" in Windows Terminal settings
-- Font size: 11-12 recommended
-- This enables all Powerlevel10k icons and styling
+### Git and GitHub CLI Installation
 
-## 10. Additional Development Tools
-
-**Install GitHub CLI:**
+**Git Configuration:**
 ```bash
+# Install Git (usually pre-installed)
+sudo apt install git
+
+# Configure Git identity
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+git config --global init.defaultBranch main
+git config --global pull.rebase false
+git config --global core.autocrlf input
+
+# Generate SSH key
+ssh-keygen -t ed25519 -C "your.email@example.com"
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+
+# Display public key for GitHub
+cat ~/.ssh/id_ed25519.pub
+```
+
+**GitHub CLI Installation:**
+Install GitHub CLI using the official repository method:
+
+```bash
+# Add GitHub CLI repository
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+# Install GitHub CLI
 sudo apt update
 sudo apt install gh
 
@@ -404,81 +119,783 @@ sudo apt install gh
 gh auth login
 ```
 
-## 11. VSCode Integration Updates
+### Docker Installation
 
-**Add these extensions for the new tools:**
-- Docker (ms-azuretools.vscode-docker)
-- GitLens (eamodio.gitlens) 
-- GitHub Pull Requests and Issues (GitHub.vscode-pull-request-github)
-
-**Update your `.zshrc` for better development experience:**
+**Docker Engine Installation:**
 ```bash
+# Install Docker prerequisites
+sudo apt install apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Add Docker GPG key and repository
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker Engine
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Configure user permissions
+sudo usermod -aG docker $USER
+
+# Configure auto-start (add to ~/.zshrc)
+echo 'if ! service docker status > /dev/null 2>&1; then' >> ~/.zshrc
+echo '    sudo service docker start > /dev/null 2>&1' >> ~/.zshrc
+echo 'fi' >> ~/.zshrc
+
+# Test installation (requires logout/login or newgrp docker)
+newgrp docker
+docker run hello-world
+```
+
+### Node.js and TypeScript Installation
+
+**Node Version Manager (NVM) Installation:**
+Install NVM using the latest official script and configure for latest Node.js:
+
+```bash
+# Install NVM dependencies
+sudo apt-get install curl
+
+# Install NVM (check for latest version)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
+
+# Configure shell environment
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
 # Add to ~/.zshrc
+echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.zshrc
+echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.zshrc
+echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> ~/.zshrc
 
-# Docker aliases
-alias dps='docker ps'
-alias di='docker images'
-alias dc='docker-compose'
+# Reload shell configuration
+exec "$SHELL"
 
-# Git aliases
-alias gs='git status'
-alias ga='git add'
-alias gc='git commit'
-alias gp='git push'
-alias gl='git pull'
-alias gb='git branch'
-alias gco='git checkout'
-
-# Claude Code alias (adjust based on actual command name)
-alias cc='claude-code'
-
-# Auto-start Docker service
-if ! service docker status > /dev/null 2>&1; then
-    sudo service docker start > /dev/null 2>&1
-fi
+# Verify NVM installation
+command -v nvm
 ```
 
-**Reload your configuration:**
+**Node.js Installation:**
 ```bash
-source ~/.zshrc
-# or
-exec zsh
+# Install latest LTS Node.js (recommended)
+nvm install --lts
+nvm use --lts
+nvm alias default node
+
+# Verify installation
+node --version
+npm --version
+
+# Install TypeScript globally
+npm install -g typescript ts-node @types/node
+
+# Verify TypeScript
+tsc --version
+ts-node --version
 ```
 
-## 12. Testing Our Setup
-
-**Create a test project to verify everything works:**
+**Bun Installation (Optional Alternative Package Manager):**
 ```bash
-# Create test directory
-mkdir -p /mnt/c/dev/test-setup
-cd /mnt/c/dev/test-setup
+# Install Bun
+curl -fsSL https://bun.sh/install | bash
+exec "$SHELL"
 
-# Initialize git repo
-git init
+# Verify installation
+bun --version
+```
 
-# Create simple Python file
-echo "print('Hello from WSL2!')" > hello.py
+### Python and Pyenv Installation
 
-# Create Dockerfile
-cat << EOF > Dockerfile
-FROM python:3.11-slim
-COPY hello.py .
-CMD ["python", "hello.py"]
-EOF
+**Python Build Dependencies:**
+Install comprehensive build dependencies required for Python compilation:
 
-# Test Docker build
-docker build -t test-setup .
+```bash
+# Install Python build prerequisites
+sudo apt update && sudo apt install -y make build-essential libssl-dev zlib1g-dev \
+libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncursesw5-dev \
+xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+```
 
-# Test Docker run
-docker run test-setup
+**Pyenv Installation:**
+Use the official pyenv installation script which is the current recommended method:
 
-# Test Claude Code (if properly configured)
-claude-code "Help me optimize this Python script"
+```bash
+# Install pyenv using official installer
+curl https://pyenv.run | bash
 
-# Open in VSCode
+# Configure shell environment for Zsh
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+echo 'eval "$(pyenv init - zsh)"' >> ~/.zshrc
+
+# Also configure for Bash (fallback)
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
+
+# Reload shell configuration
+exec "$SHELL"
+
+# Verify pyenv installation
+pyenv --version
+```
+
+**Python Installation with Pyenv:**
+```bash
+# View available Python versions
+pyenv install --list
+
+# Install Python versions
+pyenv install 3.11.5
+pyenv install 3.10.12
+
+# Set global Python version
+pyenv global 3.11.5
+
+# Verify installation
+python --version
+pip --version
+
+# Upgrade pip
+pip install --upgrade pip
+```
+
+## 3. Windows-Side Prerequisites
+
+**CUDA Toolkit (For ML/AI Development):**
+```powershell
+# Download and install CUDA Toolkit from NVIDIA
+# https://developer.nvidia.com/cuda-downloads
+# Select: Windows 11, x86_64, Local Installer
+
+# Verify CUDA installation
+nvcc --version
+nvidia-smi
+```
+
+**Python for Windows (For GPU ML Operations):**
+```powershell
+# Install Python from python.org or Microsoft Store
+# Ensure "Add to PATH" is selected during installation
+
+# Verify Windows Python installation
+python --version
+pip --version
+
+# Install CUDA-enabled ML libraries
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install tensorflow[and-cuda]
+```
+
+**Windows Terminal (Recommended):**
+```powershell
+# Install via Microsoft Store or winget
+winget install Microsoft.WindowsTerminal
+
+# Configure for WSL2 integration and Powerlevel10k fonts
+```
+
+### VSCode Installation and Configuration
+
+**VSCode Installation:**
+- Download from https://code.visualstudio.com/
+- Install with default settings
+- Ensure "Add to PATH" is selected
+
+**Essential Extensions:**
+- Remote - WSL (ms-vscode-remote.remote-wsl)
+- Python (ms-python.python)
+- TypeScript and JavaScript Language Features
+- Docker (ms-azuretools.vscode-docker)
+- GitLens (eamodio.gitlens)
+
+**Connect VSCode to WSL2:**
+```bash
+# From WSL2 terminal
 code .
 ```
 
+## 4. Installation Verification
+
+**Complete System Test:**
+```bash
+# Test all installed tools
+echo "=== System Information ==="
+cat /etc/os-release
+echo ""
+
+echo "=== Tool Versions ==="
+node --version
+npm --version
+python --version
+pip --version
+git --version
+gh --version
+docker --version
+zsh --version
+pyenv --version
+
+echo ""
+echo "=== Functionality Tests ==="
+
+# Test Docker
+docker run hello-world
+
+# Test GitHub CLI
+gh auth status
+
+# Test Python environment
+python -c "print('Python working!')"
+
+# Test Node.js
+node -e "console.log('Node.js working!')"
+
+# Test pyenv
+pyenv versions
+
+echo ""
+echo "=== Cross-Platform Tests ==="
+ls /mnt/c/
+echo "Cross-platform file access working!"
+```
+
+**Windows Environment Test:**
+```powershell
+# Verify Windows components
+python --version
+nvcc --version  # If CUDA installed
+nvidia-smi      # If NVIDIA GPU present
+wsl --list --verbose
+```
+
+## 5. Notes on prerequisites
+
+- **Restart required**: System restart recommended after WSL2 installation
+- **Font configuration**: Install MesloLGS NF fonts for proper Powerlevel10k display in Windows Terminal
+- **Firewall settings**: Ensure Windows Defender allows WSL2 and Docker operations
+- **Shared directories**: Use `/mnt/c/dev/` for cross-platform project access
+- **Backup strategy**: Configure backup for development environment and projects
+
+This prerequisites setup provides a robust, modern development environment with all necessary tools for ML/AI development using the Python/TypeScript architecture separation discussed earlier.
+
 ---
 
-This completes the Windows 11 Pro setup with WSL2, providing a comprehensive development environment with enhanced terminal capabilities through Zsh and Oh My Zsh integration.
+## Advanced setup
+### Claude Code CLI Installation
+
+**Prerequisites for Claude Code:**
+Claude Code requires Node.js v18 or newer and authentication via Anthropic Console:
+
+```bash
+# Verify Node.js version (should be 18+)
+node --version
+
+# Ensure we have the requirements met from previous steps
+```
+
+**Installation Methods:**
+
+**Method 1: NPM Installation (Recommended for WSL2):**
+Install globally via npm package manager:
+
+```bash
+# Install Claude Code globally
+npm install -g @anthropic-ai/claude-code
+
+# Verify installation
+claude --version
+
+# Should show version like: 1.0.108 (Claude Code)
+```
+
+**Method 2: Native Installer (Alternative):**
+Use the official installation script:
+
+```bash
+# Install stable version
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Or install latest version
+curl -fsSL https://claude.ai/install.sh | bash -s latest
+```
+
+**Authentication Setup:**
+```bash
+# Navigate to a project directory
+cd /mnt/c/dev/
+
+# Start Claude Code (will prompt for authentication)
+claude
+
+# Follow prompts to:
+# 1. Open browser for OAuth
+# 2. Login to Anthropic Console
+# 3. Complete authentication
+```
+
+**Verify Installation:**
+```bash
+# Check installation health
+claude doctor
+
+# Test basic functionality
+claude "Hello, help me verify the installation is working"
+```
+
+### ML/AI Project Structure Recommendations
+
+**Recommended Project Architecture:**
+```bash
+# Create standardized ML/AI project structure
+mkdir -p /mnt/c/dev/ai-projects/{project-name}/{python,typescript,shared,docs}
+
+# Example structure:
+/mnt/c/dev/ai-projects/my-ai-app/
+├── python/                    # 🐍 ML computation & training
+│   ├── src/
+│   │   ├── models/           # Model definitions
+│   │   ├── training/         # Training scripts
+│   │   ├── inference/        # Inference engines
+│   │   └── utils/            # Utility functions
+│   ├── notebooks/            # Jupyter notebooks
+│   ├── tests/               # Python tests
+│   ├── requirements.txt     # Python dependencies
+│   ├── pyproject.toml       # Poetry configuration
+│   └── README.md
+├── typescript/               # 🟦 LLM APIs & web interfaces
+│   ├── src/
+│   │   ├── api/             # REST API routes
+│   │   ├── services/        # Business logic
+│   │   ├── integrations/    # LLM API clients
+│   │   └── utils/           # Utility functions
+│   ├── web/                 # Frontend applications
+│   ├── tests/               # TypeScript tests
+│   ├── package.json         # Node.js dependencies
+│   └── README.md
+├── shared/                   # 📁 Cross-platform resources
+│   ├── data/                # Datasets
+│   ├── models/              # Trained model files (.pt, .onnx)
+│   ├── configs/             # Configuration files
+│   └── api-contracts/       # Type definitions & schemas
+├── docs/                     # 📚 Documentation
+│   ├── architecture.md
+│   ├── api-docs/
+│   └── deployment.md
+├── .vscode/                  # VSCode configuration
+│   ├── settings.json
+│   ├── launch.json
+│   └── extensions.json
+├── docker-compose.yml        # Development environment
+├── .gitignore
+└── README.md
+```
+
+**Initialize Project Template:**
+```bash
+# Quick project setup script
+create_ai_project() {
+    local project_name=$1
+    local base_dir="/mnt/c/dev/ai-projects/$project_name"
+    
+    # Create directory structure
+    mkdir -p "$base_dir"/{python/{src/{models,training,inference,utils},notebooks,tests},typescript/{src/{api,services,integrations,utils},web,tests},shared/{data,models,configs,api-contracts},docs/{api-docs},.vscode}
+    
+    # Initialize Python environment
+    cd "$base_dir/python"
+    python -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip
+    echo "torch>=2.0.0" > requirements.txt
+    echo "fastapi>=0.100.0" >> requirements.txt
+    echo "uvicorn>=0.20.0" >> requirements.txt
+    
+    # Initialize TypeScript environment
+    cd "$base_dir/typescript"
+    npm init -y
+    npm install -D typescript @types/node ts-node
+    npm install express @anthropic-ai/sdk openai
+    
+    # Create basic configuration files
+    echo "node_modules/\n*.log\n.env\n__pycache__/\n*.pyc" > "$base_dir/.gitignore"
+    
+    echo "# $project_name\n\nML/AI project with Python backend and TypeScript frontend." > "$base_dir/README.md"
+    
+    cd "$base_dir"
+    git init
+    
+    echo "Project '$project_name' created at $base_dir"
+}
+
+# Usage example:
+# create_ai_project "my-ml-app"
+```
+
+### Specific Development Workflow Examples
+
+**Daily Development Workflow:**
+
+**1. Morning Setup:**
+```bash
+# Start development session
+cd /mnt/c/dev/ai-projects/my-ai-app
+
+# Activate Python environment
+cd python && source venv/bin/activate
+
+# Check for updates
+git pull
+pip install -r requirements.txt
+
+# Start development servers
+cd ../typescript && npm install
+npm run dev &  # Background process
+
+# Open VSCode
+code ../
+```
+
+**2. Python ML Development Workflow:**
+```bash
+# In python/ directory
+cd /mnt/c/dev/ai-projects/my-ai-app/python
+
+# Activate environment
+source venv/bin/activate
+
+# Start Jupyter for experimentation
+jupyter lab --ip=0.0.0.0 --port=8888 --no-browser &
+
+# Develop model
+python src/training/train_model.py
+
+# Test inference
+python src/inference/test_model.py
+
+# Run tests
+pytest tests/
+
+# Save model to shared directory
+python -c "
+import torch
+model = torch.load('models/latest.pt')
+torch.save(model, '../shared/models/production.pt')
+"
+```
+
+**3. TypeScript Integration Workflow:**
+```bash
+# In typescript/ directory
+cd /mnt/c/dev/ai-projects/my-ai-app/typescript
+
+# Start development
+npm run dev
+
+# Test API integration
+npm run test
+
+# Deploy model integration
+node src/services/model-service.js
+```
+
+**4. Claude Code Integration Workflow:**
+```bash
+# Use Claude Code for development assistance
+cd /mnt/c/dev/ai-projects/my-ai-app
+
+# Debug Python issues
+claude "Help me debug this PyTorch training error" --add-dir python/
+
+# Generate TypeScript API endpoints
+claude "Create REST API endpoints for model inference" --add-dir typescript/src/api/
+
+# Code review
+claude "Review this machine learning pipeline for optimization" --add-dir python/src/
+
+# Documentation generation
+claude "Generate API documentation from these TypeScript files" --output-format json
+```
+
+**5. Cross-Platform Communication Patterns:**
+
+**Python → TypeScript Communication:**
+```python
+# python/src/api/ml_server.py
+from fastapi import FastAPI
+from pydantic import BaseModel
+import torch
+
+app = FastAPI()
+
+class PredictionRequest(BaseModel):
+    data: list[float]
+
+@app.post("/predict")
+async def predict(request: PredictionRequest):
+    model = torch.load("../shared/models/production.pt")
+    result = model(torch.tensor(request.data))
+    return {"prediction": result.tolist()}
+
+# Run: uvicorn ml_server:app --host 0.0.0.0 --port 5000
+```
+
+```typescript
+// typescript/src/services/ml-client.ts
+export class MLService {
+  private baseUrl = 'http://localhost:5000';
+  
+  async predict(data: number[]): Promise<number[]> {
+    const response = await fetch(`${this.baseUrl}/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data })
+    });
+    
+    const result = await response.json();
+    return result.prediction;
+  }
+}
+
+// typescript/src/api/inference.ts
+import { MLService } from '../services/ml-client';
+import Anthropic from '@anthropic-ai/sdk';
+
+const mlService = new MLService();
+const anthropic = new Anthropic();
+
+export async function handleInference(req: any, res: any) {
+  // Get ML prediction
+  const prediction = await mlService.predict(req.body.features);
+  
+  // Enhance with LLM explanation
+  const explanation = await anthropic.messages.create({
+    model: 'claude-4-sonnet',
+    messages: [{
+      role: 'user',
+      content: `Explain this prediction: ${prediction}`
+    }]
+  });
+  
+  res.json({
+    prediction,
+    explanation: explanation.content[0].text
+  });
+}
+```
+
+### Advanced VSCode Configuration
+
+**Complete .vscode/settings.json:**
+```json
+{
+  "python.defaultInterpreterPath": "./python/venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.formatting.provider": "black",
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["python/tests"],
+  
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/venv": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/shared/models/*.pt": true
+  },
+  
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/venv": true,
+    "**/shared/data": true
+  },
+  
+  "files.associations": {
+    "*.yml": "yaml",
+    "*.yaml": "yaml",
+    "Dockerfile*": "dockerfile"
+  },
+  
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}/python/src"
+  },
+  
+  "jupyter.notebookFileRoot": "${workspaceFolder}/python",
+  
+  "git.ignoreLimitWarning": true,
+  "git.autofetch": true,
+  
+  "docker.showStartPage": false,
+  
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    }
+  },
+  
+  "[typescript]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    }
+  },
+  
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}
+```
+
+**Complete .vscode/launch.json:**
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Training Script",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/python/src/training/train_model.py",
+      "cwd": "${workspaceFolder}/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/python/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: FastAPI Server",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["src.api.ml_server:app", "--reload", "--host", "0.0.0.0", "--port", "5000"],
+      "cwd": "${workspaceFolder}/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/python/src"
+      }
+    },
+    {
+      "name": "TypeScript: API Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/typescript/src/server.ts",
+      "cwd": "${workspaceFolder}/typescript",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "Debug Tests: Python",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/", "-v"],
+      "cwd": "${workspaceFolder}/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/python/src"
+      }
+    },
+    {
+      "name": "Debug Tests: TypeScript",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/typescript/node_modules/.bin/jest",
+      "args": ["--runInBand"],
+      "cwd": "${workspaceFolder}/typescript",
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack Debug",
+      "configurations": ["Python: FastAPI Server", "TypeScript: API Server"]
+    }
+  ]
+}
+```
+
+**Complete .vscode/extensions.json:**
+```json
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance", 
+    "ms-toolsai.jupyter",
+    "ms-vscode.vscode-typescript-next",
+    "bradlc.vscode-tailwindcss",
+    "ms-azuretools.vscode-docker",
+    "eamodio.gitlens",
+    "ms-vscode-remote.remote-wsl",
+    "christian-kohler.path-intellisense",
+    "esbenp.prettier-vscode",
+    "ms-python.black-formatter",
+    "ms-python.flake8",
+    "formulahendry.auto-rename-tag",
+    "streetsidesoftware.code-spell-checker",
+    "ms-vscode.vscode-json"
+  ]
+}
+```
+
+**VSCode Tasks (.vscode/tasks.json):**
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup Python Environment",
+      "type": "shell",
+      "command": "cd python && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Setup TypeScript Environment", 
+      "type": "shell",
+      "command": "cd typescript && npm install",
+      "group": "build"
+    },
+    {
+      "label": "Run Python Tests",
+      "type": "shell",
+      "command": "cd python && source venv/bin/activate && pytest tests/ -v",
+      "group": "test"
+    },
+    {
+      "label": "Run TypeScript Tests",
+      "type": "shell", 
+      "command": "cd typescript && npm test",
+      "group": "test"
+    },
+    {
+      "label": "Start Development Servers",
+      "dependsOrder": "parallel",
+      "dependsOn": ["Start Python API", "Start TypeScript Server"]
+    },
+    {
+      "label": "Start Python API",
+      "type": "shell",
+      "command": "cd python && source venv/bin/activate && uvicorn src.api.ml_server:app --reload --host 0.0.0.0 --port 5000",
+      "group": "build",
+      "isBackground": true
+    },
+    {
+      "label": "Start TypeScript Server", 
+      "type": "shell",
+      "command": "cd typescript && npm run dev",
+      "group": "build",
+      "isBackground": true
+    }
+  ]
+}
+```
