@@ -1,19 +1,26 @@
 ## 1. Setting up WSL2/Ubuntu
 
-**Enable WSL2:**
+**Quick Install Method (2025 - Recommended):**
 ```powershell
 # Run PowerShell as Administrator
-dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+# This single command enables WSL features and installs Ubuntu automatically
+wsl --install
+
+# Optional: Install without distribution for more control
+wsl --install --no-distribution
+
+# Optional: Install specific distribution
+wsl --install -d Ubuntu
 ```
 
-**Restart your computer, then:**
+**Alternative Manual Method (if quick install fails):**
 ```powershell
-# Set WSL2 as default version
-wsl --set-default-version 2
+# Enable WSL and Virtual Machine Platform
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
 
-# Install Ubuntu (latest LTS)
-wsl --install -d Ubuntu
+# Restart computer, then set WSL2 as default
+wsl --set-default-version 2
 ```
 
 **Update Ubuntu after first setup:**
@@ -24,9 +31,9 @@ sudo apt update && sudo apt upgrade -y
 ## 2. Setting up VSCode for WSL2 Development
 
 **Install VSCode Extensions:**
-- Install VSCode on Windows
-- Install the "WSL" extension (ms-vscode-remote.remote-wsl)
-- Install "Remote Development" extension pack
+- Install VSCode on Windows (version 1.35 or later)
+- Install the "Remote - WSL" extension (ms-vscode-remote.remote-wsl)
+- Or install "Remote Development" extension pack (includes WSL, SSH, and Dev Containers)
 
 **Connect VSCode to WSL2:**
 ```bash
@@ -34,7 +41,7 @@ sudo apt update && sudo apt upgrade -y
 code .
 ```
 
-This automatically installs VSCode Server in WSL2 and opens VSCode connected to your Ubuntu environment.
+This automatically installs VSCode Server in WSL2 and opens VSCode connected to the Ubuntu environment.
 
 **Recommended WSL2 Extensions:**
 - Python (ms-python.python)
@@ -46,21 +53,26 @@ This automatically installs VSCode Server in WSL2 and opens VSCode connected to 
 
 **In WSL2 Ubuntu (for editing/tools):**
 ```bash
-# Install Python build dependencies
-sudo apt install python3-pip python3-venv python3-dev build-essential
+# Install Python build dependencies (2025 updated list)
+sudo apt install -y gcc make build-essential libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev
 
 # Install pyenv for Python version management
 curl https://pyenv.run | bash
 
-# Add to ~/.bashrc
+# Add to ~/.bashrc (or ~/.zshrc if using zsh)
 echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
 
-# Reload bash
-source ~/.bashrc
+# Also create ~/.profile with the same commands
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.profile
+echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.profile
+echo 'eval "$(pyenv init -)"' >> ~/.profile
 
-# Install Python versions you need
+# Reload configuration
+exec "$SHELL"
+
+# Install Python versions we need
 pyenv install 3.11.5
 pyenv install 3.10.12
 pyenv global 3.11.5
@@ -106,13 +118,29 @@ Create `.vscode/settings.json` in your project:
 
 **In WSL2 Ubuntu:**
 ```bash
-# Install Node.js using nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-source ~/.bashrc
+# Remove any existing Node.js installations first (recommended)
+sudo apt remove nodejs npm
+
+# Install curl if not installed
+sudo apt-get install curl
+
+# Install Node.js using nvm (2025 method)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
+
+# Restart shell or source configuration
+exec "$SHELL"
+# Or: source ~/.bashrc
+
+# Verify nvm installation
+command -v nvm
 
 # Install latest LTS Node.js
 nvm install --lts
 nvm use --lts
+
+# Verify installation
+node --version
+npm --version
 
 # Install global TypeScript tools
 npm install -g typescript ts-node @types/node
@@ -127,7 +155,7 @@ npm install -g @tensorflow/tfjs-node
 
 **Project Setup:**
 ```bash
-# In your shared project directory
+# In the shared project directory
 cd /mnt/c/dev/ai-projects/my-ts-project
 
 # Initialize TypeScript project
@@ -180,12 +208,14 @@ nvidia-smi
 
 ## 6. Docker in WSL2
 
-**Option A: Docker Desktop (Recommended)**
+**Option A: Docker Desktop (Recommended for most users)**
 - Download and install Docker Desktop for Windows
 - During installation, ensure "Use WSL 2 instead of Hyper-V" is enabled
 - In Docker Desktop settings, enable WSL 2 integration for your Ubuntu distribution
+- **Note**: Requires paid license for enterprise use (free for personal use)
+- Provides built-in Kubernetes, cross-platform integration, and easier setup
 
-**Option B: Docker CE directly in WSL2**
+**Option B: Docker CE directly in WSL2 (Enterprise/cost-conscious choice)**
 ```bash
 # Update package index
 sudo apt update
@@ -203,15 +233,20 @@ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] 
 sudo apt update
 sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-# Add your user to docker group
+# Add the user to docker group
 sudo usermod -aG docker $USER
 
-# Start Docker service
+# Start Docker service (WSL2 doesn't use systemd by default)
 sudo service docker start
 
-# Enable Docker to start on boot
-echo 'sudo service docker start' >> ~/.bashrc
+# Auto-start Docker (add to shell config)
+echo 'if ! service docker status > /dev/null 2>&1; then' >> ~/.bashrc
+echo '    sudo service docker start > /dev/null 2>&1' >> ~/.bashrc
+echo 'fi' >> ~/.bashrc
 ```
+
+**Docker CE Benefits**: No licensing costs, more control, native Linux experience  
+**Docker CE Challenges**: Requires more Linux knowledge, manual daemon management
 
 **Test Docker:**
 ```bash
@@ -233,7 +268,7 @@ sudo apt install git
 
 **Configure Git:**
 ```bash
-# Set your identity
+# Set our identity
 git config --global user.name "Your Name"
 git config --global user.email "your.email@example.com"
 
@@ -287,29 +322,78 @@ pip install claude-code
 # Initialize Claude Code (follow prompts for API key setup)
 claude-code init
 
-# Set up your API key (you'll need an Anthropic API key)
+# Set up the API key (we'll need an Anthropic API key)
 claude-code config set api-key YOUR_API_KEY
 
 # Test the installation
 claude-code --help
 ```
 
-**Note:** Since Claude Code is relatively new, I recommend checking the official documentation at https://docs.anthropic.com/en/docs/claude-code for the most up-to-date installation instructions and setup process.
+**Note:** Check the official documentation at https://docs.anthropic.com/en/docs/claude-code for the most up-to-date installation instructions and setup process. As of 2025, Claude Code CLI is actively maintained and regularly updated.
 
-## 9. Additional Useful Tools for AI Development
+## 9. Terminal Enhancement with Zsh and Oh My Zsh (2025 Updated)
 
-**Install additional development tools:**
+**Install Zsh and Oh My Zsh:**
 ```bash
-# Essential build tools
-sudo apt install build-essential curl wget unzip
+# Update package list and install essential tools
+sudo apt update
+sudo apt install build-essential curl wget unzip zsh tmux htop tree
 
-# Modern terminal tools
-sudo apt install zsh fish tmux htop tree
-
-# Install Oh My Zsh (optional, for better terminal experience)
+# Install Oh My Zsh
 sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
-# Install GitHub CLI
+# Set zsh as default shell if not set automatically
+chsh -s $(which zsh)
+```
+
+**Install Powerlevel10k Theme (2025 Method):**
+```bash
+# Clone Powerlevel10k repository
+git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
+
+# Install recommended fonts (MesloLGS NF)
+sudo apt install fonts-powerline
+
+# For Windows Terminal, also install MesloLGS NF fonts manually
+# Download from: https://github.com/romkatv/powerlevel10k#fonts
+```
+
+**Install Essential Plugins:**
+```bash
+# Auto-suggestions plugin
+git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+
+# Syntax highlighting plugin
+git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+```
+
+**Configure Zsh (~/.zshrc):**
+```bash
+# Edit zsh configuration
+code ~/.zshrc
+
+# Set Powerlevel10k theme
+ZSH_THEME="powerlevel10k/powerlevel10k"
+
+# Enable plugins (2025 recommended set)
+plugins=(git docker docker-compose node npm python pip vscode zsh-autosuggestions zsh-syntax-highlighting)
+
+# Reload configuration
+source ~/.zshrc
+
+# Run configuration wizard (will auto-start on first load)
+p10k configure
+```
+
+**Windows Terminal Font Setup:**
+- Set font to "MesloLGS NF" in Windows Terminal settings
+- Font size: 11-12 recommended
+- This enables all Powerlevel10k icons and styling
+
+## 10. Additional Development Tools
+
+**Install GitHub CLI:**
+```bash
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
@@ -320,16 +404,16 @@ sudo apt install gh
 gh auth login
 ```
 
-## 10. VSCode Integration Updates
+## 11. VSCode Integration Updates
 
 **Add these extensions for the new tools:**
 - Docker (ms-azuretools.vscode-docker)
 - GitLens (eamodio.gitlens) 
 - GitHub Pull Requests and Issues (GitHub.vscode-pull-request-github)
 
-**Update your `.bashrc` for better development experience:**
+**Update your `.zshrc` for better development experience:**
 ```bash
-# Add to ~/.bashrc
+# Add to ~/.zshrc
 
 # Docker aliases
 alias dps='docker ps'
@@ -356,10 +440,12 @@ fi
 
 **Reload your configuration:**
 ```bash
-source ~/.bashrc
+source ~/.zshrc
+# or
+exec zsh
 ```
 
-## 11. Testing Your Setup
+## 12. Testing Our Setup
 
 **Create a test project to verify everything works:**
 ```bash
@@ -395,287 +481,4 @@ code .
 
 ---
 
-## 12. Installing and Configuring Zsh + Oh My Zsh
-
-**Install Zsh:**
-```bash
-# Update package list
-sudo apt update
-
-# Install zsh
-sudo apt install zsh
-
-# Check installation
-zsh --version
-```
-
-**Install Oh My Zsh:**
-```bash
-# Install Oh My Zsh
-sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-
-# This will:
-# - Download and install Oh My Zsh
-# - Backup your existing ~/.zshrc
-# - Set zsh as your default shell
-# - Start a new zsh session
-```
-
-**If it doesn't set zsh as default automatically:**
-```bash
-# Set zsh as default shell
-chsh -s $(which zsh)
-
-# Or if that doesn't work:
-sudo chsh -s $(which zsh) $USER
-```
-
-## 13. Essential Oh My Zsh Configuration
-
-**Edit your `~/.zshrc` file:**
-```bash
-code ~/.zshrc
-```
-
-**Recommended configuration:**
-```bash
-# Path to your oh-my-zsh installation
-export ZSH="$HOME/.oh-my-zsh"
-
-# Theme (try different ones!)
-ZSH_THEME="robbyrussell"  # or "powerlevel10k/powerlevel10k" for advanced
-
-# Plugins (add gradually to avoid conflicts)
-plugins=(
-    git
-    docker
-    docker-compose
-    node
-    npm
-    python
-    pip
-    vscode
-    zsh-autosuggestions
-    zsh-syntax-highlighting
-    conda-zsh-completion
-)
-
-source $ZSH/oh-my-zsh.sh
-
-# Custom aliases
-alias ll='ls -alF'
-alias la='ls -A'
-alias l='ls -CF'
-
-# Development aliases
-alias gs='git status'
-alias ga='git add'
-alias gc='git commit'
-alias gp='git push'
-alias gl='git pull'
-alias gb='git branch'
-alias gco='git checkout'
-
-# Docker aliases
-alias dps='docker ps'
-alias di='docker images'
-alias dc='docker-compose'
-
-# Python aliases
-alias py='python3'
-alias pip='pip3'
-
-# Navigation aliases
-alias ..='cd ..'
-alias ...='cd ../..'
-alias ....='cd ../../..'
-
-# WSL-specific aliases
-alias windir='cd /mnt/c/Users/$USER'
-alias devdir='cd /mnt/c/dev'
-
-# Auto-start Docker service
-if ! service docker status > /dev/null 2>&1; then
-    sudo service docker start > /dev/null 2>&1
-fi
-
-# Add local bin to PATH
-export PATH="$HOME/.local/bin:$PATH"
-
-# Python path management
-export PYENV_ROOT="$HOME/.pyenv"
-command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init -)"
-
-# Node version manager
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-```
-
-## 14. Install Essential Zsh Plugins
-
-**Install additional plugins manually:**
-```bash
-# zsh-autosuggestions (suggests commands as you type)
-git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-
-# zsh-syntax-highlighting (highlights commands)
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
-
-# conda-zsh-completion (if you use conda)
-git clone https://github.com/esc/conda-zsh-completion ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/conda-zsh-completion
-```
-
-## 15. Advanced Theme: Powerlevel10k (Optional)
-
-**Install Powerlevel10k theme:**
-```bash
-# Install the theme
-git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
-
-# Install required fonts
-sudo apt install fonts-powerline
-
-# For Windows Terminal, also install Nerd Fonts
-# Download from: https://www.nerdfonts.com/font-downloads
-# Recommended: MesloLGS NF
-```
-
-**Update ~/.zshrc:**
-```bash
-ZSH_THEME="powerlevel10k/powerlevel10k"
-```
-
-**Configure Powerlevel10k:**
-```bash
-# Restart zsh and run configuration wizard
-exec zsh
-p10k configure
-
-# Or reconfigure anytime with:
-p10k configure
-```
-
-## 16. Windows Terminal Integration
-
-**For better experience in Windows Terminal, add this to your settings.json:**
-```json
-{
-    "profiles": {
-        "list": [
-            {
-                "guid": "{07b52e3e-de2c-5db4-bd2d-ba144ed6c273}",
-                "name": "Ubuntu (WSL2)",
-                "source": "Windows.Terminal.Wsl",
-                "startingDirectory": "//wsl$/Ubuntu/home/YOUR_USERNAME",
-                "fontFace": "MesloLGS NF",
-                "fontSize": 11,
-                "colorScheme": "One Half Dark"
-            }
-        ]
-    }
-}
-```
-
-## 17. Useful Zsh Features and Tips
-
-**Enable some Oh My Zsh features in ~/.zshrc:**
-```bash
-# Case-sensitive completion
-# CASE_SENSITIVE="true"
-
-# Hyphen-insensitive completion
-HYPHEN_INSENSITIVE="true"
-
-# Auto-update behavior
-zstyle ':omz:update' mode auto
-zstyle ':omz:update' frequency 13
-
-# Disable auto-setting terminal title
-DISABLE_AUTO_TITLE="true"
-
-# Enable command auto-correction
-ENABLE_CORRECTION="true"
-
-# Display red dots while waiting for completion
-COMPLETION_WAITING_DOTS="true"
-
-# Disable marking untracked files under VCS as dirty
-DISABLE_UNTRACKED_FILES_DIRTY="true"
-```
-
-**Custom functions you can add to ~/.zshrc:**
-```bash
-# Quick directory creation and navigation
-mkcd() {
-    mkdir -p "$1" && cd "$1"
-}
-
-# Extract any archive
-extract() {
-    if [ -f $1 ] ; then
-        case $1 in
-            *.tar.bz2)   tar xjf $1     ;;
-            *.tar.gz)    tar xzf $1     ;;
-            *.bz2)       bunzip2 $1     ;;
-            *.rar)       unrar e $1     ;;
-            *.gz)        gunzip $1      ;;
-            *.tar)       tar xf $1      ;;
-            *.tbz2)      tar xjf $1     ;;
-            *.tgz)       tar xzf $1     ;;
-            *.zip)       unzip $1       ;;
-            *.Z)         uncompress $1  ;;
-            *.7z)        7z x $1        ;;
-            *)     echo "'$1' cannot be extracted via extract()" ;;
-        esac
-    else
-        echo "'$1' is not a valid file"
-    fi
-}
-
-# Find and kill process
-fkill() {
-    local pid
-    pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
-    if [ "x$pid" != "x" ]; then
-        echo $pid | xargs kill -${1:-9}
-    fi
-}
-```
-
-## 18. Apply Changes
-
-**Reload your configuration:**
-```bash
-# Reload zsh configuration
-source ~/.zshrc
-
-# Or restart zsh session
-exec zsh
-```
-
-## 19. Test Your Setup
-
-**Test various features:**
-```bash
-# Test autosuggestions (start typing and use right arrow to accept)
-git sta[TAB]
-
-# Test syntax highlighting (commands should be colored)
-ls -la
-
-# Test aliases
-gs  # should run git status
-
-# Test custom function
-mkcd test-dir  # should create and enter directory
-```
-
-Your terminal should now have:
-- **Autosuggestions**: Suggests commands as you type
-- **Syntax highlighting**: Colors commands, paths, etc.
-- **Better tab completion**: More intelligent completions
-- **Git integration**: Shows branch info, status in prompt
-- **Useful aliases**: Shortcuts for common commands
-- **Custom functions**: Enhanced functionality
+This completes the Windows 11 Pro setup with WSL2, providing a comprehensive development environment with enhanced terminal capabilities through Zsh and Oh My Zsh integration.
