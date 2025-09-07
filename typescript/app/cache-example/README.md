@@ -19,7 +19,13 @@ Demonstrates QiCore Foundation cache usage patterns with both memory and Redis b
 bun run dev
 
 # With Redis (start Redis first)
+# Option 1: Use QiCore services (from typescript/app/cache-example/)
+cd ../../../services && docker compose up -d redis
+
+# Option 2: Start Redis directly
 docker run -p 6379:6379 redis:alpine
+
+# Then run the example
 bun run dev
 ```
 

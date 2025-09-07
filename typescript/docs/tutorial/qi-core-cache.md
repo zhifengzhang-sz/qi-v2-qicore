@@ -27,9 +27,10 @@ const memoryCache = createCache<User>({
 })
 
 // Redis cache - persistent, distributed, shared
+// Start Redis first: cd ../../services && docker compose up -d redis
 const redisCache = await createRedisCache<User>({
   redis: {
-    host: 'redis.example.com',
+    host: 'localhost',
     port: 6379
   }
 })

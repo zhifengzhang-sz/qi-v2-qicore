@@ -127,7 +127,7 @@
     },
     "lib/amsg": {
       "name": "@qi/amsg",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "dependencies": {
         "@qi/base": "file:../base",
       },
@@ -140,7 +140,7 @@
     },
     "lib/base": {
       "name": "@qi/base",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "devDependencies": {
         "rimraf": "^5.0.10",
         "tsup": "^8.5.0",
@@ -150,7 +150,7 @@
     },
     "lib/cli": {
       "name": "@qi/cli",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "dependencies": {
         "@qi/amsg": "file:../amsg",
         "@qi/base": "file:../base",
@@ -179,7 +179,7 @@
     },
     "lib/core": {
       "name": "@qi/core",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "dependencies": {
         "@qi/base": "file:../base",
         "dotenv": "^16.6.1",
@@ -911,9 +911,17 @@
 
     "@qi/amsg/@qi/base": ["@qi/base@file:lib/base", { "devDependencies": { "rimraf": "^5.0.10", "tsup": "^8.5.0", "typescript": "^5.8.3", "vitest": "^1.6.1" } }],
 
+    "@qi/cli/@qi/amsg": ["@qi/amsg@file:lib/amsg", { "dependencies": { "@qi/base": "file:../base" }, "devDependencies": { "rimraf": "^5.0.10", "tsup": "^8.5.0", "typescript": "^5.8.3", "vitest": "^1.6.1" } }],
+
     "@qi/cli/@qi/base": ["@qi/base@file:lib/base", { "devDependencies": { "rimraf": "^5.0.10", "tsup": "^8.5.0", "typescript": "^5.8.3", "vitest": "^1.6.1" } }],
 
+    "@qi/cli/@qi/core": ["@qi/core@file:lib/core", { "dependencies": { "@qi/base": "file:../base", "dotenv": "^16.6.1", "eventemitter3": "^5.0.1", "ioredis": "^5.6.1", "pino": "^9.7.0", "smol-toml": "^1.4.1", "yaml": "^2.8.0", "zod": "^4.1.5" }, "devDependencies": { "rimraf": "^5.0.10", "tsup": "^8.5.0", "typescript": "^5.8.3", "vitest": "^1.6.1" } }],
+
+    "@qi/cli-amsg-example/@qi/amsg": ["@qi/amsg@file:lib/amsg", { "dependencies": { "@qi/base": "file:../base" }, "devDependencies": { "rimraf": "^5.0.10", "tsup": "^8.5.0", "typescript": "^5.8.3", "vitest": "^1.6.1" } }],
+
     "@qi/cli-amsg-example/@qi/base": ["@qi/base@file:lib/base", { "devDependencies": { "rimraf": "^5.0.10", "tsup": "^8.5.0", "typescript": "^5.8.3", "vitest": "^1.6.1" } }],
+
+    "@qi/cli-amsg-example/@qi/cli": ["@qi/cli@file:lib/cli", { "dependencies": { "@qi/amsg": "file:../amsg", "@qi/base": "file:../base", "@qi/core": "file:../core", "chalk": "^5.6.0", "ink": "^6.2.3", "ink-big-text": "^2.0.0", "ink-gradient": "^3.0.0", "ink-spinner": "^5.0.0", "ink-text-input": "^6.0.0", "js-yaml": "^4.1.0", "react": "^18.2.0", "xstate": "^5.21.0" }, "devDependencies": { "@types/js-yaml": "^4.0.9", "@types/node": "^20.0.0", "@types/react": "^18.2.0", "rimraf": "^5.0.0", "tsup": "^8.0.0", "typescript": "^5.3.0" }, "peerDependencies": { "react": "^18.0.0" } }],
 
     "@qi/core/@qi/base": ["@qi/base@file:lib/base", { "devDependencies": { "rimraf": "^5.0.10", "tsup": "^8.5.0", "typescript": "^5.8.3", "vitest": "^1.6.1" } }],
 
@@ -972,6 +980,18 @@
     "yargs/string-width": ["string-width@4.2.3", "", { "dependencies": { "emoji-regex": "^8.0.0", "is-fullwidth-code-point": "^3.0.0", "strip-ansi": "^6.0.1" } }, "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g=="],
 
     "@isaacs/cliui/string-width/emoji-regex": ["emoji-regex@9.2.2", "", {}, "sha512-L18DaJsXSUk2+42pv8mLs5jJT2hqFkFE4j21wOmgbUqsZ2hL72NsUU785g9RXgo3s0ZNgVl42TiHp3ZtOv/Vyg=="],
+
+    "@qi/cli-amsg-example/@qi/amsg/@qi/base": ["@qi/base@file:lib/base", {}],
+
+    "@qi/cli-amsg-example/@qi/cli/@qi/amsg": ["@qi/amsg@file:lib/amsg", {}],
+
+    "@qi/cli-amsg-example/@qi/cli/@qi/base": ["@qi/base@file:lib/base", {}],
+
+    "@qi/cli-amsg-example/@qi/cli/@qi/core": ["@qi/core@file:lib/core", {}],
+
+    "@qi/cli/@qi/amsg/@qi/base": ["@qi/base@file:lib/base", {}],
+
+    "@qi/cli/@qi/core/@qi/base": ["@qi/base@file:lib/base", { "devDependencies": { "rimraf": "^5.0.10", "tsup": "^8.5.0", "typescript": "^5.8.3", "vitest": "^1.6.1" } }],
 
     "cli-truncate/slice-ansi/is-fullwidth-code-point": ["is-fullwidth-code-point@4.0.0", "", {}, "sha512-O4L094N2/dZ7xqVdrXhh9r1KODPJpFms8B5sGdJLPy664AgvXsreZUyCQQNItZRDlYug4xStLjNp/sz3HvBowQ=="],
 

@@ -67,8 +67,8 @@ This directory contains comprehensive example applications demonstrating how to 
 
 2. **Start Redis** (required for cache and some integration tests):
    ```bash
-   # Option 1: Use QiCore services
-   cd ~/path/to/qi-v2-services/services
+   # Option 1: Use QiCore services (recommended)
+   cd ../../services
    docker compose up -d redis
    
    # Option 2: Start Redis directly

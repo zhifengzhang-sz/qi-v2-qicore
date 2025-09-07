@@ -70,7 +70,7 @@ Before using QiCore, ensure you have the required services running:
 
 ```bash
 # Start Redis (required for @qi/core cache integration tests)
-cd /path/to/qi-v2-services/services
+cd ../../services
 docker compose up -d redis
 
 # Verify Redis is running on localhost:6379
@@ -364,11 +364,11 @@ To run the full QiCore test suite:
 cd qi-v2-qicore/typescript
 
 # Make sure Redis is running first
-cd /path/to/qi-v2-services/services
+cd ../../services
 docker compose up -d redis
 
 # Run tests
-cd qi-v2-qicore/typescript
+cd ../typescript
 bun run test           # Basic tests
 bun run test:coverage  # With coverage report
 bun run check          # Full validation
