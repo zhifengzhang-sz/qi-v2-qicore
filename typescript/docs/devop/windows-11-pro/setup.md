@@ -356,8 +356,8 @@ pyenv versions
 
 echo ""
 echo "=== Cross-Platform Tests ==="
-ls /mnt/c/
-echo "Cross-platform file access working!"
+ls ~
+echo "Ubuntu native filesystem access working!"
 ```
 
 **Windows Environment Test:**
@@ -368,16 +368,6 @@ nvcc --version  # If CUDA installed
 nvidia-smi      # If NVIDIA GPU present
 wsl --list --verbose
 ```
-
-## Notes on prerequisites
-
-- **Restart required**: System restart recommended after WSL2 installation
-- **Font configuration**: Install MesloLGS NF fonts for proper Powerlevel10k display in Windows Terminal
-- **Firewall settings**: Ensure Windows Defender allows WSL2 and Docker operations
-- **Shared directories**: Use `/mnt/c/dev/` for cross-platform project access
-- **Backup strategy**: Configure backup for development environment and projects
-
-This prerequisites setup provides a robust, modern development environment with all necessary tools for ML/AI development using the Python/TypeScript architecture separation discussed earlier.
 
 ---
 
@@ -422,8 +412,8 @@ curl -fsSL https://claude.ai/install.sh | bash -s latest
 
 **Authentication Setup:**
 ```bash
-# Navigate to a project directory
-cd /mnt/c/dev/
+# Navigate to a project directory (use Ubuntu filesystem for better performance)
+cd ~/dev/
 
 # Start Claude Code (will prompt for authentication)
 claude
@@ -443,15 +433,50 @@ claude doctor
 claude "Hello, help me verify the installation is working"
 ```
 
+**MCP Servers Configuration:**
+Claude Code supports Model Context Protocol (MCP) servers for enhanced functionality. Install the recommended servers:
+
+```bash
+# Install essential MCP servers via npm
+npm install -g @anthropic/claude-mcp-server-memory
+npm install -g @anthropic/claude-mcp-server-sequential-thinking
+npm install -g @anthropic/claude-mcp-server-brave-search
+npm install -g @anthropic/claude-mcp-server-contexts
+
+# Alternative server names (if the above don't exist, try these):
+# npm install -g @modelcontextprotocol/server-memory
+# npm install -g @modelcontextprotocol/server-sequential-thinking  
+# npm install -g @modelcontextprotocol/server-brave-search
+# npm install -g @modelcontextprotocol/server-contexts
+```
+
+**Configure MCP Servers:**
+```bash
+# Initialize Claude Code MCP configuration
+claude mcp init
+
+# Add servers to your configuration
+claude mcp add memory
+claude mcp add sequential-thinking
+claude mcp add brave-search
+claude mcp add contexts
+
+# Verify MCP servers are configured
+claude mcp list
+
+# Test MCP functionality
+claude doctor --mcp
+```
+
 ### ML/AI Project Structure Recommendations
 
 **Recommended Project Architecture:**
 ```bash
 # Create standardized ML/AI project structure
-mkdir -p /mnt/c/dev/ai-projects/{project-name}/{python,typescript,shared,docs}
+mkdir -p ~/dev/ai-projects/{project-name}/{python,typescript,shared,docs}
 
 # Example structure:
-/mnt/c/dev/ai-projects/my-ai-app/
+~/dev/ai-projects/my-ai-app/
 ├── python/                    # 🐍 ML computation & training
 │   ├── src/
 │   │   ├── models/           # Model definitions
@@ -496,7 +521,8 @@ mkdir -p /mnt/c/dev/ai-projects/{project-name}/{python,typescript,shared,docs}
 # Quick project setup script
 create_ai_project() {
     local project_name=$1
-    local base_dir="/mnt/c/dev/ai-projects/$project_name"
+    local base_dir="$HOME/dev/ai-projects/$project_name"
+    local windows_path="\\\\wsl.localhost\\Ubuntu-24.04\\home\\$(whoami)\\dev\\ai-projects\\$project_name"
     
     # Create directory structure
     mkdir -p "$base_dir"/{python/{src/{models,training,inference,utils},notebooks,tests},typescript/{src/{api,services,integrations,utils},web,tests},shared/{data,models,configs,api-contracts},docs/{api-docs},.vscode}
@@ -525,6 +551,7 @@ create_ai_project() {
     git init
     
     echo "Project '$project_name' created at $base_dir"
+    echo "Windows access: $windows_path"
 }
 
 # Usage example:
@@ -538,7 +565,7 @@ create_ai_project() {
 **1. Morning Setup:**
 ```bash
 # Start development session
-cd /mnt/c/dev/ai-projects/my-ai-app
+cd ~/dev/ai-projects/my-ai-app
 
 # Activate Python environment
 cd python && source venv/bin/activate
@@ -558,7 +585,7 @@ code ../
 **2. Python ML Development Workflow:**
 ```bash
 # In python/ directory
-cd /mnt/c/dev/ai-projects/my-ai-app/python
+cd ~/dev/ai-projects/my-ai-app/python
 
 # Activate environment
 source venv/bin/activate
@@ -586,7 +613,7 @@ torch.save(model, '../shared/models/production.pt')
 **3. TypeScript Integration Workflow:**
 ```bash
 # In typescript/ directory
-cd /mnt/c/dev/ai-projects/my-ai-app/typescript
+cd ~/dev/ai-projects/my-ai-app/typescript
 
 # Start development
 npm run dev
@@ -601,7 +628,7 @@ node src/services/model-service.js
 **4. Claude Code Integration Workflow:**
 ```bash
 # Use Claude Code for development assistance
-cd /mnt/c/dev/ai-projects/my-ai-app
+cd ~/dev/ai-projects/my-ai-app
 
 # Debug Python issues
 claude "Help me debug this PyTorch training error" --add-dir python/
