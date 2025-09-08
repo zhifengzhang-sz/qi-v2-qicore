@@ -134,18 +134,60 @@ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] 
 sudo apt update
 sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-# Configure user permissions
+# ⚠️  CRITICAL STEP - REQUIRED FOR DOCKER TO WORK ⚠️ 
+# This is the most important command - without it, Docker will fail with "permission denied"
 sudo usermod -aG docker $USER
+
+# IMPORTANT: Apply group changes immediately (required!)
+newgrp docker
+# Alternative: logout and login to refresh groups
 
 # Configure auto-start (add to ~/.zshrc)
 echo 'if ! service docker status > /dev/null 2>&1; then' >> ~/.zshrc
 echo '    sudo service docker start > /dev/null 2>&1' >> ~/.zshrc
 echo 'fi' >> ~/.zshrc
 
-# Test installation (requires logout/login or newgrp docker)
-newgrp docker
+# Test installation (should work without sudo now)
 docker run hello-world
+docker --version
+docker ps
+
+# If you get "permission denied" errors:
+# 1. Make sure you ran: sudo usermod -aG docker $USER
+# 2. Run: newgrp docker
+# 3. Or logout and login again
 ```
+
+**Docker Compose Setup for QiCore Services:**
+```bash
+# The QiCore project includes a complete Docker setup
+# Navigate to the services directory:
+cd ~/dev/qi/github/qi-v2-services/services
+
+# Start Redis service (required for cache tests)
+docker compose up redis -d
+
+# Start all services (optional - includes PostgreSQL, Kafka, etc.)
+docker compose up -d
+
+# Check service status
+docker compose ps
+docker compose logs redis
+
+# Test Redis connection
+docker compose exec redis redis-cli ping
+# Should return: PONG
+```
+
+**Common Docker Issues and Solutions:**
+
+| Problem | Solution |
+|---------|----------|
+| `permission denied while trying to connect to Docker daemon` | **CRITICAL:** Run `sudo usermod -aG docker $USER && newgrp docker` |
+| `docker: command not found` | Restart terminal or run `exec "$SHELL"` |
+| `Cannot connect to the Docker daemon` | Start Docker: `sudo service docker start` |
+| `version: '3.8' is obsolete` | Remove the `version:` line from docker-compose.yml |
+| Redis tests failing | Make sure Redis is running: `docker compose up redis -d` |
 
 ### Node.js and TypeScript Installation
 
