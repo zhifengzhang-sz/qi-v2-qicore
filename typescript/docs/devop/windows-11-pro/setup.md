@@ -195,15 +195,25 @@ tsc --version
 ts-node --version
 ```
 
-**Bun Installation (Optional Alternative Package Manager):**
+**Bun Installation (Alternative Package Manager & Runtime):**
 ```bash
-# Install Bun
+# Install Bun (system-wide)
 curl -fsSL https://bun.sh/install | bash
 exec "$SHELL"
 
 # Verify installation
 bun --version
+
+echo "Bun installed successfully - can be used as drop-in replacement for npm/yarn"
 ```
+
+**Note on Project-Level Tools:**
+Modern tools like **Biome** (linter/formatter) and **Vitest** (test runner) are installed per-project rather than globally. This ensures:
+- **Version consistency** across team members
+- **Project-specific configurations** 
+- **No global dependency conflicts**
+
+These tools will be installed automatically when you create projects using the `create_ai_project_modern()` function below.
 
 ### Python and Pyenv Installation
 
@@ -328,6 +338,7 @@ echo ""
 echo "=== Tool Versions ==="
 node --version
 npm --version
+bun --version
 python --version
 pip --version
 git --version
@@ -335,6 +346,7 @@ gh --version
 docker --version
 zsh --version
 pyenv --version
+tsc --version
 
 echo ""
 echo "=== Functionality Tests ==="
@@ -539,8 +551,24 @@ create_ai_project() {
     # Initialize TypeScript environment
     cd "$base_dir/typescript"
     npm init -y
-    npm install -D typescript @types/node ts-node
-    npm install express @anthropic-ai/sdk openai
+    
+    # Install dev dependencies (project-level tools)
+    npm install -D typescript @types/node ts-node @biomejs/biome vitest @vitest/ui happy-dom
+    
+    # Install runtime dependencies
+    npm install express @anthropic-ai/sdk openai cors dotenv
+    
+    # Initialize Biome for linting and formatting (project-specific config)
+    npx biome init
+    
+    # Create basic test setup
+    echo 'import { describe, it, expect } from "vitest"
+    
+describe("example", () => {
+  it("should work", () => {
+    expect(1 + 1).toBe(2)
+  })
+})' > tests/example.test.ts
     
     # Create basic configuration files
     echo "node_modules/\n*.log\n.env\n__pycache__/\n*.pyc" > "$base_dir/.gitignore"
