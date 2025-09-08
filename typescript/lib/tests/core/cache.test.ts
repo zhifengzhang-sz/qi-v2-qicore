@@ -15,10 +15,10 @@ import {
   cacheError,
   type CacheConfig,
 } from '@qi/core'
-import { isSuccess, isFailure } from '@qi/base'
+import { match, isSuccess, isFailure } from '@qi/base'
 
 describe('Cache Factory Operations', () => {
-  it('createCache creates memory cache', () => {
+  it('createCache with memory backend provides working cache', async () => {
     const config: CacheConfig = {
       backend: 'memory',
       maxSize: 100,
@@ -26,7 +26,16 @@ describe('Cache Factory Operations', () => {
     }
 
     const cache = createCache(config)
-    expect(cache).toBeInstanceOf(MemoryCache)
+
+    // Test behavior, not implementation details
+    await cache.set('test-key', 'test-value')
+    const result = await cache.get('test-key')
+
+    match(
+      (value) => expect(value).toBe('test-value'),
+      (error) => expect(error).toBe(null), // Should work
+      result
+    )
   })
 
   it('createCache creates redis cache', () => {
@@ -112,13 +121,22 @@ describe('Cache Interface Operations', () => {
 describe('Cache Behavior Contract', () => {
   const cache = createMemoryCache({ maxSize: 3, defaultTtl: 1000 })
 
-  it('set then get returns same value', async () => {
+  it('set then get returns same value using Result<T> patterns', async () => {
     const setResult = await cache.set('key1', 'value1')
-    expect(isSuccess(setResult)).toBe(true)
+
+    match(
+      () => {}, // Set succeeded
+      (error) => expect(error).toBe(null), // Should not fail
+      setResult
+    )
 
     const getResult = await cache.get('key1')
-    expect(isSuccess(getResult)).toBe(true)
-    expect(getResult.tag === 'success' && getResult.value).toBe('value1')
+
+    match(
+      (value) => expect(value).toBe('value1'),
+      (error) => expect(error).toBe(null), // Should not fail
+      getResult
+    )
   })
 
   it('get returns NOT_FOUND for missing key', async () => {
@@ -267,12 +285,23 @@ describe('Cache Utility Functions', () => {
   it('cacheAside returns cached value if exists', async () => {
     await cache.set('aside-key', 'cached-value')
 
-    const loader = vi.fn().mockResolvedValue('loaded-value')
+    // Use real function instead of mock - test behavior, not interactions
+    let loaderCalled = false
+    const loader = async () => {
+      loaderCalled = true
+      return 'loaded-value'
+    }
+
     const result = await cacheAside('aside-key', cache, loader)
 
-    expect(isSuccess(result)).toBe(true)
-    expect(result.tag === 'success' && result.value).toBe('cached-value')
-    expect(loader).not.toHaveBeenCalled()
+    match(
+      (value) => {
+        expect(value).toBe('cached-value')
+        expect(loaderCalled).toBe(false) // Should not call loader when cached
+      },
+      (error) => expect(error).toBe(null), // Should not fail
+      result
+    )
   })
 
   it('cacheAside loads and caches if missing', async () => {

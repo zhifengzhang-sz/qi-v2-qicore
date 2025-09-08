@@ -7,7 +7,8 @@
   "type": "module",
   "scripts": {
     "build": "bun --filter='@qi/*' run build",
-    "clean": "bun --filter='@qi/*' run clean",
+    "clean": "bun --filter='@qi/*' run clean && rimraf dist *.tsbuildinfo **/*.tsbuildinfo coverage .turbo .cache **/.cache **/temp",
+    "deep-clean": "bun run clean && rimraf node_modules **/node_modules bun.lock **/bun.lock",
     "test": "bun vitest run",
     "test:watch": "bun vitest",
     "test:coverage": "bun vitest run --coverage",
