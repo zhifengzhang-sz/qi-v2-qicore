@@ -17,6 +17,7 @@
 // QiCore imports for v-0.8.1
 import {
   create,
+  Err,
   failure,
   fromAsyncTryCatch,
   match,
@@ -775,8 +776,15 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 export function createMessageDrivenCLI(
   _messageQueue: QiAsyncMessageQueue<QiMessage>,
   _config?: Partial<CLIConfig>
-): MessageDrivenCLI {
+): Result<MessageDrivenCLI, QiError> {
   // v-0.6.1: Message queue is required for pure enqueue-only architecture
   // The actual implementation will be handled by the factory functions
-  throw new Error('Use createCLI() from factories with messageQueue parameter instead')
+  return Err(
+    create(
+      'DEPRECATED_FACTORY',
+      'Use createCLI() from factories with messageQueue parameter instead',
+      'SYSTEM',
+      { suggestion: 'Use createReadlineCLI() or createCLIAsync() from factories' }
+    )
+  )
 }
