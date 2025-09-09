@@ -1,6 +1,6 @@
 {
   "name": "@qi/amsg",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "QiCore Async Messaging - h2A-inspired async message queue with Result<T> patterns",
   "type": "module",
   "main": "./dist/index.cjs",
