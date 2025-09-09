@@ -16,16 +16,42 @@ import type { User, Post, AppConfig } from './types.js'
 // Simulate network delay
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+// Simulation constants
+const SIMULATION_CONSTANTS = {
+  FAILURE_RATES: {
+    CONFIG_LOAD: 0.05,
+    USER_FETCH: 0.1,
+    POST_FETCH: 0.15,
+    USER_SAVE: 0.05,
+    NOTIFICATION: 0.1,
+  },
+  LATENCY_RANGES: {
+    CONFIG_LOAD: { base: 100, variance: 0 },
+    USER_FETCH: { base: 200, variance: 300 },
+    POST_FETCH: { base: 300, variance: 200 },
+    USER_SAVE: { base: 150, variance: 100 },
+    USER_PROCESS: { base: 50, variance: 50 },
+    NOTIFICATION: { base: 100, variance: 200 },
+  },
+  POST_COUNT: { min: 2, max: 5 },
+} as const
+
 // Random failure simulation
-const maybeFailure = (failureRate = 0.1) => Math.random() < failureRate
+const maybeFailure = (failureRate: number) => Math.random() < failureRate
+
+// Random latency simulation
+const randomLatency = (base: number, variance: number) => base + Math.random() * variance
+
+// Random count in range
+const randomCount = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
 
 /**
  * Load application configuration
  */
 export async function loadConfig(): Promise<Result<AppConfig, QiError>> {
-  await delay(100)
+  await delay(SIMULATION_CONSTANTS.LATENCY_RANGES.CONFIG_LOAD.base)
 
-  if (maybeFailure(0.05)) {
+  if (maybeFailure(SIMULATION_CONSTANTS.FAILURE_RATES.CONFIG_LOAD)) {
     return failure(create('CONFIG_LOAD_ERROR', 'Failed to load configuration', 'SYSTEM'))
   }
 
@@ -62,13 +88,17 @@ export async function loadConfig(): Promise<Result<AppConfig, QiError>> {
  * Fetch user data from API
  */
 export async function fetchUser(userId: number): Promise<Result<User, QiError>> {
-  await delay(200 + Math.random() * 300) // Simulate variable latency
+  const latency = randomLatency(
+    SIMULATION_CONSTANTS.LATENCY_RANGES.USER_FETCH.base,
+    SIMULATION_CONSTANTS.LATENCY_RANGES.USER_FETCH.variance
+  )
+  await delay(latency)
 
   if (userId <= 0 || userId > 10) {
     return failure(validationError(`Invalid user ID: ${userId}`))
   }
 
-  if (maybeFailure(0.1)) {
+  if (maybeFailure(SIMULATION_CONSTANTS.FAILURE_RATES.USER_FETCH)) {
     return failure(networkError(`Failed to fetch user ${userId}`))
   }
 
@@ -88,14 +118,21 @@ export async function fetchUser(userId: number): Promise<Result<User, QiError>> 
  * Fetch user's posts from API
  */
 export async function fetchUserPosts(userId: number): Promise<Result<Post[], QiError>> {
-  await delay(300 + Math.random() * 200)
+  const latency = randomLatency(
+    SIMULATION_CONSTANTS.LATENCY_RANGES.POST_FETCH.base,
+    SIMULATION_CONSTANTS.LATENCY_RANGES.POST_FETCH.variance
+  )
+  await delay(latency)
 
-  if (maybeFailure(0.15)) {
+  if (maybeFailure(SIMULATION_CONSTANTS.FAILURE_RATES.POST_FETCH)) {
     return failure(networkError(`Failed to fetch posts for user ${userId}`))
   }
 
   // Simulate 2-5 posts per user
-  const postCount = Math.floor(Math.random() * 4) + 2
+  const postCount = randomCount(
+    SIMULATION_CONSTANTS.POST_COUNT.min,
+    SIMULATION_CONSTANTS.POST_COUNT.max
+  )
   const posts: Post[] = Array.from({ length: postCount }, (_, i) => ({
     id: userId * 100 + i + 1,
     userId,
@@ -110,9 +147,13 @@ export async function fetchUserPosts(userId: number): Promise<Result<Post[], QiE
  * Save user data to database
  */
 export async function saveUser(user: User): Promise<Result<User, QiError>> {
-  await delay(150 + Math.random() * 100)
+  const latency = randomLatency(
+    SIMULATION_CONSTANTS.LATENCY_RANGES.USER_SAVE.base,
+    SIMULATION_CONSTANTS.LATENCY_RANGES.USER_SAVE.variance
+  )
+  await delay(latency)
 
-  if (maybeFailure(0.05)) {
+  if (maybeFailure(SIMULATION_CONSTANTS.FAILURE_RATES.USER_SAVE)) {
     return failure(create('DATABASE_ERROR', `Failed to save user ${user.id}`, 'SYSTEM'))
   }
 
@@ -123,7 +164,11 @@ export async function saveUser(user: User): Promise<Result<User, QiError>> {
  * Process user data (simulate some business logic)
  */
 export async function processUserData(user: User): Promise<Result<User, QiError>> {
-  await delay(50 + Math.random() * 50)
+  const latency = randomLatency(
+    SIMULATION_CONSTANTS.LATENCY_RANGES.USER_PROCESS.base,
+    SIMULATION_CONSTANTS.LATENCY_RANGES.USER_PROCESS.variance
+  )
+  await delay(latency)
 
   // Simulate validation
   if (!user.email.includes('@')) {
@@ -151,9 +196,13 @@ export async function sendNotification(
   user: User,
   message: string
 ): Promise<Result<boolean, QiError>> {
-  await delay(100 + Math.random() * 200)
+  const latency = randomLatency(
+    SIMULATION_CONSTANTS.LATENCY_RANGES.NOTIFICATION.base,
+    SIMULATION_CONSTANTS.LATENCY_RANGES.NOTIFICATION.variance
+  )
+  await delay(latency)
 
-  if (maybeFailure(0.1)) {
+  if (maybeFailure(SIMULATION_CONSTANTS.FAILURE_RATES.NOTIFICATION)) {
     return failure(networkError(`Failed to send notification to ${user.email}`))
   }
 
