@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import fc from 'fast-check'
+import { TEST_DELAYS, TEST_ERRORS, delay } from '../test-constants.js'
 import {
   success,
   failure,
@@ -27,9 +28,9 @@ import {
   isPromiseResult,
 } from '@qi/base'
 
-// Test utilities
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-const createError = (message: string) => create('TEST_ERROR', message, 'SYSTEM')
+// Test utilities (delay imported from test-constants)
+const createError = (message: string) =>
+  create(TEST_ERRORS.STANDARD.code, TEST_ERRORS.STANDARD.message, TEST_ERRORS.STANDARD.category)
 
 describe('Async Transformation Operations', () => {
   describe('flatMapAsync', () => {
@@ -48,7 +49,7 @@ describe('Async Transformation Operations', () => {
     it('applies async function to success value', async () => {
       const successResult = success(10)
       const fn = async (x: number) => {
-        await delay(1)
+        await delay(TEST_DELAYS.SHORT)
         return success(x * 2)
       }
 
@@ -62,7 +63,7 @@ describe('Async Transformation Operations', () => {
       const successResult = success(10)
       const error = createError('Async operation failed')
       const fn = async (_x: number) => {
-        await delay(1)
+        await delay(TEST_DELAYS.SHORT)
         return failure(error)
       }
 
@@ -99,7 +100,7 @@ describe('Async Transformation Operations', () => {
     it('applies async function to success value', async () => {
       const successResult = success(10)
       const fn = async (x: number) => {
-        await delay(1)
+        await delay(TEST_DELAYS.SHORT)
         return x * 2
       }
 
@@ -112,7 +113,7 @@ describe('Async Transformation Operations', () => {
     it('wraps thrown errors in QiError', async () => {
       const successResult = success(10)
       const fn = async (_x: number) => {
-        await delay(1)
+        await delay(TEST_DELAYS.SHORT)
         throw new Error('Async function failed')
       }
 
@@ -128,7 +129,7 @@ describe('Async Transformation Operations', () => {
     it('handles non-Error thrown values', async () => {
       const successResult = success(10)
       const fn = async (_x: number) => {
-        await delay(1)
+        await delay(TEST_DELAYS.SHORT)
         throw 'String error'
       }
 
@@ -163,7 +164,7 @@ describe('Async Transformation Operations', () => {
 
       const result = await matchAsync(onSuccess, onError, failureResult)
 
-      expect(result).toBe('Error: Test error')
+      expect(result).toBe(`Error: ${TEST_ERRORS.STANDARD.message}`)
       expect(onError).toHaveBeenCalledWith(error)
       expect(onSuccess).not.toHaveBeenCalled()
     })
@@ -171,7 +172,7 @@ describe('Async Transformation Operations', () => {
     it('handles async handlers with delay', async () => {
       const successResult = success(42)
       const onSuccess = async (x: number) => {
-        await delay(10)
+        await delay(TEST_DELAYS.MEDIUM)
         return `Delayed: ${x}`
       }
       const onError = async (e: QiError) => `Error: ${e.message}`
@@ -181,7 +182,7 @@ describe('Async Transformation Operations', () => {
       const elapsed = Date.now() - start
 
       expect(result).toBe('Delayed: 42')
-      expect(elapsed).toBeGreaterThanOrEqual(9) // Account for timing variations
+      expect(elapsed).toBeGreaterThanOrEqual(TEST_DELAYS.TIMING_BUFFER) // Account for timing variations
     })
   })
 })
@@ -201,7 +202,7 @@ describe('Promise<Result<T>> Composition Operations', () => {
     it('handles successful promise result with async function', async () => {
       const promiseResult = Promise.resolve(success(10))
       const fn = async (x: number) => {
-        await delay(1)
+        await delay(TEST_DELAYS.SHORT)
         return success(x * 2)
       }
 
@@ -249,7 +250,7 @@ describe('Promise<Result<T>> Composition Operations', () => {
     it('handles successful promise result with async function', async () => {
       const promiseResult = Promise.resolve(success(10))
       const fn = async (x: number) => {
-        await delay(1)
+        await delay(TEST_DELAYS.SHORT)
         return x * 2
       }
 
@@ -308,7 +309,7 @@ describe('Promise<Result<T>> Composition Operations', () => {
 
       const result = await matchPromise(onSuccess, onError, promiseResult)
 
-      expect(result).toBe('Error: Promise error')
+      expect(result).toBe(`Error: ${TEST_ERRORS.STANDARD.message}`)
       expect(onError).toHaveBeenCalledWith(error)
       expect(onSuccess).not.toHaveBeenCalled()
     })
@@ -355,7 +356,7 @@ describe('Async Collection Operations', () => {
       // even if individual promises resolve at different times
       const promises = [
         delay(30).then(() => success(1)),
-        delay(10).then(() => success(2)),
+        delay(TEST_DELAYS.MEDIUM).then(() => success(2)),
         delay(20).then(() => success(3)),
       ]
 
@@ -455,13 +456,13 @@ describe('Type Guards and Utilities', () => {
 
 describe('Property-based Tests for Async Operations', () => {
   const asyncIdentity = async <T>(x: T): Promise<T> => {
-    await delay(1)
+    await delay(TEST_DELAYS.SHORT)
     return x
   }
 
   // Helper function for testing (keeping for potential future use)
   // const asyncDouble = async (x: number): Promise<number> => {
-  //   await delay(1)
+  //   await delay(TEST_DELAYS.SHORT)
   //   return x * 2
   // }
 

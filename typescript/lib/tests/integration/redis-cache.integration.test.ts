@@ -82,7 +82,7 @@ describe.skipIf(!(await isRedisAvailable()))('Redis Cache Integration', () => {
   it('handles TTL expiration with Redis', async () => {
     const shortTtlKey = `${testKey}-ttl`
 
-    // Set with 1 second TTL
+    // Set with 1 second TTL (Redis expects integer seconds)
     const setResult = await cache.set(shortTtlKey, testValue, 1)
     expect(isSuccess(setResult)).toBe(true)
 
@@ -90,8 +90,8 @@ describe.skipIf(!(await isRedisAvailable()))('Redis Cache Integration', () => {
     const immediateResult = await cache.get(shortTtlKey)
     expect(isSuccess(immediateResult)).toBe(true)
 
-    // Wait for expiration
-    await new Promise((resolve) => setTimeout(resolve, 1100))
+    // Wait for expiration (1.2 seconds to allow for Redis processing time)
+    await new Promise((resolve) => setTimeout(resolve, 1200))
 
     // Should be expired
     const expiredResult = await cache.get(shortTtlKey)

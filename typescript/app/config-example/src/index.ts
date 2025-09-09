@@ -8,7 +8,7 @@ const __dirname = dirname(__filename)
 const configDir = join(__dirname, '..', 'configs')
 import { ConfigBuilder, type ValidatedConfig } from '@qi/core/config'
 import { createLogger, type Logger } from '@qi/core/logger'
-import { flatMapPromise, matchAsync, match } from '@qi/base'
+import { flatMapPromise, matchAsync, match, failure } from '@qi/base'
 
 async function main() {
   const environment = process.argv[2] || 'development'
@@ -20,17 +20,24 @@ async function main() {
 
       // ✅ CLEAN: Use flatMapPromise to eliminate Promise<Result<T>> unwrapping anti-patterns
       const validatedConfigResult = await flatMapPromise(
-        (builder) =>
-          builder
-            .merge(ConfigBuilder.fromEnv('APP'))
-            .validateWithSchemaFile(join(configDir, 'config.schema.json'))
-            .buildValidated(),
+        (builder) => {
+          const mergedBuilder = builder.merge(ConfigBuilder.fromEnv('APP'))
+          const validatedBuilderResult = mergedBuilder.validateWithSchemaFile(
+            join(configDir, 'config.schema.json')
+          )
+
+          return match(
+            (validatedBuilder) => validatedBuilder.buildValidated(),
+            (error) => failure(error),
+            validatedBuilderResult
+          )
+        },
         ConfigBuilder.fromYamlFile(join(configDir, `${environment}.yaml`))
       )
 
       // ✅ CLEAN: Use matchAsync for clean config handling
       await matchAsync(
-        async (config) => {
+        async (config: ValidatedConfig) => {
           await showConfigurationExample(config, logger)
         },
         async (error) => {
