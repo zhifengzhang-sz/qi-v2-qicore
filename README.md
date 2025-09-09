@@ -1,247 +1,205 @@
 # QiCore Foundation
 
-**Mathematical foundation types and essential infrastructure services for QiCore platform**
+Mathematical foundation types and infrastructure services for the QiCore platform.
 
 ## Overview
 
-QiCore Foundation provides the mathematical and infrastructure building blocks that all QiCore applications depend on:
+QiCore Foundation provides functional programming building blocks with Result<T> error handling:
 
-- **qi/base**: Foundational types (Result<T>, QiError) with category theory foundations
-- **qi/core**: Infrastructure services (Config, Logger, Cache) with monoid semantics
+- **@qi/base**: Core types (Result<T>, QiError) with functional composition
+- **@qi/core**: Infrastructure services (Config, Logger, Cache) 
+- **@qi/amsg**: Async message queue with h2A patterns
+- **@qi/cli**: Message-driven CLI framework
 
 ## Architecture
 
 ```
 qi-v2-qicore/
-├── docs/contracts/                    # Language-agnostic behavioral contracts
-│   ├── qi.base.contracts.md          # Result<T>, QiError contracts
-│   ├── qi.core.contracts.md          # Config, Logger, Cache contracts  
-│   └── qi.component.contracts.md     # Component architecture
-├── haskell/                          # Haskell implementation
-├── typescript/                       # TypeScript implementation
-├── python/                           # Python implementation
-└── cpp/                              # C++ implementation
+├── typescript/                       # TypeScript implementation (v3.0.1)
+│   ├── lib/base/                     # @qi/base - Result<T> foundation
+│   ├── lib/core/                     # @qi/core - Infrastructure services  
+│   ├── lib/amsg/                     # @qi/amsg - Async messaging
+│   ├── lib/cli/                      # @qi/cli - CLI framework
+│   ├── app/                          # Example applications
+│   └── docs/                         # API documentation
+├── haskell/                          # Haskell implementation (planned)
+├── python/                           # Python implementation (planned)
+└── cpp/                              # C++ implementation (planned)
+```
+
+## Installation
+
+```bash
+# Install packages
+bun add @qi/base @qi/core @qi/amsg @qi/cli
+
+# Or clone for development
+git clone https://github.com/your-org/qi-v2-qicore.git
+cd qi-v2-qicore/typescript
+bun install
+```
+
+## Quick Start
+
+```typescript
+import { type Result, success, failure, match } from '@qi/base';
+import { createLogger, createMemoryCache } from '@qi/core';
+
+// Result<T> error handling
+const divide = (a: number, b: number): Result<number, string> => 
+  b === 0 ? failure("Division by zero") : success(a / b);
+
+const result = divide(10, 2);
+match(
+  (value) => console.log(`Result: ${value}`),
+  (error) => console.error(`Error: ${error}`),
+  result
+);
+
+// Infrastructure services
+const logger = createLogger({ level: 'info' });
+const cache = createMemoryCache({ maxSize: 1000 });
 ```
 
 ## Core Components
 
-### Base Component (`qi/base`)
+### @qi/base
 
-**Mathematical Foundation**: Category theory-based error handling with monadic composition
+Mathematical foundation with Result<T> monadic error handling.
 
-```haskell
--- Result<T> monad for pure functional error handling
-data Result a = Success a | Failure QiError
+```typescript
+// Function composition with error handling
+const pipeline = (input: string) =>
+  parseNumber(input)
+    .flatMap(validateRange)
+    .flatMap(processValue)
+    .map(formatOutput);
 
--- Composable error type with context chaining
-data QiError = QiError
-  { code :: Text
-  , message :: Text  
-  , category :: ErrorCategory
-  , context :: Map Text Value
-  , cause :: Maybe QiError
-  , timestamp :: UTCTime
-  }
+// Error context chaining
+const error = networkError('Connection failed', {
+  endpoint: '/api/data',
+  retryCount: 3
+});
 ```
 
-**Key Properties**:
-- ✅ Monad, Functor, Applicative laws
-- ✅ Type-safe error propagation  
-- ✅ Immutable, thread-safe operations
-- ✅ Zero runtime overhead composition
+### @qi/core
 
-### Core Component (`qi/core`)
+Infrastructure services with functional patterns.
 
-**Infrastructure Services**: Configuration, logging, and caching with performance contracts
+```typescript
+// Configuration
+const config = await loadConfig(['app.json', 'local.json']);
+const dbUrl = config.get('database.url', 'localhost:5432');
 
-```haskell
--- Monoid-based configuration with right-bias merge
-data ConfigData = ConfigData 
-  { configData :: ConfigObject
-  , configTimestamp :: UTCTime
-  , configSource :: Text
-  }
+// Logging with structured context
+logger.info('User authenticated', { userId: '123', role: 'admin' });
 
--- Level-based logging with structured context
-data Logger = Logger
-  { loggerConfig :: LoggerConfig  
-  , loggerContext :: TVar LogContext
-  }
-
--- High-performance caching with TTL and eviction
-data Cache = Cache
-  { cacheConfig :: CacheConfig
-  , cacheStorage :: TVar CacheStorage
-  , cachePath :: Maybe FilePath
-  }
+// Caching
+await cache.set('user:123', userData, 3600); // TTL in seconds
+const user = await cache.get('user:123');
 ```
 
-**Key Properties**:
-- ✅ O(1) operations for core functionality
-- ✅ STM-based concurrency safety
-- ✅ Resource cleanup and management
-- ✅ Configuration-driven initialization
+### @qi/amsg
 
-## Language-Agnostic Contracts
+Async message queue with h2A-inspired patterns.
 
-All implementations must satisfy the behavioral contracts defined in `docs/contracts/`:
+```typescript
+import { QiAsyncMessageQueue, MessageType } from '@qi/amsg';
 
-### Base Contracts
-- **Result<T>**: Monadic error handling with functor/applicative laws
-- **QiError**: Structured error representation with context chaining
+const queue = new QiAsyncMessageQueue({ maxSize: 1000 });
 
-### Core Contracts  
-- **Configuration**: Monoid merge semantics with validation
-- **Logger**: Level-based filtering with performance guarantees
-- **Cache**: Map semantics with TTL and eviction policies
+// Producer
+await queue.enqueue(messageFactory.createUserInputMessage('Hello', 'cli'));
 
-## Usage
-
-### Haskell Implementation
-
-```bash
-cd haskell
-nix develop
-cabal build qi-base qi-core
-cabal test
+// Consumer (h2A pattern)
+for await (const message of queue) {
+  console.log(`Processing: ${message.type}`);
+}
 ```
 
-### Implementation Status
+### @qi/cli
 
-| Language   | Status | Version | Features |
-|------------|--------|---------|----------|
-| **Haskell** | 🚧 In Progress | GHC 9.12+ | Category theory foundation, STM concurrency |
-| **TypeScript** | 📋 Specified | 5.8+ | Modern type system, async/await patterns |
-| **Python** | 📋 Specified | 3.13+ | JIT optimization, No-GIL mode |
-| **C++** | 📋 Specified | C++23/26 | std::expected, modules, SIMD |
+Message-driven CLI framework.
 
-### Cross-Language Compatibility
+```typescript
+import { createCLIAsync, CLIStateManager } from '@qi/cli';
 
-The foundation contracts ensure identical behavior across all language implementations:
+const cli = await createCLIAsync({
+  messageQueue: new QiAsyncMessageQueue(),
+  stateManager: new CLIStateManager(),
+  config: { framework: 'hybrid', enableHotkeys: true }
+});
 
-```yaml
-# Mathematical laws verified across all languages
-result_monad_laws:
-  - "flatMap(f) ∘ flatMap(g) == flatMap(x => flatMap(f)(g(x)))"
-  - "flatMap(success) == identity"
-  - "map(f) ∘ map(g) == map(f ∘ g)"
-
-configuration_monoid_laws:
-  - "merge([a, merge([b, c])]) == merge([merge([a, b]), c])" 
-  - "merge([empty, config]) == config"
-  - "merge([config, empty]) == config"
+await cli.start();
 ```
 
-## Dependencies
+## Development
 
-### Haskell
-- **GHC 9.12+**: Modern Haskell with latest language features
-- **Core Libraries**: text, containers, stm, aeson, time
-- **Development**: hspec, QuickCheck, tasty (for testing)
+### Build and Test
 
-### TypeScript
-- **TypeScript 5.8+**: Latest type system features
-- **Node.js 22+** or **Bun 1.0+**: Modern JavaScript runtime
-- **Redis**: Required for integration tests (start from `~/dev/qi/github/qi-v2-services`)
-- **Testing**: Vitest, Node.js built-in test runner
-
-### Python
-- **Python 3.13+**: JIT optimization and No-GIL mode support
-- **Core Libraries**: dataclasses, typing, asyncio
-- **Testing**: pytest, hypothesis (property-based testing)
-
-### C++
-- **C++23/26**: std::expected, modules, reflection
-- **Compilers**: GCC 14+, Clang 17+, MSVC 19.40+
-- **Build**: CMake 3.28+ for module support
-
-### Build Requirements
-- **Nix**: Reproducible development environment (Haskell)
-- **Language-specific**: See individual implementation directories
-
-## Testing
-
-### Haskell
-```bash
-# Unit tests for mathematical laws
-cabal test qi-base:test
-
-# Integration tests for infrastructure services  
-cabal test qi-core:test
-
-# Property-based testing with QuickCheck
-cabal test --test-options="--quickcheck-tests=1000"
-```
-
-### TypeScript
 ```bash
 cd typescript
 
-# Start Redis service first (required for integration tests)
-# From project root: cd ~/dev/qi/github/qi-v2-services && [start Redis]
+# Build all packages
+bun run build
 
-# Run all tests
+# Run tests (170 tests)
 bun run test
 
-# Run with coverage
-bun run test:coverage
-
-# Complete validation (format + lint + test + typecheck)
+# Type checking and linting
 bun run check
 ```
 
-## Performance Guarantees
+### Examples
 
-### Base Component
-- **Result operations**: O(1) for all transformations
-- **Error construction**: O(1) with context accumulation
-- **Memory overhead**: < 64 bytes per Result instance
-
-### Core Component  
-- **Config get operations**: O(1) for direct keys, O(depth) for nested
-- **Logger level checking**: O(1) with early exit optimization
-- **Cache operations**: O(1) average case with STM concurrency
-
-## Examples and Learning
-
-### TypeScript Examples
-Comprehensive working examples are available in the TypeScript implementation:
-
-- **[typescript/app/](typescript/app/README.md)**: Complete example applications
-  - `basic-result/` - Fundamental Result<T> patterns
-  - `error-handling/` - Error management strategies  
-  - `error-extension/` - Domain-specific error types
-  - `async-composition/` - Advanced async Result patterns
-  - `config-example/` - Configuration + logging integration
-  - `cache-example/` - Caching strategies with Redis
-
-### Quick Start
 ```bash
-cd typescript
+# Basic Result<T> usage
+bun app/basic-result/src/index.ts
 
-# Build the packages
-bun run build
+# Error handling patterns
+bun app/error-handling/src/index.ts
 
-# Start Redis (required for some examples)
-cd ~/path/to/qi-v2-services/services && docker compose up -d redis
+# Configuration and logging
+bun app/config-example/src/index.ts
 
-# Run examples
-bun app/basic-result/src/index.ts      # Start here!
-bun app/config-example/src/index.ts    # Config + logging
-bun app/cache-example/src/index.ts     # Caching patterns
+# Caching with Redis (requires Redis service)
+bun app/cache-example/src/index.ts
+
+# CLI-AMSG integration
+bun app/cli-amsg-example/src/index.ts
 ```
 
-See [typescript/app/README.md](typescript/app/README.md) for complete usage instructions.
+## Implementation Status
 
-## Related Projects
+| Component | Status | Version | Tests | Features |
+|-----------|--------|---------|-------|----------|
+| **@qi/base** | ✅ Complete | 3.0.1 | 75 | Result<T>, QiError, async patterns |
+| **@qi/core** | ✅ Complete | 3.0.1 | 80 | Config, Logger, Cache |
+| **@qi/amsg** | ✅ Complete | 3.0.1 | 15 | Message queue, h2A patterns |
+| **@qi/cli** | ✅ Complete | 3.0.1 | 0 | CLI framework, state management |
 
-- **[qi-v2-dp-actor](../qi-v2-dp-actor)**: Data processing actors built on this foundation
-- **QiCore Applications**: Any project requiring foundational types and infrastructure
+**Total: 170 tests passing**
 
-## Contract Compliance
+## Documentation
 
-All implementations satisfy **ALL** contracts defined in the language-agnostic specifications. Any implementation claiming QiCore compatibility must pass the same contract verification tests.
+- **[API Reference](typescript/docs/api/cli.md)**: Complete @qi/cli API documentation
+- **[CLI-AMSG Integration](typescript/docs/cli-amsg/)**: Architecture and usage patterns
+- **[Example Apps](typescript/app/)**: Working examples and patterns
 
----
+## Architecture Principles
 
-**QiCore Foundation**: The mathematical and infrastructure bedrock for composable, high-performance data processing systems.
+- **Functional programming**: Result<T> error handling, immutable data
+- **Type safety**: Comprehensive TypeScript coverage
+- **Performance**: O(1) operations, efficient memory usage
+- **Composability**: Function composition, monadic patterns
+- **Error handling**: Structured errors with context chains
+
+## Requirements
+
+- **TypeScript 5.8+**
+- **Node.js 22+** or **Bun 1.0+**
+- **Redis** (for cache integration tests)
+
+## License
+
+MIT
