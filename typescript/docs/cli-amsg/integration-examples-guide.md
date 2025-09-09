@@ -17,7 +17,7 @@ import {
   SimpleCLICommandHandler,
   createCLIAsync 
 } from '@qi/cli';
-import { success, failure, match } from '@qi/base';
+import { type Result, type QiError, success, failure, match, systemError } from '@qi/base';
 
 async function createMinimalCLI(): Promise<void> {
   // 1. Create message queue with basic configuration
@@ -69,29 +69,34 @@ async function startSystems(systems: {
   messageQueue: QiAsyncMessageQueue;
   cli: MessageDrivenCLI;
   messageProcessor: AgentMessageProcessor;
-}): Promise<Result<void, SystemError>> {
-  try {
-    // Start message queue
-    const queueResult = await systems.messageQueue.start();
-    if (!queueResult.success) {
-      return failure(systemError.queueStartFailed(queueResult.error));
-    }
+}): Promise<Result<void, QiError>> {
+  // Start message queue
+  const queueResult = await systems.messageQueue.start();
+  const queueCheck = match(
+    () => success(undefined),
+    (error: QiError) => failure(systemError(`Failed to start message queue: ${error.message}`)),
+    queueResult
+  );
+  
+  return match(
+    () => {
+      // Start message processor in background
+      systems.messageProcessor.startProcessing().catch(error => {
+        console.error('Message processor error:', error);
+      });
 
-    // Start message processor in background
-    systems.messageProcessor.startProcessing().catch(error => {
-      console.error('Message processor error:', error);
-    });
-
-    // Start CLI
-    const cliResult = await systems.cli.start();
-    if (!cliResult.success) {
-      return failure(systemError.cliStartFailed(cliResult.error));
-    }
-
-    return success(void 0);
-  } catch (error) {
-    return failure(systemError.unexpectedError(error as Error));
-  }
+      // Start CLI using functional pattern
+      return systems.cli.start().then(cliResult => 
+        match(
+          () => success(undefined),
+          (error: QiError) => failure(systemError(`Failed to start CLI: ${error.message}`)),
+          cliResult
+        )
+      );
+    },
+    (error: QiError) => Promise.resolve(failure(error)),
+    queueCheck
+  ).then(result => result);
 }
 
 // Bootstrap the application
@@ -172,7 +177,7 @@ class AgentMessageProcessor {
           false
         );
         
-        if (responseMessage.success) {
+        if (responseMessage.tag === 'success') {
           await this.messageQueue.enqueue(responseMessage.value);
         }
       },
@@ -210,7 +215,7 @@ class AgentMessageProcessor {
         })
       );
 
-      if (errorMessage.success) {
+      if (errorMessage.tag === 'success') {
         await this.messageQueue.enqueue(errorMessage.value);
       }
     }
@@ -279,10 +284,7 @@ async function createProductionCLI(config: ProductionCLIConfig): Promise<Message
           const stats = messageQueue.getStats();
           const state = stateManager.getStateContext();
           
-          return {
-            success: true,
-            output: formatSystemStatus(stats, state, request.flags?.detailed)
-          };
+          return success(formatSystemStatus(stats, state, request.flags?.detailed));
         }
       },
       
@@ -297,10 +299,7 @@ async function createProductionCLI(config: ProductionCLIConfig): Promise<Message
             await resetMetrics();
           }
           
-          return {
-            success: true,
-            output: formatMetrics(metrics)
-          };
+          return success(formatMetrics(metrics));
         }
       }
     ]
@@ -476,9 +475,11 @@ const CLIApp: React.FC<{
     // Send to message queue
     const message = messageFactory.createUserInputMessage(input, 'cli');
     
-    if (message.success) {
-      await messageQueue.enqueue(message.value);
-    }
+    match(
+      async (msg) => await messageQueue.enqueue(msg),
+      (error) => console.error('Failed to create message:', error),
+      message
+    );
   }
 };
 ```
@@ -533,9 +534,9 @@ describe('CLI Integration Tests', () => {
 
     // Act
     const userMessage = messageFactory.createUserInputMessage(testInput, 'cli');
-    expect(userMessage.success).toBe(true);
+    expect(userMessage.tag).toBe('success');
     
-    await messageQueue.enqueue(userMessage.value!);
+    await messageQueue.enqueue(userMessage.value);
     receivedMessage = await messagePromise;
 
     // Assert
@@ -557,7 +558,7 @@ describe('CLI Integration Tests', () => {
     expect(isCommand).toBe(true);
     expect(parseResult).toBeTruthy();
     expect(parseResult!.command).toBe('help');
-    expect(executeResult.success).toBe(true);
+    expect(executeResult.tag).toBe('success');
     expect(executeResult.output).toContain('Available CLI Commands');
   });
 
@@ -808,7 +809,7 @@ class MemoryManagedCLI extends MessageDrivenCLI {
   async initialize(): Promise<Result<void, InitializationError>> {
     const result = await super.initialize();
     
-    if (result.success) {
+    if (result.tag === 'success') {
       await this.startMemoryManagement();
     }
     
@@ -960,12 +961,15 @@ async function main(): Promise<void> {
     // Start the CLI
     const startResult = await cli.start();
     
-    if (!startResult.success) {
-      logger.error('Failed to start CLI:', startResult.error);
-      process.exit(1);
-    }
+    match(
+      () => logger.info('🚀 Production CLI started successfully'),
+      (error) => {
+        logger.error('Failed to start CLI:', error);
+        process.exit(1);
+      },
+      startResult
+    );
     
-    logger.info('🚀 Production CLI started successfully');
     
     // Keep the process alive
     process.stdin.resume();

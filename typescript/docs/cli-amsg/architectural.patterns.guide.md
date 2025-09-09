@@ -131,7 +131,7 @@ class CommandRegistry {
   register(command: CLICommand): Result<void, RegistrationError> {
     // Validate command definition
     const validation = this.validateCommand(command);
-    if (!validation.success) {
+    if (validation.tag === 'failure') {
       return validation;
     }
     
@@ -171,7 +171,7 @@ class CommandRegistry {
     // Validate arguments
     if (command.validator) {
       const validation = command.validator(request);
-      if (!validation.success) {
+      if (validation.tag === 'failure') {
         return failure(executionError.validationFailed(validation.error));
       }
     }
@@ -447,7 +447,7 @@ class MessageCorrelationManager {
     // Send request
     const sendResult = await this.messageQueue.enqueue(request);
     
-    if (!sendResult.success) {
+    if (sendResult.tag === 'failure') {
       return failure(correlationError.sendFailed(sendResult.error));
     }
     
@@ -615,7 +615,7 @@ async function withRetry<T>(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await operation();
     
-    if (result.success) {
+    if (result.tag === 'success') {
       return result;
     }
     
@@ -658,7 +658,7 @@ class CircuitBreaker<T> {
     
     const result = await this.operation();
     
-    if (result.success) {
+    if (result.tag === 'success') {
       this.onSuccess();
       return result;
     } else {
@@ -711,7 +711,7 @@ class MessageDrivenCLI {
     ]);
     
     // Check for any initialization failures
-    const failures = results.filter(r => !r.success);
+    const failures = results.filter(r => r.tag === 'failure');
     
     if (failures.length > 0) {
       return failure(initializationError.componentsFailed(failures));
