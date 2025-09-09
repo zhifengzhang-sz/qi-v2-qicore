@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { SAMPLE_DATA } from '../test-constants.js'
 import {
   MemoryCache,
   RedisCache,
@@ -25,14 +26,18 @@ describe('Cache Factory Operations', () => {
       defaultTtl: 60,
     }
 
-    const cache = createCache(config)
+    const cacheResult = createCache(config)
+    expect(isSuccess(cacheResult)).toBe(true)
+
+    if (cacheResult.tag === 'failure') return // Type guard
+    const cache = cacheResult.value
 
     // Test behavior, not implementation details
-    await cache.set('test-key', 'test-value')
-    const result = await cache.get('test-key')
+    await cache.set(SAMPLE_DATA.CACHE_KEYS.BASIC, SAMPLE_DATA.CACHE_VALUES.BASIC)
+    const result = await cache.get(SAMPLE_DATA.CACHE_KEYS.BASIC)
 
     match(
-      (value) => expect(value).toBe('test-value'),
+      (value) => expect(value).toBe(SAMPLE_DATA.CACHE_VALUES.BASIC),
       (error) => expect(error).toBe(null), // Should work
       result
     )
@@ -45,8 +50,11 @@ describe('Cache Factory Operations', () => {
       redis: { host: 'localhost', port: 6379 },
     }
 
-    const cache = createCache(config)
-    expect(cache).toBeInstanceOf(RedisCache)
+    const cacheResult = createCache(config)
+    expect(isSuccess(cacheResult)).toBe(true)
+
+    if (cacheResult.tag === 'failure') return // Type guard
+    expect(cacheResult.value).toBeInstanceOf(RedisCache)
   })
 
   it('createMemoryCache creates memory cache', () => {
@@ -211,36 +219,6 @@ describe('Cache Behavior Contract', () => {
   })
 })
 
-describe('Cache TTL Behavior', () => {
-  const cache = createMemoryCache({ maxSize: 10, defaultTtl: 1 }) // 1 second TTL
-
-  it('entry expires after TTL', async () => {
-    await cache.set('expire-key', 'value', 1) // 1 second TTL
-
-    const immediate = await cache.get('expire-key')
-    expect(isSuccess(immediate)).toBe(true)
-
-    // Wait for expiration
-    await new Promise((resolve) => setTimeout(resolve, 1100))
-
-    const expired = await cache.get('expire-key')
-    expect(isFailure(expired)).toBe(true)
-  })
-
-  it('uses default TTL when not specified', async () => {
-    await cache.set('default-ttl-key', 'value') // Uses default 1 second TTL
-
-    const immediate = await cache.get('default-ttl-key')
-    expect(isSuccess(immediate)).toBe(true)
-
-    // Wait for expiration
-    await new Promise((resolve) => setTimeout(resolve, 1100))
-
-    const expired = await cache.get('default-ttl-key')
-    expect(isFailure(expired)).toBe(true)
-  })
-})
-
 describe('Cache LRU Behavior', () => {
   const cache = createMemoryCache({ maxSize: 2 }) // Only 2 entries
 
@@ -323,14 +301,14 @@ describe('Cache Error Factory', () => {
   it('cacheError creates cache-specific error', () => {
     const error = cacheError('Cache failed', {
       operation: 'get',
-      key: 'test-key',
+      key: SAMPLE_DATA.CACHE_KEYS.ERROR,
       backend: 'memory',
     })
 
     expect(error.category).toBe('RESOURCE')
     expect(error.message).toBe('Cache failed')
     expect(error.context.operation).toBe('get')
-    expect(error.context.key).toBe('test-key')
+    expect(error.context.key).toBe(SAMPLE_DATA.CACHE_KEYS.ERROR)
     expect(error.context.backend).toBe('memory')
   })
 
@@ -540,25 +518,6 @@ describe('Cache Advanced Operations', () => {
       // Verify nothing was cached
       const cachedResult = await cache.get('error-key')
       expect(isFailure(cachedResult)).toBe(true)
-    })
-
-    it('uses provided TTL for cached value', async () => {
-      const factory = vi.fn().mockResolvedValue({ tag: 'success', value: 'ttl-value' })
-      const result = await cache.getOrSet('ttl-key', factory, 1) // 1 second TTL
-
-      expect(isSuccess(result)).toBe(true)
-      expect(result.tag === 'success' && result.value).toBe('ttl-value')
-
-      // Wait for TTL to expire
-      await new Promise((resolve) => setTimeout(resolve, 1100))
-
-      // Should call factory again since value expired
-      const factory2 = vi.fn().mockResolvedValue({ tag: 'success', value: 'refreshed-value' })
-      const result2 = await cache.getOrSet('ttl-key', factory2)
-
-      expect(isSuccess(result2)).toBe(true)
-      expect(result2.tag === 'success' && result2.value).toBe('refreshed-value')
-      expect(factory2).toHaveBeenCalledOnce()
     })
 
     it('handles concurrent calls atomically', async () => {

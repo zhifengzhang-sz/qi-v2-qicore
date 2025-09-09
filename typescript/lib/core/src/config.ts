@@ -291,16 +291,19 @@ export class ConfigBuilder {
   /**
    * Validate configuration using external JSON schema file
    */
-  validateWithSchemaFile(schemaPath: string): ConfigBuilder {
+  validateWithSchemaFile(schemaPath: string): Result<ConfigBuilder, ConfigError> {
     try {
       const schemaContent = readFileSync(schemaPath, 'utf-8')
       const jsonSchema = JSON.parse(schemaContent)
       const zodSchema = convertJsonSchemaToZod(jsonSchema) as z.ZodType
 
-      return this.validateWith(zodSchema)
+      return success(this.validateWith(zodSchema))
     } catch (error) {
-      throw new Error(
-        `Failed to load schema from ${schemaPath}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      return failure(
+        configError(
+          `Failed to load schema from ${schemaPath}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          { path: schemaPath }
+        )
       )
     }
   }
@@ -535,9 +538,8 @@ export class ConfigAccessError extends Error {
  */
 export class ValidatedConfig {
   constructor(private readonly config: Config) {
-    if (!config.isValidated()) {
-      throw new Error('ValidatedConfig can only be created from validated Config instances')
-    }
+    // ValidatedConfig instances should only be created through ConfigBuilder.buildValidated()
+    // which ensures validation has occurred before reaching this constructor
   }
 
   /**

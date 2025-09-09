@@ -98,6 +98,21 @@ export type CacheError = QiError & {
 export const cacheError = (message: string, context: CacheError['context'] = {}): CacheError =>
   createError('CACHE_ERROR', message, 'RESOURCE', context) as CacheError
 
+/**
+ * Cache-specific async try-catch wrapper that returns CacheError
+ */
+const fromCacheAsyncTryCatch = async <T>(
+  operation: () => Promise<T>,
+  errorMapper: (error: unknown) => CacheError
+): Promise<Result<T, CacheError>> => {
+  try {
+    const result = await operation()
+    return success(result)
+  } catch (error) {
+    return failure(errorMapper(error))
+  }
+}
+
 // ============================================================================
 // Cache Interface
 // ============================================================================
@@ -123,7 +138,7 @@ export interface ICache {
     ttl?: number
   ): Promise<Result<T, CacheError>>
   getStats(): CacheStats
-  close(): Promise<void>
+  close(): Promise<Result<void, CacheError>>
 }
 
 // ============================================================================
@@ -393,9 +408,19 @@ export class MemoryCache implements ICache {
     return { ...this.stats }
   }
 
-  async close(): Promise<void> {
-    this.entries.clear()
-    this.events.removeAllListeners()
+  async close(): Promise<Result<void, CacheError>> {
+    return fromCacheAsyncTryCatch(
+      async () => {
+        this.entries.clear()
+        this.events.removeAllListeners()
+      },
+      (error) =>
+        cacheError('Failed to close memory cache', {
+          operation: 'close',
+          backend: 'memory',
+          error: error instanceof Error ? error.message : String(error),
+        })
+    )
   }
 
   private updateAccessOrder(key: string, operation: 'add' | 'access' | 'remove'): void {
@@ -632,9 +657,19 @@ export class RedisCache implements ICache {
     return { ...this.stats }
   }
 
-  async close(): Promise<void> {
-    await this.redis.quit()
-    this.events.removeAllListeners()
+  async close(): Promise<Result<void, CacheError>> {
+    return fromCacheAsyncTryCatch(
+      async () => {
+        await this.redis.quit()
+        this.events.removeAllListeners()
+      },
+      (error) =>
+        cacheError('Failed to close Redis cache', {
+          operation: 'close',
+          backend: 'redis',
+          error: error instanceof Error ? error.message : String(error),
+        })
+    )
   }
 
   // Redis-specific methods leveraging ioredis capabilities
@@ -811,14 +846,19 @@ export class RedisCache implements ICache {
 /**
  * Create cache instance based on configuration
  */
-export const createCache = (config: CacheConfig): ICache => {
+export const createCache = (config: CacheConfig): Result<ICache, CacheError> => {
   switch (config.backend) {
     case 'memory':
-      return new MemoryCache(config)
+      return success(new MemoryCache(config))
     case 'redis':
-      return new RedisCache(config)
+      return success(new RedisCache(config))
     default:
-      throw new Error(`Unsupported cache backend: ${config.backend}`)
+      return failure(
+        cacheError(`Unsupported cache backend: ${config.backend}`, {
+          backend: config.backend,
+          operation: 'create',
+        })
+      )
   }
 }
 

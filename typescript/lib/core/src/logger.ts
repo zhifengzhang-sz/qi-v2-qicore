@@ -97,33 +97,45 @@ export class Logger {
   private readonly config: LoggerConfig
   private childContext?: LoggerContext
 
-  constructor(config: LoggerConfig) {
+  constructor(
+    config: LoggerConfig,
+    pinoInstance?: PinoLogger,
+    eventEmitter?: EventEmitter<LoggerEvents>,
+    childContext?: LoggerContext
+  ) {
     this.config = { ...config }
-    this.events = new EventEmitter<LoggerEvents>()
+    this.events = eventEmitter ?? new EventEmitter<LoggerEvents>()
+    this.childContext = childContext
 
-    // Configure Pino logger (leveraging 70% of pino capabilities)
-    const pinoOptions: LoggerOptions = {
-      level: config.level,
-      ...(config.name && { name: config.name }),
-      ...(config.redact && { redact: config.redact }),
-      ...(config.serializers && { serializers: config.serializers }),
-      ...(config.hooks && { hooks: config.hooks }),
-      ...(config.pretty && {
-        transport: {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'HH:MM:ss Z',
-            ignore: 'pid,hostname',
+    if (pinoInstance) {
+      // Child logger case - use provided pino instance
+      this.pino = pinoInstance
+    } else {
+      // Root logger case - create new pino instance
+      // Configure Pino logger (leveraging 70% of pino capabilities)
+      const pinoOptions: LoggerOptions = {
+        level: config.level,
+        ...(config.name && { name: config.name }),
+        ...(config.redact && { redact: config.redact }),
+        ...(config.serializers && { serializers: config.serializers }),
+        ...(config.hooks && { hooks: config.hooks }),
+        ...(config.pretty && {
+          transport: {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              translateTime: 'HH:MM:ss Z',
+              ignore: 'pid,hostname',
+            },
           },
-        },
-      }),
-    }
+        }),
+      }
 
-    // Use pino's destination handling for file/stream output
-    this.pino = config.destination
-      ? pino(pinoOptions, pino.destination(config.destination))
-      : pino(pinoOptions)
+      // Use pino's destination handling for file/stream output
+      this.pino = config.destination
+        ? pino(pinoOptions, pino.destination(config.destination))
+        : pino(pinoOptions)
+    }
   }
 
   /**
@@ -131,17 +143,9 @@ export class Logger {
    */
   child(context: LoggerContext): Logger {
     const childPino = this.pino.child(context)
-    const childLogger = new Logger(this.config)
 
-    // Replace pino instance with child
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(childLogger as any).pino = childPino
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(childLogger as any).events = this.events // Share event emitter
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(childLogger as any).childContext = context
-
-    return childLogger
+    // Create child logger with proper constructor parameters (no unsafe casting needed)
+    return new Logger(this.config, childPino, this.events, context)
   }
 
   /**
