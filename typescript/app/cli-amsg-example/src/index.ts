@@ -146,7 +146,7 @@ class MockAgent {
       (responseMessage): Result<void, QiError> => {
         // Set correlation ID if provided
         if (correlationId) {
-          ;(responseMessage as any).correlationId = correlationId
+          ;(responseMessage as QiMessage & { correlationId?: string }).correlationId = correlationId
         }
 
         const enqueueResult = this.messageQueue.enqueue(responseMessage)
@@ -172,7 +172,7 @@ class MockAgent {
    */
   private async sendSystemMessage(action: string, reason?: string): Promise<Result<void, QiError>> {
     const systemMessageResult = this.messageFactory.createSystemControlMessage(
-      action as any,
+      action as 'pause' | 'resume' | 'shutdown' | 'reset',
       true,
       reason
     )
@@ -259,7 +259,7 @@ class MockCLI {
     })
 
     // Store unsubscribe function for cleanup
-    ;(this as any).unsubscribeFromQueue = unsubscribe
+    ;(this as MockCLI & { unsubscribeFromQueue?: () => void }).unsubscribeFromQueue = unsubscribe
   }
 
   /**
@@ -325,7 +325,7 @@ class MockCLI {
     return match(
       (message): Result<void, QiError> => {
         // Override priority to HIGH
-        ;(message as any).priority = MessagePriority.HIGH
+        ;(message as QiMessage & { priority: MessagePriority }).priority = MessagePriority.HIGH
 
         const enqueueResult = this.messageQueue.enqueue(message)
 

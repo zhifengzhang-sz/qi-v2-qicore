@@ -19,6 +19,15 @@ import type {
 const execAsync = promisify(exec)
 
 /**
+ * Validate command name according to naming conventions
+ */
+function validateCommandName(name: string): void {
+  if (!name || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(name)) {
+    throw new Error(`Invalid command name: ${name}`)
+  }
+}
+
+/**
  * Built-in command definitions
  */
 const BUILT_IN_COMMANDS: CommandDefinition[] = [
@@ -220,9 +229,7 @@ export class CommandHandler implements ICommandHandler {
 
   registerCommand(definition: CommandDefinition, handler: CommandExecutor): void {
     // Validate command name
-    if (!definition.name || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(definition.name)) {
-      throw new Error(`Invalid command name: ${definition.name}`)
-    }
+    validateCommandName(definition.name)
 
     // Register the handler and definition
     this.commandRegistry.set(definition.name, handler)

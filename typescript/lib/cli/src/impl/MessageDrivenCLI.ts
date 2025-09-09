@@ -24,6 +24,7 @@ import {
   type QiError,
   type Result,
   success,
+  unwrap,
 } from '@qi/base'
 import type { ICommandHandler } from '../command/abstractions/index'
 // v-0.6.1 Message Queue integration
@@ -226,14 +227,8 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
    */
   async initialize(): Promise<void> {
     const result = await this.initializeQiCore()
-    return match(
-      () => {}, // Success - return void
-      (error) => {
-        console.error('CLI initialization failed:', error)
-        throw new Error(error.message)
-      },
-      result
-    )
+    // Interface boundary: convert Result<T> to Promise<void> for legacy compatibility
+    unwrap(result)
   }
 
   /**
@@ -286,14 +281,8 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
    */
   async start(): Promise<void> {
     const result = await this.startQiCore()
-    return match(
-      () => {}, // Success - return void
-      (error) => {
-        console.error('CLI start failed:', error)
-        throw new Error(error.message)
-      },
-      result
-    )
+    // Interface boundary: convert Result<T> to Promise<void> for legacy compatibility
+    unwrap(result)
   }
 
   /**
@@ -338,14 +327,8 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
    */
   async shutdown(): Promise<void> {
     const result = await this.shutdownQiCore()
-    return match(
-      () => {}, // Success - return void
-      (error) => {
-        console.error('CLI shutdown failed:', error)
-        throw new Error(error.message)
-      },
-      result
-    )
+    // Interface boundary: convert Result<T> to Promise<void> for legacy compatibility
+    unwrap(result)
   }
 
   // State management (delegated to components)

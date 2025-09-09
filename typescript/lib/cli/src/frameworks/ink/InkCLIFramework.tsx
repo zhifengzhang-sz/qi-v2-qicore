@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { render, useInput, useApp } from 'ink'
 import { randomBytes } from 'crypto'
+import { create, failure, success, fromTryCatch, type QiError, type Result } from '@qi/base'
 import type {
   ICLIFramework,
   IAgentCLIBridge,
@@ -29,6 +30,33 @@ import {
 import { createPermissionRequest, type PermissionRequest } from './components/PermissionDialog'
 import { createDebugLogger } from '../../utils/DebugLogger'
 import { createConditionalLogger, type SimpleLogger } from '../../utils/QiCoreLogger'
+
+/**
+ * CLI Framework error types
+ */
+interface InkFrameworkError extends QiError {
+  context: {
+    framework?: string
+    operation?: string
+    renderInstance?: boolean
+  }
+}
+
+const inkFrameworkError = (
+  code: string,
+  message: string,
+  context: InkFrameworkError['context'] = {}
+): InkFrameworkError => create(code, message, 'SYSTEM', context) as InkFrameworkError
+
+/**
+ * Type-safe access to framework internals
+ */
+interface FrameworkWithInternals {
+  config?: CLIConfig & { stateManager?: any }
+  stateManager?: any
+  debugMode?: boolean
+  connectedAgent?: any
+}
 
 /**
  * Generate a unique message ID using crypto random bytes
@@ -80,7 +108,7 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     this.messageQueue = messageQueue
 
     // Store debug mode from config
-    this.debugMode = (config as any).debug || false
+    this.debugMode = (config as CLIConfig & { debug?: boolean }).debug || false
 
     // Initialize QiCore conditional logger
     this.logger = createConditionalLogger({
@@ -185,7 +213,13 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     }
 
     if (this.renderInstance) {
-      throw new Error('CLI already started')
+      const error = inkFrameworkError('CLI_ALREADY_STARTED', 'CLI framework is already started', {
+        framework: 'ink',
+        operation: 'start',
+        renderInstance: true,
+      })
+      this.logger.error('Cannot start CLI - already started', error)
+      return Promise.reject(error)
     }
 
     // Enable hotkeys after start - only in interactive TTY environments
@@ -312,7 +346,7 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
           source: 'cli' as const,
           timestamp: new Date(),
           id: generateUniqueId(),
-          priority: 2 as any,
+          priority: 2 as const,
         })
       }
       return
@@ -584,51 +618,55 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   // Get real provider/model info from StateManager
   useEffect(() => {
     const getAgentInfo = () => {
-      try {
-        // CRITICAL FIX: Get StateManager directly from framework config first
-        const stateManager =
-          (framework as any).config?.stateManager || (framework as any).stateManager
-        const debugMode = (framework as any).debugMode || false
+      const safeGetAgentInfo = fromTryCatch(
+        () => {
+          // Type-safe access to framework internals
+          const typedFramework = framework as unknown as FrameworkWithInternals
+          const stateManager = typedFramework.config?.stateManager || typedFramework.stateManager
+          const debugMode = typedFramework.debugMode || false
 
-        if (debugMode) {
-          console.log('🔍 [DEBUG] getAgentInfo - stateManager found:', !!stateManager)
-        }
-
-        if (stateManager?.getPromptConfig) {
-          const promptConfig = stateManager.getPromptConfig()
           if (debugMode) {
-            console.log('🔍 [DEBUG] getAgentInfo - promptConfig:', promptConfig)
+            console.log('🔍 [DEBUG] getAgentInfo - stateManager found:', !!stateManager)
           }
-          if (promptConfig?.provider && promptConfig?.model) {
-            if (debugMode) {
-              console.log(
-                '🔍 [DEBUG] getAgentInfo - updating UI:',
-                promptConfig.provider,
-                promptConfig.model
-              )
-            }
-            setProviderInfo({
-              provider: promptConfig.provider,
-              model: promptConfig.model,
-            })
-            return
-          }
-        }
 
-        // Fallback: Try to get from connected agent if StateManager approach fails
-        const agent = (framework as any).connectedAgent
-        if (agent) {
-          // Fallback to getting from prompt handler
-          if (agent.promptHandler?.getCurrentModel) {
-            const currentModel = agent.promptHandler.getCurrentModel()
-            if (currentModel) {
-              setProviderInfo((prev) => ({ ...prev, model: currentModel }))
+          if (stateManager?.getPromptConfig) {
+            const promptConfig = stateManager.getPromptConfig()
+            if (debugMode) {
+              console.log('🔍 [DEBUG] getAgentInfo - promptConfig:', promptConfig)
+            }
+            if (promptConfig?.provider && promptConfig?.model) {
+              if (debugMode) {
+                console.log(
+                  '🔍 [DEBUG] getAgentInfo - updating UI:',
+                  promptConfig.provider,
+                  promptConfig.model
+                )
+              }
+              setProviderInfo({
+                provider: promptConfig.provider,
+                model: promptConfig.model,
+              })
+              return
             }
           }
-        }
-      } catch (error) {
-        // Keep default values if we can't get agent info
-      }
+
+          // Fallback: Try to get from connected agent if StateManager approach fails
+          const agent = typedFramework.connectedAgent
+          if (agent) {
+            // Fallback to getting from prompt handler
+            if (agent.promptHandler?.getCurrentModel) {
+              const currentModel = agent.promptHandler.getCurrentModel()
+              if (currentModel) {
+                setProviderInfo((prev) => ({ ...prev, model: currentModel }))
+              }
+            }
+          }
+        },
+        (error) => create('AGENT_INFO_FAILED', `Failed to get agent info: ${error}`, 'SYSTEM')
+      )
+
+      // Result is ignored as this is optional UI enhancement
+      // Keep default values if we can't get agent info
     }
 
     // Update agent info initially and when framework changes
@@ -636,7 +674,8 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
 
     // Listen for state changes to refresh immediately
     const handleStateChange = (event: any) => {
-      const debugMode = (framework as any).debugMode || false
+      const typedFramework = framework as unknown as FrameworkWithInternals
+      const debugMode = typedFramework.debugMode || false
       if (debugMode) {
         console.log('🔍 [DEBUG] StateChange received:', event.type, event.field)
       }
@@ -651,33 +690,33 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
 
     // Subscribe to state changes from the state manager
     let unsubscribe: (() => void) | null = null
-    try {
-      const stateManager =
-        (framework as any).config?.stateManager || (framework as any).stateManager
-      const debugMode = (framework as any).debugMode || false
+    const setupSubscription = fromTryCatch(
+      () => {
+        const typedFramework = framework as unknown as FrameworkWithInternals
+        const stateManager = typedFramework.config?.stateManager || typedFramework.stateManager
+        const debugMode = typedFramework.debugMode || false
 
-      if (debugMode) {
-        console.log('🔍 [DEBUG] Subscription setup - stateManager found:', !!stateManager)
-      }
-      if (stateManager?.subscribe) {
         if (debugMode) {
-          console.log('🔍 [DEBUG] Setting up StateManager subscription')
+          console.log('🔍 [DEBUG] Subscription setup - stateManager found:', !!stateManager)
         }
-        unsubscribe = stateManager.subscribe(handleStateChange)
-        if (debugMode) {
-          console.log('🔍 [DEBUG] StateManager subscription active')
+        if (stateManager?.subscribe) {
+          if (debugMode) {
+            console.log('🔍 [DEBUG] Setting up StateManager subscription')
+          }
+          unsubscribe = stateManager.subscribe(handleStateChange)
+          if (debugMode) {
+            console.log('🔍 [DEBUG] StateManager subscription active')
+          }
+        } else {
+          if (debugMode) {
+            console.log('🔍 [DEBUG] No stateManager.subscribe method found')
+          }
         }
-      } else {
-        if (debugMode) {
-          console.log('🔍 [DEBUG] No stateManager.subscribe method found')
-        }
-      }
-    } catch (error) {
-      const debugMode = (framework as any).debugMode || false
-      if (debugMode) {
-        console.log('🔍 [DEBUG] Subscription setup error:', error)
-      }
-    }
+      },
+      (error) =>
+        create('SUBSCRIPTION_SETUP_FAILED', `Failed to setup subscription: ${error}`, 'SYSTEM')
+    )
+    // Result is ignored as subscription is optional UI enhancement
 
     // Set up an interval to refresh agent info periodically as fallback
     const interval = setInterval(getAgentInfo, 2000)
@@ -686,11 +725,11 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
       clearInterval(interval)
       // Clean up state change listener
       if (unsubscribe) {
-        try {
-          unsubscribe()
-        } catch (error) {
-          // Ignore cleanup errors
-        }
+        const cleanupResult = fromTryCatch(
+          () => unsubscribe!(),
+          (error) => create('CLEANUP_FAILED', `Failed to cleanup subscription: ${error}`, 'SYSTEM')
+        )
+        // Ignore cleanup result as this is just cleanup
       }
     }
   }, [framework])
@@ -700,7 +739,7 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     framework.registerMessageCallback(setMessages)
     return () => {
       // Clean up callback on unmount
-      framework.registerMessageCallback(null as any)
+      framework.registerMessageCallback((() => {}) as any)
     }
   }, [framework, setMessages])
 

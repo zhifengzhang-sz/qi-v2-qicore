@@ -206,7 +206,13 @@ async function demonstrateNetworkErrors() {
       }
 
       if (id === 0) {
-        throw new Error('Network connection failed')
+        return Err(
+          networkError('Network connection failed', {
+            endpoint: `/api/users/${id}`,
+            errorType: 'CONNECTION_FAILED',
+            method: 'GET',
+          })
+        )
       }
 
       // Simulate successful response
