@@ -77,8 +77,15 @@ export function createCLI(
       return createInkCLI(config)
 
     case 'hybrid':
-      throw new Error(
-        'Hybrid framework not supported in sync createCLI. Use createCLIAsync() instead.'
+      return Err(
+        cliFactoryError(
+          'HYBRID_NOT_SUPPORTED_SYNC',
+          'Hybrid framework not supported in sync createCLI. Use createCLIAsync() instead.',
+          {
+            framework: 'hybrid',
+            operation: 'createCLI',
+          }
+        )
       )
 
     default:
@@ -116,7 +123,16 @@ export function createValidatedCLI(
           return createValidatedInkCLI(config)
 
         case 'hybrid':
-          throw new Error('Hybrid CLI validation not supported. Use createCLIAsync() instead.')
+          return Err(
+            cliFactoryError(
+              'HYBRID_VALIDATION_NOT_SUPPORTED',
+              'Hybrid CLI validation not supported. Use createCLIAsync() instead.',
+              {
+                framework: 'hybrid',
+                operation: 'createValidatedCLI',
+              }
+            )
+          )
 
         default:
           return Err(

@@ -168,16 +168,28 @@ function registerServices(
     }
   }
 
-  // Register input manager
+  // Register input manager (requires message queue)
+  const preCheckMessageQueue = container.resolve('messageQueue')
+  if (preCheckMessageQueue.tag === 'failure') {
+    return Err(
+      create(
+        'MISSING_DEPENDENCY',
+        'ReadlineInputManager requires messageQueue to be registered',
+        'SYSTEM',
+        { dependency: 'messageQueue', component: 'ReadlineInputManager' }
+      )
+    )
+  }
+
   const inputResult = container.register(
     'inputManager',
     () => {
       // v-0.6.1: ReadlineInputManager requires message queue
       const messageQueueResult = container.resolve('messageQueue')
-      if (messageQueueResult.tag === 'failure') {
-        throw new Error('Failed to resolve messageQueue')
-      }
-      return new ReadlineInputManager(messageQueueResult.value as any)
+      // This should never fail due to pre-check above, but keep type safety
+      return new ReadlineInputManager(
+        messageQueueResult.tag === 'success' ? messageQueueResult.value : (null as any)
+      )
     },
     { singleton: true, destroyer: (instance) => (instance as ReadlineInputManager).close() }
   )
