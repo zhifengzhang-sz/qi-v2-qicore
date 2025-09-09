@@ -162,7 +162,7 @@ export class CLIContainer implements ICLIContainer {
         // If service is a promise, await it
         if (service && typeof service === 'object' && 'then' in service) {
           try {
-            const resolved = await (service as any)
+            const resolved = await (service as unknown as Promise<unknown>)
             return Ok(resolved as T)
           } catch (error) {
             return Err(

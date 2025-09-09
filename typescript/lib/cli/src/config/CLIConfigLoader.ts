@@ -142,7 +142,7 @@ function mergeConfigFromEnv(
   for (const [envVar, configKey] of Object.entries(envMappings)) {
     const envValue = env[envVar]
     if (envValue !== undefined) {
-      ;(envConfig as any)[configKey] = parseEnvValue(envValue, configKey)
+      ;(envConfig as Record<string, unknown>)[configKey] = parseEnvValue(envValue, configKey)
     }
   }
 
@@ -167,12 +167,12 @@ function mergeConfigFromArgs(
         // Argument expects a value
         const value = args[i + 1]
         if (value && !value.startsWith('-')) {
-          ;(argConfig as any)[mapping] = parseArgValue(value, mapping)
+          ;(argConfig as Record<string, unknown>)[mapping] = parseArgValue(value, mapping)
           i++ // Skip the next argument as it's the value
         }
       } else if (typeof mapping === 'object') {
         // Boolean flag
-        ;(argConfig as any)[mapping.key] = mapping.value
+        ;(argConfig as Record<string, unknown>)[mapping.key] = mapping.value
       }
     }
 

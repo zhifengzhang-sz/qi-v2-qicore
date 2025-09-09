@@ -79,7 +79,10 @@ export class MetadataBuilder {
   error(error: Error | any): MetadataBuilder {
     this.metadata.errorMessage = error instanceof Error ? error.message : String(error)
     this.metadata.errorStack = error instanceof Error ? error.stack : undefined
-    this.metadata.errorContext = (error as any)?.context
+    this.metadata.errorContext =
+      error && typeof error === 'object' && 'context' in error
+        ? (error as { context: unknown }).context
+        : undefined
     return this
   }
 
@@ -165,7 +168,7 @@ export const createQiLogger = (config: LoggerConfig = {}): SimpleLogger => {
   try {
     // Attempt to create QiCore logger
     const qiLoggerResult = qiCreateLogger({
-      level: loggerConfig.level as any,
+      level: loggerConfig.level as 'debug' | 'info' | 'warn' | 'error',
       pretty: loggerConfig.pretty,
       name: loggerConfig.name,
     })
@@ -320,7 +323,10 @@ export const logError = (
     ...context,
     errorMessage,
     errorStack,
-    errorContext: (error as any)?.context || context.errorContext,
+    errorContext:
+      (error && typeof error === 'object' && 'context' in error
+        ? (error as { context: unknown }).context
+        : undefined) || context.errorContext,
     trace: 'error',
   })
 }
