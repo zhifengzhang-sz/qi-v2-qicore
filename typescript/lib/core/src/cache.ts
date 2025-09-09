@@ -508,22 +508,16 @@ export class RedisCache implements ICache {
   }
 
   async get<T>(key: string): Promise<Result<T, CacheError>> {
-    return fromAsyncTryCatch(
+    const result = await fromAsyncTryCatch(
       async () => {
         // Use Redis GET command via ioredis
         const value = await this.redis.get(key)
 
         if (value === null) {
-          this.stats.misses++
-          this.events.emit('miss', key)
-          throw new Error(`Cache miss for key: ${key}`)
+          return null // Return null to indicate cache miss
         }
 
-        const parsed = JSON.parse(value) as T
-        this.stats.hits++
-        this.events.emit('hit', key, parsed)
-
-        return parsed
+        return JSON.parse(value) as T
       },
       (error) =>
         cacheError(error instanceof Error ? error.message : String(error), {
@@ -531,7 +525,28 @@ export class RedisCache implements ICache {
           key,
           backend: 'redis',
         })
-    ) as Promise<Result<T, CacheError>>
+    )
+
+    // Handle cache miss outside of the try/catch wrapper
+    if (result.tag === 'success' && result.value === null) {
+      this.stats.misses++
+      this.events.emit('miss', key)
+      return failure(
+        cacheError(`Cache miss for key: ${key}`, {
+          operation: 'get',
+          key,
+          backend: 'redis',
+        })
+      )
+    }
+
+    // Handle success case
+    if (result.tag === 'success') {
+      this.stats.hits++
+      this.events.emit('hit', key, result.value)
+    }
+
+    return result as Result<T, CacheError>
   }
 
   async set<T>(key: string, value: T, ttl?: number): Promise<Result<void, CacheError>> {

@@ -212,8 +212,17 @@ export type CLIMessage =
  * CLI Message Factory for creating typed CLI messages
  */
 export namespace CLIMessageFactory {
+  // Constants for ID generation
+  const ID_PREFIX = 'cli'
+  const RANDOM_SUFFIX_LENGTH = 8
+  const RANDOM_BASE = 36
+
   export function generateId(): string {
-    return `cli_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const timestamp = Date.now()
+    const randomSuffix = Math.random()
+      .toString(RANDOM_BASE)
+      .slice(2, 2 + RANDOM_SUFFIX_LENGTH)
+    return `${ID_PREFIX}_${timestamp}_${randomSuffix}`
   }
 
   export function createReadyMessage(config: {

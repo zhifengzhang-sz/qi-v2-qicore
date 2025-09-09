@@ -217,18 +217,15 @@ export class Logger {
    * Event listener methods for external event handling
    */
   on<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.events.on(event as any, listener as any)
+    this.events.on(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
   }
 
   once<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.events.once(event as any, listener as any)
+    this.events.once(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
   }
 
   off<K extends keyof LoggerEvents>(event: K, listener: LoggerEvents[K]): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.events.off(event as any, listener as any)
+    this.events.off(event, listener as EventEmitter.EventListener<LoggerEvents, K>)
   }
 
   /**

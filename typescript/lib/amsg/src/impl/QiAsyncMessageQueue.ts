@@ -8,8 +8,7 @@
 import type { IAsyncMessageQueue, QueueOptions, QueueState } from '../interfaces/IAsyncMessageQueue'
 // v-0.6.1: QueueEventCallback and QueueEventType removed - pure message-driven
 import type { MessageStats, QiMessage } from '../types/MessageTypes'
-import { MessagePriority } from '../types/MessageTypes'
-import { MessageStatus } from '../types/MessageTypes'
+import { MessagePriority, MessageStatus, MessageType } from '../types/MessageTypes'
 import {
   create,
   failure,
@@ -209,12 +208,12 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       cleanupFn: options.cleanupFn || (() => {}),
     }
 
-    // Initialize stats
+    // Initialize stats with proper typing
     this.stats = {
       totalMessages: 0,
-      messagesByType: {} as any,
-      messagesByPriority: {} as any,
-      messagesByStatus: {} as any,
+      messagesByType: {} as Record<MessageType, number>,
+      messagesByPriority: {} as Record<MessagePriority, number>,
+      messagesByStatus: {} as Record<MessageStatus, number>,
       averageProcessingTime: 0,
       errorRate: 0,
       queueLength: 0,
