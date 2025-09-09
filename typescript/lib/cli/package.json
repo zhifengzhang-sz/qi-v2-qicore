@@ -1,6 +1,6 @@
 {
   "name": "@qi/cli",
-  "version": "2.2.1",
+  "version": "3.0.0",
   "description": "QiCore CLI Framework - Message-driven CLI with hybrid terminal support",
   "type": "module",
   "main": "dist/index.cjs",
