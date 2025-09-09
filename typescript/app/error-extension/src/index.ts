@@ -583,30 +583,37 @@ async function demonstrateErrorComposition(logger: DemoLogger) {
 
 async function main() {
   const loggerResult = createLogger({ level: 'info', pretty: true })
-  if (loggerResult.tag === 'failure') throw new Error('Logger failed')
-  const logger = loggerResult.value
 
-  console.log('🚀 QiCore Foundation - Error Extension Examples')
-  console.log('==============================================\n')
+  return match(
+    async (logger) => {
+      console.log('🚀 QiCore Foundation - Error Extension Examples')
+      console.log('==============================================\n')
 
-  await demonstrateUserFlow(logger)
-  console.log()
+      await demonstrateUserFlow(logger)
+      console.log()
 
-  await demonstratePaymentFlow(logger)
-  console.log()
+      await demonstratePaymentFlow(logger)
+      console.log()
 
-  await demonstrateOrderFlow(logger)
-  console.log()
+      await demonstrateOrderFlow(logger)
+      console.log()
 
-  await demonstrateErrorComposition(logger)
-  console.log()
+      await demonstrateErrorComposition(logger)
+      console.log()
 
-  logger.info('✨ Error extension examples completed!')
-  logger.info('💡 Key takeaways:')
-  logger.info('   - Domain-specific error types provide better context')
-  logger.info('   - Error categories determine retry strategies')
-  logger.info('   - Structured error handling improves debugging')
-  logger.info('   - Error composition works across different domains')
+      logger.info('✨ Error extension examples completed!')
+      logger.info('💡 Key takeaways:')
+      logger.info('   - Domain-specific error types provide better context')
+      logger.info('   - Error categories determine retry strategies')
+      logger.info('   - Structured error handling improves debugging')
+      logger.info('   - Error composition works across different domains')
+    },
+    (error) => {
+      console.error('Failed to create logger:', error.message)
+      process.exit(1)
+    },
+    loggerResult
+  )
 }
 
 main().catch(console.error)
