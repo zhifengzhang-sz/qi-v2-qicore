@@ -17,6 +17,7 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
+    "lint:anti-patterns": "eslint .",
     "typecheck": "tsc --noEmit --pretty",
     "check": "bun run typecheck && bun --filter='@qi/*' run typecheck && bun run format:check && bun run lint",
     "build:check": "bun run clean && bun run build && bun run check"
@@ -77,17 +78,20 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@eslint/js": "^9.35.0",
     "@fast-check/vitest": "^0.2.2",
     "@types/node": "^20.19.8",
     "@types/pino": "^7.0.5",
     "@vitest/coverage-v8": "^1.6.1",
     "bun-types": "^1.2.18",
     "dts-bundle-generator": "^9.5.1",
+    "eslint": "^9.35.0",
     "fast-check": "^3.23.2",
     "rimraf": "^5.0.10",
     "tsup": "^8.5.0",
     "typedoc": "^0.25.13",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.43.0",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^1.6.1"
   }
