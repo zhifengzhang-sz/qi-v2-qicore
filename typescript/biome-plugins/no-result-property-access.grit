@@ -1,0 +1,8 @@
+language js
+
+pattern no_result_property_access() {
+  or {
+    `$result.value`,
+    `$result.error`
+  }
+}

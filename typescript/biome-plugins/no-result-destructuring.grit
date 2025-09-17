@@ -1,0 +1,27 @@
+language js
+
+pattern no_result_destructuring() {
+  or {
+    `const { $props } = $result` where {
+      $props <: contains or {
+        `tag`,
+        `value`,
+        `error`
+      }
+    },
+    `let { $props } = $result` where {
+      $props <: contains or {
+        `tag`,
+        `value`,
+        `error`
+      }
+    },
+    `var { $props } = $result` where {
+      $props <: contains or {
+        `tag`,
+        `value`,
+        `error`
+      }
+    }
+  }
+}

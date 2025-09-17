@@ -1,0 +1,12 @@
+language js
+
+pattern no_result_tag_check() {
+  `$result.tag === $value` where {
+    $value <: or {
+      `"success"`,
+      `"failure"`,
+      `'success'`,
+      `'failure'`
+    }
+  }
+}
