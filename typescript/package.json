@@ -18,6 +18,10 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "lint:anti-patterns": "eslint .",
+    "lint:base": "eslint lib/base/src/ lib/tests/base/",
+    "lint:core": "eslint lib/core/src/ lib/tests/core/",
+    "lint:cli": "eslint lib/cli/src/ lib/tests/cli/",
+    "lint:amsg": "eslint lib/amsg/src/ lib/tests/amsg/",
     "typecheck": "tsc --noEmit --pretty",
     "check": "bun run typecheck && bun --filter='@qi/*' run typecheck && bun run format:check && bun run lint",
     "build:check": "bun run clean && bun run build && bun run check"
