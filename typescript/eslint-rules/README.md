@@ -165,21 +165,24 @@ For more information about `Result<T>` patterns, see the [QiCore Base tutorial](
 
 ## Detection Status in QiCore
 
-Based on the latest analysis of the `lib/` directory, this plugin will detect **130+ anti-pattern violations** across the codebase:
+Based on the latest analysis of the `lib/` directory, this plugin will detect **100+ anti-pattern violations** across the codebase:
 
 ### 🚨 **Current Violations Found**
-- **Direct tag checking**: 77 violations (`.tag === 'success'`)
-- **Direct property access**: 53 violations (`.value`, `.error`)
+- **Direct tag checking**: ~52 violations (`.tag === 'success'`) in application code
+- **Direct property access**: ~28 violations (`.value`, `.error`) in application code
 - **Destructuring**: 0 violations ✅
 
 ### 📍 **Most Critical Files**
-- `lib/core/src/cache.ts`: 10+ violations
-- `lib/core/src/config.ts`: 10+ violations
-- `lib/cli/src/factories/createReadlineCLI.ts`: 12+ violations
-- `lib/base/src/result.ts`: 15 violations (internal implementation)
-- `lib/base/src/async.ts`: 10 violations (internal implementation)
+- `lib/core/src/cache.ts`: ~12 violations
+- `lib/core/src/config.ts`: ~9 violations
+- `lib/cli/src/factories/createReadlineCLI.ts`: ~12 violations
+- `lib/amsg/src/`: Unknown count (to be analyzed)
 
-**Note**: Violations in `lib/base/src/` are internal Result<T> implementation details and may be acceptable.
+### ✅ **Correctly Excluded**
+- `lib/base/src/result.ts`: 0 violations (legitimately implements Result<T> patterns)
+- `lib/base/src/async.ts`: 0 violations (legitimately implements async Result<T> helpers)
+
+**Note**: The rule now correctly excludes `lib/base/src/**` files since these contain the legitimate internal implementations of Result<T> combinators like `isSuccess()`, `map()`, `flatMap()`, etc.
 
 ## Known Issues
 

@@ -35,6 +35,12 @@ export const noResultAntiPatterns = createRule({
   defaultOptions: [],
   create(context) {
     const sourceCode = context.getSourceCode();
+    const filename = context.getFilename ? context.getFilename() : context.filename;
+
+    // Skip files in lib/base/src - these are legitimate Result<T> implementations
+    if (filename.includes('/lib/base/src/') || filename.includes('\\lib\\base\\src\\')) {
+      return {};
+    }
 
     // Check if a node represents a Result type based on TypeScript type information
     function isResultType(node: any): boolean {
