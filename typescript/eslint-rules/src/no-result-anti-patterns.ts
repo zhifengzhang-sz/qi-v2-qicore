@@ -9,91 +9,104 @@
  * Enforces using: match(), map(), flatMap(), isSuccess(), isFailure()
  */
 
-import { ESLintUtils } from '@typescript-eslint/utils'
+import { ESLintUtils } from "@typescript-eslint/utils";
 
 const createRule = ESLintUtils.RuleCreator(
-  name => `https://github.com/qi-org/qi-v2-qicore/blob/main/eslint-rules/${name}.md`
-)
+  (name) => `https://github.com/qi-org/qi-v2-qicore/blob/main/eslint-rules/${name}.md`,
+);
 
 export const noResultAntiPatterns = createRule({
-  name: 'no-result-anti-patterns',
+  name: "no-result-anti-patterns",
   meta: {
-    type: 'problem',
+    type: "problem",
     docs: {
-      description: 'Prevent anti-patterns when using Result<T> from @qi/base',
+      description: "Prevent anti-patterns when using Result<T> from @qi/base",
     },
     messages: {
-      directTagCheck: 'Do not check result.tag directly. Use match(), isSuccess(), or isFailure() instead.',
-      directPropertyAccess: 'Do not access result.{{property}} directly. Use match(), map(), or flatMap() instead.',
-      resultDestructuring: 'Do not destructure Result objects. Use match(), map(), or flatMap() instead.',
+      directTagCheck:
+        "Do not check result.tag directly. Use match(), isSuccess(), or isFailure() instead.",
+      directPropertyAccess:
+        "Do not access result.{{property}} directly. Use match(), map(), or flatMap() instead.",
+      resultDestructuring:
+        "Do not destructure Result objects. Use match(), map(), or flatMap() instead.",
     },
     schema: [],
   },
   defaultOptions: [],
   create(context) {
-    const sourceCode = context.getSourceCode()
+    const sourceCode = context.getSourceCode();
 
     // Check if a node represents a Result type based on TypeScript type information
     function isResultType(node: any): boolean {
       try {
-        const services = ESLintUtils.getParserServices(context)
-        const checker = services.program.getTypeChecker()
-        const tsNode = services.esTreeNodeToTSNodeMap.get(node)
-        
-        if (!tsNode) return false
-        
-        const type = checker.getTypeAtLocation(tsNode)
-        const typeString = checker.typeToString(type)
-        
+        const services = ESLintUtils.getParserServices(context);
+        const checker = services.program.getTypeChecker();
+        const tsNode = services.esTreeNodeToTSNodeMap.get(node);
+
+        if (!tsNode) return false;
+
+        const type = checker.getTypeAtLocation(tsNode);
+        const typeString = checker.typeToString(type);
+
         // Check if it's a Result type from @qi/base
-        return typeString.includes('Result<') ||
-               typeString.includes('Success<') ||
-               typeString.includes('Failure<') ||
-               (type.symbol && type.symbol.name === 'Result') ||
-               // Check if it has the discriminated union structure: { tag: "success"; value: T } | { tag: "failure"; error: E }
-               (typeString.includes('{ tag: "success"') && typeString.includes('value:')) ||
-               (typeString.includes('{ tag: "failure"') && typeString.includes('error:'))
+        return (
+          typeString.includes("Result<") ||
+          typeString.includes("Success<") ||
+          typeString.includes("Failure<") ||
+          (type.symbol && type.symbol.name === "Result") ||
+          // Check if it has the discriminated union structure: { tag: "success"; value: T } | { tag: "failure"; error: E }
+          (typeString.includes('{ tag: "success"') && typeString.includes("value:")) ||
+          (typeString.includes('{ tag: "failure"') && typeString.includes("error:"))
+        );
       } catch (error) {
         // Fallback to name-based heuristic if type services aren't available
-        const text = sourceCode.getText(node)
-        return text.includes('result') || text.includes('Result')
+        const text = sourceCode.getText(node);
+        return text.includes("result") || text.includes("Result");
       }
     }
 
     return {
       // Prevent: result.tag === 'success'/'failure'
       BinaryExpression(node) {
-        if (node.operator === '===' || node.operator === '==' ||
-            node.operator === '!==' || node.operator === '!=') {
-          
+        if (
+          node.operator === "===" ||
+          node.operator === "==" ||
+          node.operator === "!==" ||
+          node.operator === "!="
+        ) {
           // Check if left side is result.tag
-          if (node.left.type === 'MemberExpression' &&
-              node.left.property.type === 'Identifier' &&
-              node.left.property.name === 'tag') {
-            
+          if (
+            node.left.type === "MemberExpression" &&
+            node.left.property.type === "Identifier" &&
+            node.left.property.name === "tag"
+          ) {
             // Check if right side is 'success' or 'failure'
-            if (node.right.type === 'Literal' &&
-                (node.right.value === 'success' || node.right.value === 'failure')) {
+            if (
+              node.right.type === "Literal" &&
+              (node.right.value === "success" || node.right.value === "failure")
+            ) {
               if (isResultType(node.left.object)) {
                 context.report({
                   node,
-                  messageId: 'directTagCheck',
-                })
+                  messageId: "directTagCheck",
+                });
               }
             }
           }
 
           // Also check flipped: 'success' === result.tag
-          if (node.right.type === 'MemberExpression' &&
-              node.right.property.type === 'Identifier' &&
-              node.right.property.name === 'tag' &&
-              node.left.type === 'Literal' &&
-              (node.left.value === 'success' || node.left.value === 'failure')) {
+          if (
+            node.right.type === "MemberExpression" &&
+            node.right.property.type === "Identifier" &&
+            node.right.property.name === "tag" &&
+            node.left.type === "Literal" &&
+            (node.left.value === "success" || node.left.value === "failure")
+          ) {
             if (isResultType(node.right.object)) {
               context.report({
                 node,
-                messageId: 'directTagCheck',
-              })
+                messageId: "directTagCheck",
+              });
             }
           }
         }
@@ -101,66 +114,62 @@ export const noResultAntiPatterns = createRule({
 
       // Prevent: result.value, result.error (but allow result.tag for error messages)
       MemberExpression(node) {
-        if (node.property.type === 'Identifier' &&
-            (node.property.name === 'value' || node.property.name === 'error')) {
+        if (
+          node.property.type === "Identifier" &&
+          (node.property.name === "value" || node.property.name === "error")
+        ) {
           if (isResultType(node.object)) {
             context.report({
               node,
-              messageId: 'directPropertyAccess',
+              messageId: "directPropertyAccess",
               data: {
                 property: node.property.name,
               },
-            })
+            });
           }
         }
       },
 
       // Prevent: const { tag, value, error } = result
       VariableDeclarator(node) {
-        if (node.id.type === 'ObjectPattern' &&
-            node.init &&
-            isResultType(node.init)) {
-          
+        if (node.id.type === "ObjectPattern" && node.init && isResultType(node.init)) {
           // Check if destructuring includes Result-specific properties
-          const hasResultProps = node.id.properties.some(prop => {
-            if (prop.type === 'Property' && prop.key.type === 'Identifier') {
-              return ['tag', 'value', 'error'].includes(prop.key.name)
+          const hasResultProps = node.id.properties.some((prop: any) => {
+            if (prop.type === "Property" && prop.key.type === "Identifier") {
+              return ["tag", "value", "error"].includes(prop.key.name);
             }
-            return false
-          })
+            return false;
+          });
 
           if (hasResultProps) {
             context.report({
               node,
-              messageId: 'resultDestructuring',
-            })
+              messageId: "resultDestructuring",
+            });
           }
         }
       },
 
       // Prevent: const { tag, value } = someResult in assignments
       AssignmentExpression(node) {
-        if (node.left.type === 'ObjectPattern' &&
-            node.right &&
-            isResultType(node.right)) {
-          
-          const hasResultProps = node.left.properties.some(prop => {
-            if (prop.type === 'Property' && prop.key.type === 'Identifier') {
-              return ['tag', 'value', 'error'].includes(prop.key.name)
+        if (node.left.type === "ObjectPattern" && node.right && isResultType(node.right)) {
+          const hasResultProps = node.left.properties.some((prop: any) => {
+            if (prop.type === "Property" && prop.key.type === "Identifier") {
+              return ["tag", "value", "error"].includes(prop.key.name);
             }
-            return false
-          })
+            return false;
+          });
 
           if (hasResultProps) {
             context.report({
               node,
-              messageId: 'resultDestructuring',
-            })
+              messageId: "resultDestructuring",
+            });
           }
         }
       },
-    }
+    };
   },
-})
+});
 
-export default noResultAntiPatterns
+export default noResultAntiPatterns;

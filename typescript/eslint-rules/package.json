@@ -1,12 +1,19 @@
 {
   "name": "@qi/eslint-plugin",
   "version": "1.0.0",
-  "description": "ESLint rules to enforce proper @qi/base Result<T> usage patterns",
+  "description": "ESLint rules to enforce proper @qi/base Result<T> usage patterns in QiCore Foundation",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    "README.md"
   ],
   "scripts": {
     "build": "bun run tsc",
@@ -17,26 +24,31 @@
   "keywords": [
     "eslint",
     "eslint-plugin",
+    "eslintplugin",
     "typescript",
     "result",
     "functional-programming",
-    "qi"
+    "qi",
+    "qicore",
+    "anti-patterns"
   ],
   "dependencies": {
-    "@typescript-eslint/utils": "^6.0.0"
+    "@typescript-eslint/utils": "^8.43.0",
+    "@typescript-eslint/visitor-keys": "^8.44.0",
+    "eslint-visitor-keys": "^4.2.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.3",
     "@eslint/js": "^9.35.0",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
-    "@typescript-eslint/rule-tester": "^6.0.0",
-    "typescript": "^5.0.0",
+    "@typescript-eslint/rule-tester": "^8.43.0",
+    "typescript": "^5.6.0",
     "typescript-eslint": "^8.43.0",
-    "vitest": "^1.0.0"
+    "vitest": "^2.1.0"
   },
   "peerDependencies": {
-    "@typescript-eslint/parser": "^6.0.0",
+    "@typescript-eslint/parser": "^8.43.0",
     "eslint": "^9.35.0"
   },
   "engines": {

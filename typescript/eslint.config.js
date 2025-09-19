@@ -1,6 +1,6 @@
-import js from '@eslint/js'
-import tseslint from 'typescript-eslint'
-import qiPlugin from './eslint-rules/dist/index.js'
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+import qiPlugin from "@qi/eslint-plugin";
 
 export default [
   js.configs.recommended,
@@ -10,26 +10,28 @@ export default [
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
-      }
-    }
+      },
+    },
   },
+  // Apply QI rules to TypeScript files
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ["**/*.ts", "**/*.tsx"],
     plugins: {
-      '@qi': qiPlugin
+      "@qi": qiPlugin,
     },
     rules: {
-      '@qi/no-result-anti-patterns': 'error'
-    }
+      // Use recommended config with additional rules
+      ...qiPlugin.configs.recommended.rules,
+    },
   },
   {
     ignores: [
-      'dist/**',
-      'node_modules/**',
-      'coverage/**',
-      'temp/**',
-      'eslint-rules/**',
-      'biome-plugins/**'
-    ]
-  }
-]
+      "dist/**",
+      "node_modules/**",
+      "coverage/**",
+      "temp/**",
+      "eslint-rules/**",
+      "biome-plugins/**",
+    ],
+  },
+];
