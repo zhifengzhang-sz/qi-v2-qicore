@@ -14,19 +14,42 @@ To verify it's working:
 bun run lint:anti-patterns
 
 # Check which rules are active
-npx eslint --print-config lib/core/src/cache.ts
+bunx eslint --print-config lib/core/src/cache.ts
 ```
 
 **Current Setup**: The workspace automatically uses the `recommended` configuration which flags Result<T> anti-patterns as errors.
 
 ### 📦 External Usage (Other Projects)
 
-#### Installation
+#### Quick Start
+
+1. **Install the plugin:**
 ```bash
 npm install @qi/eslint-plugin --save-dev
 ```
 
-#### ESLint 9+ Configuration (Recommended)
+2. **Add to your ESLint config:**
+```javascript
+// eslint.config.js
+import qiPlugin from '@qi/eslint-plugin';
+
+export default [
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    plugins: { '@qi': qiPlugin },
+    rules: qiPlugin.configs.recommended.rules
+  }
+];
+```
+
+3. **Start linting:**
+```bash
+npx eslint .
+```
+
+That's it! The rule will now catch Result<T> anti-patterns in your codebase.
+
+#### Advanced Configuration
 ```javascript
 // eslint.config.js
 import qiPlugin from '@qi/eslint-plugin';
@@ -92,23 +115,62 @@ export default [
 
 Prevents anti-patterns when using `Result<T>` from `@qi/base`.
 
+#### Configuration Options
+
+```javascript
+'@qi/no-result-anti-patterns': ['error', {
+  excludePatterns: ['/path/to/exclude/', '/another/pattern/']
+}]
+```
+
+**Options:**
+- `excludePatterns` (optional): Array of path patterns to exclude from anti-pattern checking. Useful for legitimate Result<T> implementation files.
+
+**Example with exclusions:**
+```javascript
+// eslint.config.js
+export default [
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    plugins: { '@qi': qiPlugin },
+    rules: {
+      '@qi/no-result-anti-patterns': ['error', {
+        excludePatterns: ['/lib/base/src/', '/internal/result/']
+      }]
+    }
+  }
+];
+```
+
 #### ❌ Invalid (will be flagged)
 
 ```typescript
 import { Result } from '@qi/base'
 
 function bad(result: Result<string, Error>) {
-  // Direct tag checking
+  // Direct tag checking (binary expressions)
   if (result.tag === 'success') {
     return result.value  // Direct property access
   }
-  
+
+  // Switch statements on tag
+  switch (result.tag) {
+    case 'success': return result.value;
+    case 'failure': return result.error;
+  }
+
+  // Ternary operators with tag
+  const val = result.tag === 'success' ? result.value : null;
+
+  // Logical operators with tag
+  const isOk = result.tag === 'success' && result.value.length > 0;
+
   // Destructuring
   const { tag, value, error } = result
-  
+
   // Direct property access
-  const val = result.value
-  const err = result.error
+  const directVal = result.value;
+  const directErr = result.error;
 }
 ```
 
@@ -165,11 +227,12 @@ For more information about `Result<T>` patterns, see the [QiCore Base tutorial](
 
 ## Detection Status in QiCore
 
-Based on the latest analysis of the `lib/` directory, this plugin will detect **100+ anti-pattern violations** across the codebase:
+Based on the latest analysis with enhanced detection, this plugin will detect **200+ anti-pattern violations** across the codebase:
 
 ### 🚨 **Current Violations Found**
-- **Direct tag checking**: ~52 violations (`.tag === 'success'`) in application code
-- **Direct property access**: ~28 violations (`.value`, `.error`) in application code
+- **Direct tag checking**: ~150+ violations (binary expressions, ternary, logical operators)
+- **Direct property access**: ~50+ violations (`.value`, `.error`)
+- **Switch statements**: ~5+ violations (`switch (result.tag)`)
 - **Destructuring**: 0 violations ✅
 
 ### 📍 **Most Critical Files**
@@ -182,27 +245,27 @@ Based on the latest analysis of the `lib/` directory, this plugin will detect **
 - `lib/base/src/result.ts`: 0 violations (legitimately implements Result<T> patterns)
 - `lib/base/src/async.ts`: 0 violations (legitimately implements async Result<T> helpers)
 
-**Note**: The rule now correctly excludes `lib/base/src/**` files since these contain the legitimate internal implementations of Result<T> combinators like `isSuccess()`, `map()`, `flatMap()`, etc.
+**Note**: This workspace configures the rule with `excludePatterns: ["/lib/base/src/", "/lib/tests/base/"]` to exclude legitimate internal implementations of Result<T> combinators like `isSuccess()`, `map()`, `flatMap()`, etc.
 
-## Known Issues
+## Anti-Pattern Detection Coverage
 
-### ESLint Dependency Compatibility (2025)
+This rule detects the following Result<T> anti-patterns:
 
-There are currently known compatibility issues with `eslint-visitor-keys` in the latest TypeScript-ESLint v8.x and ESLint v9.x versions. This affects testing and runtime usage but not rule compilation.
+### Direct Tag Checking
+- **Binary expressions**: `result.tag === 'success'`, `result.tag !== 'failure'`
+- **Switch statements**: `switch (result.tag) { case 'success': ... }`
+- **Ternary operators**: `result.tag === 'success' ? value : null`
+- **Logical operators**: `result.tag === 'success' && doSomething()`
 
-**Symptoms:**
-- `Cannot find module 'eslint-visitor-keys'` errors
-- Issues with `@typescript-eslint/rule-tester`
+### Direct Property Access
+- **Value access**: `result.value`, `result.error`
+- **Destructuring**: `const { tag, value, error } = result`
 
-**Root Cause:**
-- TypeScript-ESLint v6+ changed how visitor keys are imported
-- Visitor keys can now only be imported from `@typescript-eslint/visitor-keys`
-- Ongoing compatibility challenges between ESLint 9+ and the broader ecosystem
+### Why These Are Anti-Patterns
 
-**Current Status:**
-- Rules compile correctly with TypeScript
-- Will work once the broader ESLint ecosystem resolves visitor-keys dependency conflicts
-- Affects testing primarily, not production usage
+1. **Type safety**: Accessing `result.value` on a failure case causes runtime errors
+2. **Error handling**: Missing exhaustive case handling leads to bugs
+3. **API consistency**: Bypasses the intended functional programming interface
+4. **Maintainability**: Hard to refactor and test compared to `match()` patterns
 
-**Workaround:**
-For now, the rules are properly structured and will function correctly when the dependency issues are resolved in the upstream packages.
+Use the provided combinators (`match`, `map`, `flatMap`, `isSuccess`, `isFailure`) instead for safer, more maintainable code.
