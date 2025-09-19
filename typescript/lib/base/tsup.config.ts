@@ -1,18 +1,18 @@
-import { defineConfig } from 'tsup'
+import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: {
-    index: 'src/index.ts',
+    index: "src/index.ts",
   },
-  format: ['cjs', 'esm'],
+  format: ["cjs", "esm"],
   dts: true, // Generate TypeScript declarations directly
   sourcemap: true,
   clean: true,
   splitting: false,
   minify: true,
-  target: 'es2023',
-  outDir: 'dist',
+  target: "es2023",
+  outDir: "dist",
   external: [],
   bundle: true,
-  tsconfig: './tsconfig.json',
-})
+  tsconfig: "./tsconfig.json",
+});

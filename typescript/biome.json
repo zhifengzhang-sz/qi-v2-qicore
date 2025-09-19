@@ -2,8 +2,8 @@
   "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.json"],
-    "experimentalScannerIgnores": ["dist/**", "coverage/**", "temp/**", "node_modules/**", "*.d.ts"]
+    "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.json"],
+    "ignore": ["dist/**", "coverage/**", "temp/**", "node_modules/**", "*.d.ts"]
   },
   "linter": {
     "enabled": true,

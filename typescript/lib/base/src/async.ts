@@ -5,10 +5,10 @@
  * These extensions eliminate manual Promise/Result unwrapping anti-patterns.
  */
 
-import type { QiError } from './error.js'
-import { create } from './error.js'
-import { success, failure } from './result.js'
-import type { Result } from './result.js'
+import type { QiError } from "./error.js";
+import { create } from "./error.js";
+import { success, failure } from "./result.js";
+import type { Result } from "./result.js";
 
 // ============================================================================
 // Async Transformation Operations
@@ -29,11 +29,11 @@ import type { Result } from './result.js'
  */
 export const flatMapAsync = async <T, U, E>(
   fn: (value: T) => Promise<Result<U, E>>,
-  result: Result<T, E>
+  result: Result<T, E>,
 ): Promise<Result<U, E>> => {
-  if (result.tag === 'failure') return result
-  return await fn(result.value)
-}
+  if (result.tag === "failure") return result;
+  return await fn(result.value);
+};
 
 /**
  * Async version of map with automatic error wrapping
@@ -51,24 +51,24 @@ export const flatMapAsync = async <T, U, E>(
  */
 export const mapAsync = async <T, U, E>(
   fn: (value: T) => Promise<U>,
-  result: Result<T, E>
+  result: Result<T, E>,
 ): Promise<Result<U, E | QiError>> => {
-  if (result.tag === 'failure') return result
+  if (result.tag === "failure") return result;
 
   try {
-    const value = await fn(result.value)
-    return success(value)
+    const value = await fn(result.value);
+    return success(value);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorMessage = error instanceof Error ? error.message : String(error);
     const qiError = create(
-      'ASYNC_MAP_ERROR',
+      "ASYNC_MAP_ERROR",
       `Async map operation failed: ${errorMessage}`,
-      'SYSTEM',
-      { originalError: error }
-    )
-    return failure(qiError)
+      "SYSTEM",
+      { originalError: error },
+    );
+    return failure(qiError);
   }
-}
+};
 
 /**
  * Async version of match for async result handling
@@ -87,10 +87,10 @@ export const mapAsync = async <T, U, E>(
 export const matchAsync = async <T, E, R>(
   onSuccess: (value: T) => Promise<R>,
   onError: (error: E) => Promise<R>,
-  result: Result<T, E>
+  result: Result<T, E>,
 ): Promise<R> => {
-  return result.tag === 'success' ? await onSuccess(result.value) : await onError(result.error)
-}
+  return result.tag === "success" ? await onSuccess(result.value) : await onError(result.error);
+};
 
 // ============================================================================
 // Promise<Result<T>> Composition Operations
@@ -112,14 +112,14 @@ export const matchAsync = async <T, E, R>(
  */
 export const flatMapPromise = async <T, U, E>(
   fn: (value: T) => Result<U, E> | Promise<Result<U, E>>,
-  promiseResult: Promise<Result<T, E>>
+  promiseResult: Promise<Result<T, E>>,
 ): Promise<Result<U, E>> => {
-  const result = await promiseResult
-  if (result.tag === 'failure') return result
+  const result = await promiseResult;
+  if (result.tag === "failure") return result;
 
-  const mapped = fn(result.value)
-  return mapped instanceof Promise ? await mapped : mapped
-}
+  const mapped = fn(result.value);
+  return mapped instanceof Promise ? await mapped : mapped;
+};
 
 /**
  * Map over Promise<Result<T>> with automatic error handling
@@ -137,26 +137,26 @@ export const flatMapPromise = async <T, U, E>(
  */
 export const mapPromise = async <T, U, E>(
   fn: (value: T) => U | Promise<U>,
-  promiseResult: Promise<Result<T, E>>
+  promiseResult: Promise<Result<T, E>>,
 ): Promise<Result<U, E | QiError>> => {
-  const result = await promiseResult
-  if (result.tag === 'failure') return result
+  const result = await promiseResult;
+  if (result.tag === "failure") return result;
 
   try {
-    const mapped = fn(result.value)
-    const value = mapped instanceof Promise ? await mapped : mapped
-    return success(value)
+    const mapped = fn(result.value);
+    const value = mapped instanceof Promise ? await mapped : mapped;
+    return success(value);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorMessage = error instanceof Error ? error.message : String(error);
     const qiError = create(
-      'ASYNC_MAP_PROMISE_ERROR',
+      "ASYNC_MAP_PROMISE_ERROR",
       `Async promise map operation failed: ${errorMessage}`,
-      'SYSTEM',
-      { originalError: error }
-    )
-    return failure(qiError)
+      "SYSTEM",
+      { originalError: error },
+    );
+    return failure(qiError);
   }
-}
+};
 
 /**
  * Match over Promise<Result<T>> with async handlers
@@ -175,11 +175,11 @@ export const mapPromise = async <T, U, E>(
 export const matchPromise = async <T, E, R>(
   onSuccess: (value: T) => Promise<R>,
   onError: (error: E) => Promise<R>,
-  promiseResult: Promise<Result<T, E>>
+  promiseResult: Promise<Result<T, E>>,
 ): Promise<R> => {
-  const result = await promiseResult
-  return result.tag === 'success' ? await onSuccess(result.value) : await onError(result.error)
-}
+  const result = await promiseResult;
+  return result.tag === "success" ? await onSuccess(result.value) : await onError(result.error);
+};
 
 // ============================================================================
 // Async Collection Operations
@@ -202,18 +202,18 @@ export const matchPromise = async <T, E, R>(
  * ```
  */
 export const sequenceAsync = async <T, E>(
-  promises: Promise<Result<T, E>>[]
+  promises: Promise<Result<T, E>>[],
 ): Promise<Result<T[], E>> => {
-  const values: T[] = []
+  const values: T[] = [];
 
   for (const promise of promises) {
-    const result = await promise
-    if (result.tag === 'failure') return result
-    values.push(result.value)
+    const result = await promise;
+    if (result.tag === "failure") return result;
+    values.push(result.value);
   }
 
-  return success(values)
-}
+  return success(values);
+};
 
 /**
  * Collect all async operations, preserving both successes and failures
@@ -231,22 +231,22 @@ export const sequenceAsync = async <T, E>(
  * ```
  */
 export const collectAsync = async <T, E>(
-  promises: Promise<Result<T, E>>[]
+  promises: Promise<Result<T, E>>[],
 ): Promise<{ successes: T[]; failures: E[] }> => {
-  const results = await Promise.all(promises)
-  const successes: T[] = []
-  const failures: E[] = []
+  const results = await Promise.all(promises);
+  const successes: T[] = [];
+  const failures: E[] = [];
 
   for (const result of results) {
-    if (result.tag === 'success') {
-      successes.push(result.value)
+    if (result.tag === "success") {
+      successes.push(result.value);
     } else {
-      failures.push(result.error)
+      failures.push(result.error);
     }
   }
 
-  return { successes, failures }
-}
+  return { successes, failures };
+};
 
 // ============================================================================
 // Type Guards and Utilities
@@ -257,5 +257,5 @@ export const collectAsync = async <T, E>(
  * Useful for conditional async result handling
  */
 export const isPromiseResult = <T, E>(value: unknown): value is Promise<Result<T, E>> => {
-  return value instanceof Promise
-}
+  return value instanceof Promise;
+};

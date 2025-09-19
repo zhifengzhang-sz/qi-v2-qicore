@@ -5,26 +5,26 @@
  * following the behavioral contracts exactly.
  */
 
-import type { QiError } from './error.js'
-import { create } from './error.js'
+import type { QiError } from "./error.js";
+import { create } from "./error.js";
 
 /**
  * Result<T> - Pure discriminated union
  * Contract: Result<T> = Success<T> | Failure<QiError>
  */
 export type Result<T, E = QiError> =
-  | { readonly tag: 'success'; readonly value: T }
-  | { readonly tag: 'failure'; readonly error: E }
+  | { readonly tag: "success"; readonly value: T }
+  | { readonly tag: "failure"; readonly error: E };
 
 /**
  * Success variant type for cleaner type guards
  */
-export type Success<T> = { readonly tag: 'success'; readonly value: T }
+export type Success<T> = { readonly tag: "success"; readonly value: T };
 
 /**
  * Failure variant type for cleaner type guards
  */
-export type Failure<E> = { readonly tag: 'failure'; readonly error: E }
+export type Failure<E> = { readonly tag: "failure"; readonly error: E };
 
 // ============================================================================
 // Factory Operations (Contract Section 1.1)
@@ -35,18 +35,18 @@ export type Failure<E> = { readonly tag: 'failure'; readonly error: E }
  * Contract: success(x).isSuccess() == true
  */
 export const success = <T>(value: T): Result<T, never> => ({
-  tag: 'success',
+  tag: "success",
   value,
-})
+});
 
 /**
  * Create failed Result
  * Contract: failure(e).isFailure() == true
  */
 export const failure = <E>(error: E): Result<never, E> => ({
-  tag: 'failure',
+  tag: "failure",
   error,
-})
+});
 
 /**
  * Create Result from fallible operation
@@ -55,22 +55,22 @@ export const failure = <E>(error: E): Result<never, E> => ({
  */
 export const fromTryCatch = <T>(
   operation: () => T,
-  errorHandler?: (error: unknown) => QiError
+  errorHandler?: (error: unknown) => QiError,
 ): Result<T, QiError> => {
   try {
-    return success(operation())
+    return success(operation());
   } catch (error) {
     if (errorHandler) {
-      return failure(errorHandler(error))
+      return failure(errorHandler(error));
     }
     // Default error handling using create function
     return failure(
-      create('EXCEPTION', error instanceof Error ? error.message : String(error), 'SYSTEM', {
+      create("EXCEPTION", error instanceof Error ? error.message : String(error), "SYSTEM", {
         originalError: error,
-      })
-    )
+      }),
+    );
   }
-}
+};
 
 /**
  * Create Result from async operation
@@ -78,22 +78,22 @@ export const fromTryCatch = <T>(
  */
 export const fromAsyncTryCatch = async <T>(
   operation: () => Promise<T>,
-  errorHandler?: (error: unknown) => QiError
+  errorHandler?: (error: unknown) => QiError,
 ): Promise<Result<T, QiError>> => {
   try {
-    const value = await operation()
-    return success(value)
+    const value = await operation();
+    return success(value);
   } catch (error) {
     if (errorHandler) {
-      return failure(errorHandler(error))
+      return failure(errorHandler(error));
     }
     return failure(
-      create('ASYNC_EXCEPTION', error instanceof Error ? error.message : String(error), 'SYSTEM', {
+      create("ASYNC_EXCEPTION", error instanceof Error ? error.message : String(error), "SYSTEM", {
         originalError: error,
-      })
-    )
+      }),
+    );
   }
-}
+};
 
 /**
  * Create Result from nullable value
@@ -102,20 +102,20 @@ export const fromAsyncTryCatch = async <T>(
  */
 export const fromMaybe = <T>(
   value: T | null | undefined,
-  errorIfNull: QiError
+  errorIfNull: QiError,
 ): Result<T, QiError> => {
-  return value != null ? success(value) : failure(errorIfNull)
-}
+  return value != null ? success(value) : failure(errorIfNull);
+};
 
 /**
  * Convert from Either-like type
  * Contract: preserves left/right semantics
  */
 export const fromEither = <L, R>(
-  either: { tag: 'left'; value: L } | { tag: 'right'; value: R }
+  either: { tag: "left"; value: L } | { tag: "right"; value: R },
 ): Result<R, L> => {
-  return either.tag === 'right' ? success(either.value) : failure(either.value)
-}
+  return either.tag === "right" ? success(either.value) : failure(either.value);
+};
 
 // ============================================================================
 // Query Properties (Contract Section 1.2)
@@ -127,7 +127,7 @@ export const fromEither = <L, R>(
  * Contract: isSuccess(failure(e)) == false
  */
 export const isSuccess = <T, E>(result: Result<T, E>): result is Success<T> =>
-  result.tag === 'success'
+  result.tag === "success";
 
 /**
  * Check if Result is failure
@@ -135,7 +135,7 @@ export const isSuccess = <T, E>(result: Result<T, E>): result is Success<T> =>
  * Contract: isFailure(success(x)) == false
  */
 export const isFailure = <T, E>(result: Result<T, E>): result is Failure<E> =>
-  result.tag === 'failure'
+  result.tag === "failure";
 
 /**
  * Get value or null
@@ -143,7 +143,7 @@ export const isFailure = <T, E>(result: Result<T, E>): result is Failure<E> =>
  * Contract: getValue(failure(e)) == null
  */
 export const getValue = <T, E>(result: Result<T, E>): T | null =>
-  result.tag === 'success' ? result.value : null
+  result.tag === "success" ? result.value : null;
 
 /**
  * Get error or null
@@ -151,7 +151,7 @@ export const getValue = <T, E>(result: Result<T, E>): T | null =>
  * Contract: getError(success(x)) == null
  */
 export const getError = <T, E>(result: Result<T, E>): E | null =>
-  result.tag === 'failure' ? result.error : null
+  result.tag === "failure" ? result.error : null;
 
 // ============================================================================
 // Transformation Operations (Contract Section 1.3)
@@ -165,7 +165,7 @@ export const getError = <T, E>(result: Result<T, E>): E | null =>
  * Contract: map(f)(failure(e)) == failure(e)
  */
 export const map = <T, U, E>(fn: (value: T) => U, result: Result<T, E>): Result<U, E> =>
-  result.tag === 'success' ? success(fn(result.value)) : result
+  result.tag === "success" ? success(fn(result.value)) : result;
 
 /**
  * Map function over error value
@@ -173,7 +173,7 @@ export const map = <T, U, E>(fn: (value: T) => U, result: Result<T, E>): Result<
  * Contract: mapError(f)(failure(e)) == failure(f(e))
  */
 export const mapError = <T, E, F>(fn: (error: E) => F, result: Result<T, E>): Result<T, F> =>
-  result.tag === 'failure' ? failure(fn(result.error)) : result
+  result.tag === "failure" ? failure(fn(result.error)) : result;
 
 /**
  * Monadic bind operation
@@ -184,8 +184,8 @@ export const mapError = <T, E, F>(fn: (error: E) => F, result: Result<T, E>): Re
  */
 export const flatMap = <T, U, E>(
   fn: (value: T) => Result<U, E>,
-  result: Result<T, E>
-): Result<U, E> => (result.tag === 'success' ? fn(result.value) : result)
+  result: Result<T, E>,
+): Result<U, E> => (result.tag === "success" ? fn(result.value) : result);
 
 /**
  * Alias for flatMap with clearer semantics
@@ -193,8 +193,8 @@ export const flatMap = <T, U, E>(
  */
 export const andThen = <T, U, E>(
   fn: (value: T) => Result<U, E>,
-  result: Result<T, E>
-): Result<U, E> => flatMap(fn, result)
+  result: Result<T, E>,
+): Result<U, E> => flatMap(fn, result);
 
 /**
  * Inspect success value without changing it
@@ -202,11 +202,11 @@ export const andThen = <T, U, E>(
  * Contract: inspect(f)(failure(e)) == failure(e) without calling f
  */
 export const inspect = <T, E>(fn: (value: T) => void, result: Result<T, E>): Result<T, E> => {
-  if (result.tag === 'success') {
-    fn(result.value)
+  if (result.tag === "success") {
+    fn(result.value);
   }
-  return result
-}
+  return result;
+};
 
 /**
  * Inspect error value without changing it
@@ -214,11 +214,11 @@ export const inspect = <T, E>(fn: (value: T) => void, result: Result<T, E>): Res
  * Contract: inspectErr(f)(success(x)) == success(x) without calling f
  */
 export const inspectErr = <T, E>(fn: (error: E) => void, result: Result<T, E>): Result<T, E> => {
-  if (result.tag === 'failure') {
-    fn(result.error)
+  if (result.tag === "failure") {
+    fn(result.error);
   }
-  return result
-}
+  return result;
+};
 
 /**
  * Flatten nested Results
@@ -227,7 +227,7 @@ export const inspectErr = <T, E>(fn: (error: E) => void, result: Result<T, E>): 
  * Contract: collect(failure(e)) == failure(e)
  */
 export const collect = <T, E>(result: Result<Result<T, E>, E>): Result<T, E> =>
-  result.tag === 'success' ? result.value : result
+  result.tag === "success" ? result.value : result;
 
 /**
  * Filter success values
@@ -238,13 +238,13 @@ export const collect = <T, E>(result: Result<Result<T, E>, E>): Result<T, E> =>
 export const filter = <T, E>(
   predicate: (value: T) => boolean,
   errorIfFalse: E,
-  result: Result<T, E>
+  result: Result<T, E>,
 ): Result<T, E> => {
-  if (result.tag === 'success') {
-    return predicate(result.value) ? result : failure(errorIfFalse)
+  if (result.tag === "success") {
+    return predicate(result.value) ? result : failure(errorIfFalse);
   }
-  return result
-}
+  return result;
+};
 
 /**
  * Provide alternative for failure case
@@ -253,8 +253,8 @@ export const filter = <T, E>(
  */
 export const orElse = <T, E, F>(
   alternative: (error: E) => Result<T, F>,
-  result: Result<T, E>
-): Result<T, F> => (result.tag === 'failure' ? alternative(result.error) : result)
+  result: Result<T, E>,
+): Result<T, F> => (result.tag === "failure" ? alternative(result.error) : result);
 
 // ============================================================================
 // Extraction Operations (Contract Section 1.4)
@@ -266,11 +266,11 @@ export const orElse = <T, E, F>(
  * Contract: unwrap(failure(e)) throws exception
  */
 export const unwrap = <T, E>(result: Result<T, E>): T => {
-  if (result.tag === 'success') {
-    return result.value
+  if (result.tag === "success") {
+    return result.value;
   }
-  throw new Error(`Called unwrap on failure: ${JSON.stringify(result.error)}`)
-}
+  throw new Error(`Called unwrap on failure: ${JSON.stringify(result.error)}`);
+};
 
 /**
  * Extract value with default
@@ -278,7 +278,7 @@ export const unwrap = <T, E>(result: Result<T, E>): T => {
  * Contract: unwrapOr(default)(failure(e)) == default
  */
 export const unwrapOr = <T, E>(defaultValue: T, result: Result<T, E>): T =>
-  result.tag === 'success' ? result.value : defaultValue
+  result.tag === "success" ? result.value : defaultValue;
 
 /**
  * Pattern matching
@@ -288,12 +288,12 @@ export const unwrapOr = <T, E>(defaultValue: T, result: Result<T, E>): T =>
 export const match = <T, E, R>(
   onSuccess: (value: T) => R,
   onError: (error: E) => R,
-  result: Result<T, E>
+  result: Result<T, E>,
 ): R => {
   switch (result.tag) {
-    case 'success':
-      return onSuccess(result.value)
-    case 'failure':
-      return onError(result.error)
+    case "success":
+      return onSuccess(result.value);
+    case "failure":
+      return onError(result.error);
   }
-}
+};

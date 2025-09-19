@@ -19,6 +19,7 @@
     "clean": "bun rimraf dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check": "bun run typecheck && biome format . && biome lint .",
     "prepublishOnly": "bun run clean && bun run build"
   },
   "keywords": [
