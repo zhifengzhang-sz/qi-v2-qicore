@@ -7,14 +7,21 @@
  * Max-Min principle: 70% packages (zod, yaml, smol-toml, dotenv), 30% custom logic.
  */
 
-import { readFile } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
-import { type Result, type QiError, success, failure, create as createError } from '@qi/base'
-import { config as loadEnv } from 'dotenv'
-import { parse as parseToml } from 'smol-toml'
-import { parse as parseYaml } from 'yaml'
-import { z } from 'zod'
-import { convertJsonSchemaToZod } from 'zod-from-json-schema'
+import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import {
+  type Result,
+  type QiError,
+  success,
+  failure,
+  create as createError,
+  match,
+} from "@qi/base";
+import { config as loadEnv } from "dotenv";
+import { parse as parseToml } from "smol-toml";
+import { parse as parseYaml } from "yaml";
+import { z } from "zod";
+import { convertJsonSchemaToZod } from "zod-from-json-schema";
 
 // ============================================================================
 // Core Types
@@ -23,35 +30,35 @@ import { convertJsonSchemaToZod } from 'zod-from-json-schema'
 /**
  * Configuration data as plain object
  */
-export type ConfigData = Record<string, unknown>
+export type ConfigData = Record<string, unknown>;
 
 /**
  * Configuration source types
  */
-export type ConfigSource = 'object' | 'json' | 'yaml' | 'toml' | 'env'
+export type ConfigSource = "object" | "json" | "yaml" | "toml" | "env";
 
 /**
  * Configuration loading options
  */
 export interface ConfigOptions {
   /** Source type for parsing */
-  source: ConfigSource
+  source: ConfigSource;
   /** Environment variable prefix for env source */
-  envPrefix?: string
+  envPrefix?: string;
   /** Whether to validate against schema */
-  validate?: boolean
+  validate?: boolean;
   /** Schema for validation */
-  schema?: z.ZodType
+  schema?: z.ZodType;
 }
 
 /**
  * Configuration builder state
  */
 interface ConfigBuilderState {
-  readonly data: ConfigData
-  readonly sources: ConfigSource[]
-  readonly schema?: z.ZodType
-  readonly validated: boolean
+  readonly data: ConfigData;
+  readonly sources: ConfigSource[];
+  readonly schema?: z.ZodType;
+  readonly validated: boolean;
 }
 
 // ============================================================================
@@ -62,19 +69,19 @@ interface ConfigBuilderState {
  * Configuration-specific error types
  */
 export type ConfigError = QiError & {
-  readonly category: 'CONFIGURATION'
+  readonly category: "CONFIGURATION";
   readonly context: {
-    readonly source?: ConfigSource
-    readonly path?: string
-    readonly schema?: string
-  }
-}
+    readonly source?: ConfigSource;
+    readonly path?: string;
+    readonly schema?: string;
+  };
+};
 
 /**
  * Create configuration error
  */
-export const configError = (message: string, context: ConfigError['context'] = {}): ConfigError =>
-  createError('CONFIG_ERROR', message, 'CONFIGURATION', context) as ConfigError
+export const configError = (message: string, context: ConfigError["context"] = {}): ConfigError =>
+  createError("CONFIG_ERROR", message, "CONFIGURATION", context) as ConfigError;
 
 // ============================================================================
 // Configuration Builder (Fluent API) - 30% custom logic
@@ -94,54 +101,54 @@ export class ConfigBuilder {
   static fromObject(data: ConfigData): ConfigBuilder {
     return new ConfigBuilder({
       data: { ...data },
-      sources: ['object'],
+      sources: ["object"],
       validated: false,
-    })
+    });
   }
 
   /**
    * Create new configuration builder from JSON file
    */
   static fromJsonFile(path: string): Promise<Result<ConfigBuilder, ConfigError>> {
-    return ConfigBuilder.fromFile(path, { source: 'json' })
+    return ConfigBuilder.fromFile(path, { source: "json" });
   }
 
   /**
    * Create new configuration builder from YAML file (using yaml package)
    */
   static fromYamlFile(path: string): Promise<Result<ConfigBuilder, ConfigError>> {
-    return ConfigBuilder.fromFile(path, { source: 'yaml' })
+    return ConfigBuilder.fromFile(path, { source: "yaml" });
   }
 
   /**
    * Create new configuration builder from TOML file (using smol-toml package)
    */
   static fromTomlFile(path: string): Promise<Result<ConfigBuilder, ConfigError>> {
-    return ConfigBuilder.fromFile(path, { source: 'toml' })
+    return ConfigBuilder.fromFile(path, { source: "toml" });
   }
 
   /**
    * Create new configuration builder from environment variables (using dotenv package)
    */
-  static fromEnv(prefix = ''): ConfigBuilder {
+  static fromEnv(prefix = ""): ConfigBuilder {
     // Use dotenv package to load .env file
-    loadEnv()
-    const data: ConfigData = {}
+    loadEnv();
+    const data: ConfigData = {};
 
-    const prefixFilter = prefix ? `${prefix}_` : ''
+    const prefixFilter = prefix ? `${prefix}_` : "";
 
     for (const [key, value] of Object.entries(process.env)) {
       if (!prefixFilter || key.startsWith(prefixFilter)) {
-        const configKey = prefixFilter ? key.slice(prefixFilter.length) : key
-        data[configKey.toLowerCase()] = value
+        const configKey = prefixFilter ? key.slice(prefixFilter.length) : key;
+        data[configKey.toLowerCase()] = value;
       }
     }
 
     return new ConfigBuilder({
       data,
-      sources: ['env'],
+      sources: ["env"],
       validated: false,
-    })
+    });
   }
 
   /**
@@ -149,57 +156,59 @@ export class ConfigBuilder {
    */
   private static async fromFile(
     path: string,
-    options: ConfigOptions
+    options: ConfigOptions,
   ): Promise<Result<ConfigBuilder, ConfigError>> {
     try {
-      const content = await readFile(path, 'utf-8')
+      const content = await readFile(path, "utf-8");
 
-      let data: ConfigData
+      let data: ConfigData;
 
       switch (options.source) {
-        case 'json':
-          data = JSON.parse(content)
-          break
-        case 'yaml':
+        case "json":
+          data = JSON.parse(content) as Record<string, unknown>;
+          break;
+        case "yaml":
           // Use yaml package for parsing
-          data = parseYaml(content) as ConfigData
-          break
-        case 'toml':
+          data = parseYaml(content) as ConfigData;
+          break;
+        case "toml":
           // Use smol-toml package for parsing
-          data = parseToml(content) as ConfigData
-          break
+          data = parseToml(content) as ConfigData;
+          break;
         default:
           return failure(
             configError(`Unsupported source: ${options.source}`, {
               source: options.source,
               path,
-            })
-          )
+            }),
+          );
       }
 
       const builder = new ConfigBuilder({
         data,
         sources: [options.source],
         validated: false,
-      })
+      });
 
       // Apply schema validation if provided (using zod)
       if (options.validate && options.schema) {
-        const validatedResult = builder.validateWith(options.schema).build()
-        if (validatedResult.tag === 'success') {
-          return success(builder.validateWith(options.schema)) // Return builder for consistency
-        }
-        return validatedResult as Result<ConfigBuilder, ConfigError>
+        const schema = options.schema;
+        const validatedResult = builder.validateWith(schema).build();
+        return match(
+          () => success(builder.validateWith(schema)), // Return builder for consistency
+          (error) => failure(error) as Result<ConfigBuilder, ConfigError>,
+          validatedResult,
+        );
       }
 
-      return success(builder)
+      return success(builder);
     } catch (error) {
       return failure(
-        configError(`Failed to load config from ${path}: ${error}`, {
+        configError(`Failed to load config from ${path}: ${String(error)}`, {
           source: options.source,
           path,
-        })
-      )
+        }),
+      );
     }
   }
 
@@ -213,42 +222,42 @@ export class ConfigBuilder {
       sources: [...this.state.sources, ...other.state.sources],
       schema: this.state.schema || other.state.schema,
       validated: false, // Need to revalidate after merge
-    })
+    });
   }
 
   /**
    * Merge with plain object (fluent)
    */
   mergeObject(data: ConfigData): ConfigBuilder {
-    return this.merge(ConfigBuilder.fromObject(data))
+    return this.merge(ConfigBuilder.fromObject(data));
   }
 
   /**
    * Set nested value using dot notation (fluent)
    */
   set(path: string, value: unknown): ConfigBuilder {
-    const keys = path.split('.')
-    const newData = { ...this.state.data }
+    const keys = path.split(".");
+    const newData = { ...this.state.data };
 
-    let current = newData
+    let current = newData;
     for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i]
-      if (!key) continue
-      if (typeof current[key] !== 'object' || current[key] === null) {
-        current[key] = {}
+      const key = keys[i];
+      if (!key) continue;
+      if (typeof current[key] !== "object" || current[key] === null) {
+        current[key] = {};
       }
-      current = current[key] as Record<string, unknown>
+      current = current[key] as Record<string, unknown>;
     }
 
-    const lastKey = keys[keys.length - 1]
-    if (!lastKey) return this
-    current[lastKey] = value
+    const lastKey = keys[keys.length - 1];
+    if (!lastKey) return this;
+    current[lastKey] = value;
 
     return new ConfigBuilder({
       ...this.state,
       data: newData,
       validated: false,
-    })
+    });
   }
 
   /**
@@ -259,7 +268,7 @@ export class ConfigBuilder {
       ...this.state,
       schema,
       validated: false,
-    })
+    });
   }
 
   /**
@@ -270,7 +279,7 @@ export class ConfigBuilder {
       ...this.state,
       data: fn(this.state.data) as ConfigData,
       validated: false,
-    })
+    });
   }
 
   /**
@@ -278,14 +287,14 @@ export class ConfigBuilder {
    */
   filter(predicate: (key: string, value: unknown) => boolean): ConfigBuilder {
     const filtered = Object.fromEntries(
-      Object.entries(this.state.data).filter(([key, value]) => predicate(key, value))
-    )
+      Object.entries(this.state.data).filter(([key, value]) => predicate(key, value)),
+    );
 
     return new ConfigBuilder({
       ...this.state,
       data: filtered,
       validated: false,
-    })
+    });
   }
 
   /**
@@ -293,18 +302,18 @@ export class ConfigBuilder {
    */
   validateWithSchemaFile(schemaPath: string): Result<ConfigBuilder, ConfigError> {
     try {
-      const schemaContent = readFileSync(schemaPath, 'utf-8')
-      const jsonSchema = JSON.parse(schemaContent)
-      const zodSchema = convertJsonSchemaToZod(jsonSchema) as z.ZodType
+      const schemaContent = readFileSync(schemaPath, "utf-8");
+      const jsonSchema = JSON.parse(schemaContent) as Record<string, unknown>;
+      const zodSchema = convertJsonSchemaToZod(jsonSchema);
 
-      return success(this.validateWith(zodSchema))
+      return success(this.validateWith(zodSchema));
     } catch (error) {
       return failure(
         configError(
-          `Failed to load schema from ${schemaPath}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          { path: schemaPath }
-        )
-      )
+          `Failed to load schema from ${schemaPath}: ${error instanceof Error ? error.message : "Unknown error"}`,
+          { path: schemaPath },
+        ),
+      );
     }
   }
 
@@ -314,14 +323,14 @@ export class ConfigBuilder {
   build(): Result<Config, ConfigError> {
     // Apply schema validation if configured (using zod package)
     if (this.state.schema) {
-      const validation = this.state.schema.safeParse(this.state.data)
+      const validation = this.state.schema.safeParse(this.state.data);
 
       if (!validation.success) {
         return failure(
-          configError('Schema validation failed', {
+          configError("Schema validation failed", {
             schema: this.state.schema.constructor.name,
-          })
-        )
+          }),
+        );
       }
 
       return success(
@@ -329,35 +338,37 @@ export class ConfigBuilder {
           ...this.state,
           data: validation.data as ConfigData,
           validated: true,
-        })
-      )
+        }),
+      );
     }
 
     return success(
       new Config({
         ...this.state,
         validated: false, // Only set to true if schema validation was successful
-      })
-    )
+      }),
+    );
   }
 
   /**
    * Build ValidatedConfig with validation (throws on invalid config)
    */
   buildValidated(): Result<ValidatedConfig, ConfigError> {
-    const buildResult = this.build()
-    if (buildResult.tag === 'failure') {
-      return buildResult
-    }
-
-    const config = buildResult.value
-    if (!config.isValidated()) {
-      return failure(
-        configError('Configuration must be validated before creating ValidatedConfig', {})
-      )
-    }
-
-    return success(new ValidatedConfig(config))
+    const buildResult = this.build();
+    return match(
+      (config) => {
+        if (!config.isValidated()) {
+          return failure(
+            configError("Configuration must be validated before safe build", {
+              code: "VALIDATION_REQUIRED",
+            }),
+          );
+        }
+        return success(new ValidatedConfig(config));
+      },
+      (error) => failure(error),
+      buildResult,
+    );
   }
 
   /**
@@ -367,50 +378,50 @@ export class ConfigBuilder {
     return new Config({
       ...this.state,
       validated: false,
-    })
+    });
   }
 
   /**
    * Get current data (for inspection)
    */
   getData(): ConfigData {
-    return { ...this.state.data }
+    return { ...this.state.data };
   }
 
   /**
    * Get sources (for inspection)
    */
   getSources(): ConfigSource[] {
-    return [...this.state.sources]
+    return [...this.state.sources];
   }
 
   /**
    * Deep merge two configuration objects
    */
   private deepMerge(target: ConfigData, source: ConfigData): ConfigData {
-    const result = { ...target }
+    const result = { ...target };
 
     for (const key in source) {
-      const sourceValue = source[key]
-      const targetValue = result[key]
+      const sourceValue = source[key];
+      const targetValue = result[key];
 
       if (
         sourceValue !== null &&
-        typeof sourceValue === 'object' &&
+        typeof sourceValue === "object" &&
         !Array.isArray(sourceValue) &&
         targetValue !== null &&
-        typeof targetValue === 'object' &&
+        typeof targetValue === "object" &&
         !Array.isArray(targetValue)
       ) {
         // Both are objects, merge recursively
-        result[key] = this.deepMerge(targetValue as ConfigData, sourceValue as ConfigData)
+        result[key] = this.deepMerge(targetValue as ConfigData, sourceValue as ConfigData);
       } else {
         // Override with source value (primitives, arrays, or null)
-        result[key] = sourceValue
+        result[key] = sourceValue;
       }
     }
 
-    return result
+    return result;
   }
 }
 
@@ -428,88 +439,96 @@ export class Config {
    * Get configuration value by path
    */
   get<T = unknown>(path: string): Result<T, ConfigError> {
-    const keys = path.split('.')
-    let current: unknown = this.state.data
+    const keys = path.split(".");
+    let current: unknown = this.state.data;
 
     for (const key of keys) {
-      if (typeof current !== 'object' || current === null || !(key in current)) {
-        return failure(configError(`Configuration path not found: ${path}`, { path }))
+      if (typeof current !== "object" || current === null || !(key in current)) {
+        return failure(configError(`Configuration path not found: ${path}`, { path }));
       }
-      current = (current as Record<string, unknown>)[key]
+      current = (current as Record<string, unknown>)[key];
     }
 
-    return success(current as T)
+    return success(current as T);
   }
 
   /**
    * Get configuration value with default
    */
   getOr<T>(path: string, defaultValue: T): T {
-    const result = this.get<T>(path)
-    return result.tag === 'success' ? result.value : defaultValue
+    const result = this.get<T>(path);
+    return match(
+      (value) => value,
+      () => defaultValue,
+      result,
+    );
   }
 
   /**
    * Check if path exists
    */
   has(path: string): boolean {
-    return this.get(path).tag === 'success'
+    return match(
+      () => true,
+      () => false,
+      this.get(path),
+    );
   }
 
   /**
    * Get all configuration data
    */
   getAll(): ConfigData {
-    return { ...this.state.data }
+    return { ...this.state.data };
   }
 
   /**
    * Get configuration sources
    */
   getSources(): ConfigSource[] {
-    return [...this.state.sources]
+    return [...this.state.sources];
   }
 
   /**
    * Check if configuration was validated
    */
   isValidated(): boolean {
-    return this.state.validated
+    return this.state.validated;
   }
 
   /**
    * Get schema if present
    */
   getSchema(): z.ZodType | undefined {
-    return this.state.schema
+    return this.state.schema;
   }
 
   /**
    * Convert to builder for further modification
    */
   toBuilder(): ConfigBuilder {
-    return ConfigBuilder.fromObject(this.state.data)
+    return ConfigBuilder.fromObject(this.state.data);
   }
 
   /**
    * Merge with another configuration (immutable)
    */
   merge(other: Config): Config {
-    return this.toBuilder().merge(other.toBuilder()).buildUnsafe()
+    return this.toBuilder().merge(other.toBuilder()).buildUnsafe();
   }
 
   /**
    * Serialize to JSON
    */
   toJson(): string {
-    return JSON.stringify(this.state.data, null, 2)
+    return JSON.stringify(this.state.data, null, 2);
   }
 
   /**
    * Get as plain object
    */
   toObject(): ConfigData {
-    return this.getAll()
+    return this.getAll();
   }
 }
 
@@ -523,10 +542,10 @@ export class Config {
 export class ConfigAccessError extends Error {
   constructor(
     message: string,
-    public readonly path: string
+    public readonly path: string,
   ) {
-    super(message)
-    this.name = 'ConfigAccessError'
+    super(message);
+    this.name = "ConfigAccessError";
   }
 }
 
@@ -549,11 +568,14 @@ export class ValidatedConfig {
    * Throws ConfigAccessError if the path is not found.
    */
   get<T = unknown>(path: string): T {
-    const result = this.config.get<T>(path)
-    if (result.tag === 'failure') {
-      throw new ConfigAccessError(`Configuration path not found: ${path}`, path)
-    }
-    return result.value
+    const result = this.config.get<T>(path);
+    return match(
+      (value) => value,
+      () => {
+        throw new ConfigAccessError(`Configuration path not found: ${path}`, path);
+      },
+      result,
+    );
   }
 
   /**
@@ -562,8 +584,12 @@ export class ValidatedConfig {
    * Use this for optional configuration values.
    */
   getOptional<T = unknown>(path: string): T | undefined {
-    const result = this.config.get<T>(path)
-    return result.tag === 'success' ? result.value : undefined
+    const result = this.config.get<T>(path);
+    return match(
+      (value) => value,
+      () => undefined,
+      result,
+    );
   }
 
   /**
@@ -572,64 +598,64 @@ export class ValidatedConfig {
    * Use this when you want a safe fallback value.
    */
   getOr<T>(path: string, defaultValue: T): T {
-    return this.config.getOr(path, defaultValue)
+    return this.config.getOr(path, defaultValue);
   }
 
   /**
    * Check if path exists in configuration
    */
   has(path: string): boolean {
-    return this.config.has(path)
+    return this.config.has(path);
   }
 
   /**
    * Get all configuration data as plain object
    */
   getAll(): ConfigData {
-    return this.config.getAll()
+    return this.config.getAll();
   }
 
   /**
    * Get configuration sources used to build this config
    */
   getSources(): ConfigSource[] {
-    return this.config.getSources()
+    return this.config.getSources();
   }
 
   /**
    * Get the schema used for validation
    */
   getSchema(): z.ZodType | undefined {
-    return this.config.getSchema()
+    return this.config.getSchema();
   }
 
   /**
    * Convert back to regular Config for Result-based access
    */
   toConfig(): Config {
-    return this.config
+    return this.config;
   }
 
   /**
    * Merge with another ValidatedConfig (creates new ValidatedConfig)
    */
   merge(other: ValidatedConfig): ValidatedConfig {
-    const mergedConfig = this.config.merge(other.config)
-    return new ValidatedConfig(mergedConfig)
+    const mergedConfig = this.config.merge(other.config);
+    return new ValidatedConfig(mergedConfig);
   }
 
   /**
    * Serialize to JSON string
    */
   toJson(): string {
-    return this.config.toJson()
+    return this.config.toJson();
   }
 
   /**
    * Get as plain object
    */
   toObject(): ConfigData {
-    return this.config.toObject()
+    return this.config.toObject();
   }
 }
 
@@ -640,41 +666,54 @@ export class ValidatedConfig {
 /**
  * Create configuration from object
  */
-export const fromObject = (data: ConfigData): Config => ConfigBuilder.fromObject(data).buildUnsafe()
+export const fromObject = (data: ConfigData): Config =>
+  ConfigBuilder.fromObject(data).buildUnsafe();
 
 /**
  * Create configuration from JSON file
  */
 export const fromJsonFile = (path: string): Promise<Result<Config, ConfigError>> =>
   ConfigBuilder.fromJsonFile(path).then((result) =>
-    result.tag === 'success' ? result.value.build() : result
-  )
+    match(
+      (builder) => builder.build(),
+      (error) => failure(error),
+      result,
+    ),
+  );
 
 /**
  * Create configuration from YAML file (using yaml package)
  */
 export const fromYamlFile = (path: string): Promise<Result<Config, ConfigError>> =>
   ConfigBuilder.fromYamlFile(path).then((result) =>
-    result.tag === 'success' ? result.value.build() : result
-  )
+    match(
+      (builder) => builder.build(),
+      (error) => failure(error),
+      result,
+    ),
+  );
 
 /**
  * Create configuration from TOML file (using smol-toml package)
  */
 export const fromTomlFile = (path: string): Promise<Result<Config, ConfigError>> =>
   ConfigBuilder.fromTomlFile(path).then((result) =>
-    result.tag === 'success' ? result.value.build() : result
-  )
+    match(
+      (builder) => builder.build(),
+      (error) => failure(error),
+      result,
+    ),
+  );
 
 /**
  * Create configuration from environment variables (using dotenv package)
  */
-export const fromEnv = (prefix = ''): Config => ConfigBuilder.fromEnv(prefix).buildUnsafe()
+export const fromEnv = (prefix = ""): Config => ConfigBuilder.fromEnv(prefix).buildUnsafe();
 
 /**
  * Create empty configuration
  */
-export const empty = (): Config => ConfigBuilder.fromObject({}).buildUnsafe()
+export const empty = (): Config => ConfigBuilder.fromObject({}).buildUnsafe();
 
 // ============================================================================
 // Schema Validation Utilities (70% zod package)
@@ -684,52 +723,52 @@ export const empty = (): Config => ConfigBuilder.fromObject({}).buildUnsafe()
  * Validate configuration against Zod schema
  */
 export const validateConfig = <T>(config: Config, schema: z.ZodType<T>): Result<T, ConfigError> => {
-  const validation = schema.safeParse(config.getAll())
+  const validation = schema.safeParse(config.getAll());
 
   if (!validation.success) {
     return failure(
-      configError('Configuration validation failed', {
+      configError("Configuration validation failed", {
         schema: schema.constructor.name,
         context: {
           errors: validation.error.issues.map((err) => ({
-            path: err.path.join('.'),
+            path: err.path.join("."),
             message: err.message,
             code: err.code,
           })),
         },
-      })
-    )
+      }),
+    );
   }
 
-  return success(validation.data as T)
-}
+  return success(validation.data);
+};
 
 /**
  * Safe parse with detailed error information (using zod)
  */
 export const safeParseConfig = <T>(
   data: ConfigData,
-  schema: z.ZodType<T>
+  schema: z.ZodType<T>,
 ): Result<T, ConfigError> => {
-  const validation = schema.safeParse(data)
+  const validation = schema.safeParse(data);
 
   if (!validation.success) {
     return failure(
-      configError('Schema parsing failed', {
+      configError("Schema parsing failed", {
         schema: schema.constructor.name,
         context: {
           errors: validation.error.issues.map((err) => ({
-            path: err.path.join('.'),
+            path: err.path.join("."),
             message: err.message,
             code: err.code,
           })),
         },
-      })
-    )
+      }),
+    );
   }
 
-  return success(validation.data as T)
-}
+  return success(validation.data);
+};
 
 // ============================================================================
 // Common Schema Patterns (70% zod package)
@@ -742,9 +781,9 @@ export const AppConfigSchema = z.object({
   app: z.object({
     name: z.string(),
     version: z.string(),
-    environment: z.enum(['development', 'production', 'test']).default('development'),
+    environment: z.enum(["development", "production", "test"]).default("development"),
     port: z.coerce.number().default(3000),
-    host: z.string().default('localhost'),
+    host: z.string().default("localhost"),
   }),
   database: z
     .object({
@@ -757,17 +796,17 @@ export const AppConfigSchema = z.object({
     .optional(),
   redis: z
     .object({
-      host: z.string().default('localhost'),
+      host: z.string().default("localhost"),
       port: z.coerce.number().default(6379),
       password: z.string().optional(),
     })
     .optional(),
   logging: z
     .object({
-      level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+      level: z.enum(["debug", "info", "warn", "error"]).default("info"),
       pretty: z.coerce.boolean().default(false),
     })
     .optional(),
-})
+});
 
-export type AppConfig = z.infer<typeof AppConfigSchema>
+export type AppConfig = z.infer<typeof AppConfigSchema>;

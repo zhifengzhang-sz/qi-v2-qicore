@@ -1,0 +1,9 @@
+app:
+  name: test-app-yaml
+  version: 2.0.0
+  port: 4000
+database:
+  host: yaml-host
+  port: 5433
+  name: yamldb
+test: yaml-value
