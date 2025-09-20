@@ -48,13 +48,13 @@ class ConfigBuilder {
   validateWith<T>(schema: ZodSchema<T>): ConfigBuilder
   transform<T>(fn: (data: ConfigData) => T): ConfigBuilder
   filter(predicate: (key: string, value: unknown) => boolean): ConfigBuilder
-  validateWithSchemaFile(schemaPath: string): ConfigBuilder
+  validateWithSchemaFile(schemaPath: string): Result<ConfigBuilder, ConfigError>
   
   // Build methods
   build(): Result<Config, ConfigError>
   buildValidated(): Result<ValidatedConfig, ConfigError>
   buildUnsafe(): Config
-  
+
   // Inspection methods
   getData(): ConfigData
   getSources(): ConfigSource[]
@@ -75,7 +75,7 @@ class Config {
   toObject(): ConfigData
   toJson(): string
   merge(other: Config): Config
-  
+
   // Additional methods
   getSources(): ConfigSource[]
   getSchema(): ZodSchema<unknown> | undefined
@@ -94,9 +94,10 @@ class ValidatedConfig {
   getOptional<T>(path: string): T | undefined
   getOr<T>(path: string, defaultValue: T): T
   has(path: string): boolean
-  
+
   // Data access
   getAll(): ConfigData
+  toObject(): ConfigData
   getSources(): ConfigSource[]
   getSchema(): ZodSchema<unknown> | undefined
   

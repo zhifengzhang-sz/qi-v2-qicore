@@ -3,7 +3,6 @@
  * Focus: Law, Interfaces, Behavior using Result<T> patterns
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { match, failure } from "@qi/base";

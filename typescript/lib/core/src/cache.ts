@@ -101,21 +101,6 @@ export type CacheError = QiError & {
 export const cacheError = (message: string, context: CacheError["context"] = {}): CacheError =>
   createError("CACHE_ERROR", message, "RESOURCE", context) as CacheError;
 
-/**
- * Cache-specific async try-catch wrapper that returns CacheError
- */
-const fromCacheAsyncTryCatch = async <T>(
-  operation: () => Promise<T>,
-  errorMapper: (error: unknown) => CacheError,
-): Promise<Result<T, CacheError>> => {
-  try {
-    const result = await operation();
-    return success(result);
-  } catch (error) {
-    return failure(errorMapper(error));
-  }
-};
-
 // ============================================================================
 // Cache Interface
 // ============================================================================
@@ -141,7 +126,7 @@ export interface ICache {
     ttl?: number,
   ): Promise<Result<T, CacheError>>;
   getStats(): CacheStats;
-  close(): Promise<Result<void, CacheError>>;
+  close(): Promise<void>;
 }
 
 // ============================================================================
@@ -431,20 +416,14 @@ export class MemoryCache implements ICache {
     return { ...this.stats };
   }
 
-  async close(): Promise<Result<void, CacheError>> {
-    return fromCacheAsyncTryCatch(
-      async () => {
-        this.entries.clear();
-        this.events.removeAllListeners();
-        await Promise.resolve();
-      },
-      (error) =>
-        cacheError("Failed to close memory cache", {
-          operation: "close",
-          backend: "memory",
-          error: error instanceof Error ? error.message : String(error),
-        }),
-    );
+  close(): Promise<void> {
+    try {
+      this.entries.clear();
+      this.events.removeAllListeners();
+    } catch {
+      // Cleanup operations should be resilient - ignore errors
+    }
+    return Promise.resolve();
   }
 
   private updateAccessOrder(key: string, operation: "add" | "access" | "remove"): void {
@@ -699,19 +678,17 @@ export class RedisCache implements ICache {
     return { ...this.stats };
   }
 
-  async close(): Promise<Result<void, CacheError>> {
-    return fromCacheAsyncTryCatch(
-      async () => {
-        await this.redis.quit();
-        this.events.removeAllListeners();
-      },
-      (error) =>
-        cacheError("Failed to close Redis cache", {
-          operation: "close",
-          backend: "redis",
-          error: error instanceof Error ? error.message : String(error),
-        }),
-    );
+  async close(): Promise<void> {
+    try {
+      // Close Redis connection using ioredis built-in method
+      await this.redis.quit();
+      this.events.removeAllListeners();
+    } catch {
+      // Cleanup operations should be resilient - ignore errors
+      // Force disconnect if quit fails
+      this.redis.disconnect();
+      this.events.removeAllListeners();
+    }
   }
 
   // Redis-specific methods leveraging ioredis capabilities
