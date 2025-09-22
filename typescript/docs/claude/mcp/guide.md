@@ -68,34 +68,44 @@ docker --version        # Any recent version
 uv --version           # Install if missing
 
 # Check Docker services
-docker ps | grep -E "(timescale|qdrant|redis)"
+docker ps | grep -E "(timescale|qdrant|redis|chromadb)"
 ```
 
 ### Environment Setup
 
 ```bash
-# Add to ~/.zshrc
+# Add to ~/.zshrc (or ~/.bashrc for Bash users)
 cat >> ~/.zshrc << 'EOF'
 
 # Claude MCP Configuration
 export PATH="$HOME/.cargo/bin:$PATH"
 export DATABASE_URL="postgresql://postgres:password@localhost:5432/cryptodb"
-export CHROMA_PATH="/home/zzhang/.chromadb"
-export CHROMA_PERSIST_DIRECTORY="/home/zzhang/.chromadb/data"
+export CHROMA_URL="http://localhost:8000"
 export QDRANT_URL="http://localhost:6333"
 export GITHUB_PERSONAL_ACCESS_TOKEN="your-github-token-here"
 export BRAVE_API_KEY="your-brave-api-key-here"
-export ALLOWED_DIRECTORIES="/home/zzhang/dev,/home/zzhang/dev/qi,/home/zzhang/.claude"
+export ALLOWED_DIRECTORIES="$HOME/dev,$HOME/projects,$HOME/.claude"
 
 EOF
 
-# Reload
+# Reload configuration
 source ~/.zshrc
 ```
+
+**Note**: Customize `ALLOWED_DIRECTORIES` to match your actual development directories. Common examples:
+- `$HOME/dev,$HOME/projects,$HOME/workspace,$HOME/.claude`
+- `$HOME/code,$HOME/repositories,$HOME/.claude`
+- `/workspace,$HOME/dev,$HOME/.claude` (for Docker dev environments)
 
 ### Database Setup
 
 ```bash
+# Start Docker services (if not already running)
+docker-compose up -d timescaledb qdrant chromadb redis
+
+# Wait for services to be healthy
+sleep 10
+
 # TimescaleDB schemas
 psql "postgresql://postgres:password@localhost:5432/cryptodb" << 'EOF'
 CREATE SCHEMA IF NOT EXISTS mcp_core;
@@ -153,9 +163,8 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA mcp_filesystem TO postgres;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA mcp_docker TO postgres;
 EOF
 
-# ChromaDB directories
-mkdir -p ~/.chromadb/{data,collections}
-chmod 755 ~/.chromadb ~/.chromadb/data
+# Verify ChromaDB is accessible
+curl -f http://localhost:8000/api/v1/heartbeat && echo "✓ ChromaDB ready"
 ```
 
 ### MCP Server Installation
@@ -169,7 +178,7 @@ claude mcp add-json --scope user "memory" '{"command":"npx","args":["-y","mcp-me
 
 # Vector Databases
 claude mcp add-json --scope user "qdrant" '{"command":"uvx","args":["mcp-server-qdrant"],"env":{"QDRANT_URL":"http://localhost:6333","COLLECTION_NAME":"mcp-memories","EMBEDDING_MODEL":"sentence-transformers/all-MiniLM-L6-v2"}}'
-claude mcp add-json --scope user "chromadb" '{"command":"npx","args":["-y","chroma-mcp-server"],"env":{"CHROMA_PATH":"/home/zzhang/.chromadb","CHROMA_PERSIST_DIRECTORY":"/home/zzhang/.chromadb/data"}}'
+claude mcp add-json --scope user "chromadb" '{"command":"npx","args":["-y","chroma-mcp-server"],"env":{"CHROMA_URL":"http://localhost:8000"}}'
 
 # External Services
 claude mcp add-json --scope user "brave-search" '{"command":"npx","args":["-y","@brave/brave-search-mcp-server"],"env":{"BRAVE_API_KEY":"your-brave-api-key-here"}}'
@@ -177,7 +186,7 @@ claude mcp add-json --scope user "context7" '{"command":"npx","args":["-y","@ups
 
 # Development Tools
 claude mcp add-json --scope user "github" '{"command":"npx","args":["-y","@modelcontextprotocol/server-github"],"env":{"GITHUB_PERSONAL_ACCESS_TOKEN":"your-github-token-here","DATABASE_URL":"postgresql://postgres:password@localhost:5432/cryptodb"}}'
-claude mcp add-json --scope user "filesystem" '{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem"],"env":{"ALLOWED_DIRECTORIES":"/home/zzhang/dev,/home/zzhang/dev/qi,/home/zzhang/.claude","DATABASE_URL":"postgresql://postgres:password@localhost:5432/cryptodb"}}'
+claude mcp add-json --scope user "filesystem" '{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem"],"env":{"ALLOWED_DIRECTORIES":"$HOME/dev,$HOME/projects,$HOME/.claude","DATABASE_URL":"postgresql://postgres:password@localhost:5432/cryptodb"}}'
 claude mcp add-json --scope user "docker" '{"command":"npx","args":["-y","@modelcontextprotocol/server-docker"],"env":{"DATABASE_URL":"postgresql://postgres:password@localhost:5432/cryptodb"}}'
 
 # Database Operations

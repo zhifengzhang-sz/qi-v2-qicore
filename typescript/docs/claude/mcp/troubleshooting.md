@@ -9,10 +9,11 @@ which uv uvx npm node python3
 echo -e "\n=== Environment ==="
 echo "DATABASE_URL: ${DATABASE_URL:0:30}..."
 echo "QDRANT_URL: $QDRANT_URL"
-echo "CHROMA_PATH: $CHROMA_PATH"
+echo "CHROMA_URL: $CHROMA_URL"
 echo -e "\n=== Services ==="
 docker ps --filter "name=qicore"
 curl -s http://localhost:6333/health && echo "✓ Qdrant OK" || echo "✗ Qdrant Failed"
+curl -s http://localhost:8000/api/v1/heartbeat && echo "✓ ChromaDB OK" || echo "✗ ChromaDB Failed"
 psql "$DATABASE_URL" -c "SELECT 1;" 2>/dev/null && echo "✓ PostgreSQL OK" || echo "✗ PostgreSQL Failed"
 echo -e "\n=== MCP Servers ==="
 claude mcp list
@@ -94,20 +95,26 @@ pkill -f claude
 claude
 ```
 
-### 5. ChromaDB Permission Errors
+### 5. ChromaDB Connection Errors
 
-**Problem**: "Permission denied" when accessing ~/.chromadb/
+**Problem**: "Connection refused" when accessing ChromaDB service
 
 **Solutions**:
 ```bash
-# Fix ownership and permissions
-sudo chown -R $(whoami):$(whoami) ~/.chromadb/
-chmod -R 755 ~/.chromadb/
+# Check ChromaDB container status
+docker ps | grep chromadb
 
-# Recreate directories if needed
-rm -rf ~/.chromadb/data/*
-mkdir -p ~/.chromadb/{data,collections}
-chmod 755 ~/.chromadb ~/.chromadb/data
+# Check ChromaDB health
+curl -f http://localhost:8000/api/v1/heartbeat
+
+# Restart ChromaDB container
+docker restart qicore-chromadb
+
+# Check ChromaDB logs
+docker logs qicore-chromadb --tail 20
+
+# Test ChromaDB API
+curl -X GET "http://localhost:8000/api/v1/collections"
 ```
 
 ### 6. GitHub/Brave Search API Errors
@@ -123,7 +130,7 @@ env | grep -E "(GITHUB|BRAVE)"
 export GITHUB_PERSONAL_ACCESS_TOKEN="your-token-here"
 export BRAVE_API_KEY="your-key-here"
 
-# Add to ~/.zshrc for persistence
+# Add to ~/.zshrc (or ~/.bashrc for Bash users) for persistence
 echo 'export GITHUB_PERSONAL_ACCESS_TOKEN="your-token"' >> ~/.zshrc
 echo 'export BRAVE_API_KEY="your-key"' >> ~/.zshrc
 source ~/.zshrc
@@ -205,7 +212,7 @@ df -h
 du -sh ~/.chromadb/ ~/.claude/
 
 # Restart services to free memory
-docker restart qicore-timescaledb qicore-qdrant
+docker restart qicore-timescaledb qicore-qdrant qicore-chromadb
 ```
 
 ## Recovery Procedures
@@ -223,12 +230,11 @@ npm cache clean --force
 pip cache purge 2>/dev/null || true
 
 # 3. Restart Docker services
-docker restart qicore-timescaledb qicore-qdrant qicore-redis
+docker restart qicore-timescaledb qicore-qdrant qicore-chromadb qicore-redis
 
-# 4. Reset ChromaDB
-rm -rf ~/.chromadb/data/*
-mkdir -p ~/.chromadb/{data,collections}
-chmod 755 ~/.chromadb ~/.chromadb/data
+# 4. Reset ChromaDB (if needed)
+docker exec qicore-chromadb rm -rf /chroma/chroma/*
+docker restart qicore-chromadb
 
 # 5. Reinstall everything
 # Follow installation commands from guide.md
@@ -273,8 +279,8 @@ psql "$DATABASE_URL" -c "\dt mcp_*.*"  # List MCP tables
 psql "$DATABASE_URL" -c "SELECT schemaname FROM pg_tables WHERE schemaname LIKE 'mcp_%';"
 
 # ChromaDB debugging
-ls -la ~/.chromadb/data/
-python3 -c "import chromadb; client = chromadb.PersistentClient(path='~/.chromadb/data'); print([c.name for c in client.list_collections()])"
+curl -X GET "http://localhost:8000/api/v1/collections"
+docker exec qicore-chromadb ls -la /chroma/chroma/
 
 # Qdrant debugging
 curl -X GET "http://localhost:6333/collections"
@@ -324,7 +330,7 @@ free -h
 
 echo -e "\n💾 Disk Usage:"
 df -h | grep -E "(/$|home)"
-echo "ChromaDB: $(du -sh ~/.chromadb/ 2>/dev/null | cut -f1)"
+echo "ChromaDB: $(docker exec qicore-chromadb du -sh /chroma/chroma/ 2>/dev/null | cut -f1)"
 
 echo -e "\n🐳 Container Status:"
 docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
